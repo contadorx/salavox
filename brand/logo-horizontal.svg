@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" width="240" height="64" role="img" aria-label="Salavox">
+  <rect width="64" height="64" rx="15" fill="#2F6F66"/>
+  <g fill="#fff">
+    <rect x="15" y="28" width="5" height="8"  rx="2.5"/>
+    <rect x="24" y="21" width="5" height="22" rx="2.5"/>
+    <rect x="33" y="17" width="5" height="30" rx="2.5" fill="#D09A5E"/>
+    <rect x="42" y="24" width="5" height="16" rx="2.5"/>
+  </g>
+  <text x="80" y="41.5" font-family="Inter,'Segoe UI',system-ui,-apple-system,Helvetica,Arial,sans-serif"
+        font-size="27" letter-spacing="-0.7">
+    <tspan fill="#1F1E1C" font-weight="450">Sala</tspan><tspan fill="#2F6F66" font-weight="680">vox</tspan>
+  </text>
+</svg>

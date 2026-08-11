@@ -44,7 +44,29 @@
     };
   }
 
+  /* ============================================================
+     Consentimento. A responsabilidade de avisar os participantes é
+     de quem grava — a ferramenta não tem como verificar isso, então
+     ao menos obriga a confirmação explícita e oferece o texto pronto.
+     ============================================================ */
+  const AVISO = 'Aviso a todos: estou gravando esta reunião para gerar a ata. ' +
+    'A gravação e a transcrição ficam no meu computador e não são enviadas a nenhum serviço externo. ' +
+    'Quem preferir que não seja gravado, por favor diga agora.';
+
+  $('okConsent').onchange = () => { $('rec').disabled = !$('okConsent').checked; };
+
+  $('copiarAviso').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(AVISO);
+      $('avisoMsg').innerHTML = '<span class="ok">aviso copiado</span>';
+    } catch (e) {
+      $('avisoMsg').textContent = AVISO;
+    }
+    setTimeout(() => { $('avisoMsg').textContent = ''; }, 4000);
+  };
+
   $('rec').onclick = async () => {
+    if (!$('okConsent').checked) return;
     if (!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia && window.MediaRecorder)) {
       $('recMsg').innerHTML = '<span class="err">Este navegador não grava a tela. Use Chrome ou Edge no computador.</span>';
       return;
@@ -317,6 +339,55 @@
              `<v ${f.quem === 'voce' ? 'Você' : 'Participantes'}>${f.texto}`;
     }).join('\n\n') + '\n';
   }
+
+  /* ---- ata em PDF, com cabeçalho e rodapé de página ---- */
+  $('baixarPdf').onclick = () => {
+    if (!falas.length || !window.jspdf) return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    const PW = 210, PH = 297, M = 18, CW = PW - M * 2;
+    const quando = new Date();
+    const dataTxt = quando.toLocaleString('pt-BR');
+    let pagina = 0;
+
+    const rodape = () => {
+      pagina++;
+      doc.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(150);
+      doc.text('Gerado pelo Salavox — a gravação nao saiu deste computador', M, PH - 10);
+      doc.text(String(pagina), PW - M, PH - 10, { align: 'right' });
+      doc.setTextColor(30);
+    };
+
+    doc.setFont('helvetica', 'bold').setFontSize(19).text('Ata de reuniao', M, 30);
+    doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(110);
+    doc.text(dataTxt + '   |   duracao ' + fmt(segundos) + '   |   ' + falas.length + ' trechos', M, 38);
+    doc.setDrawColor(215).line(M, 44, PW - M, 44);
+
+    doc.setFontSize(8.6).setTextColor(130);
+    doc.text(doc.splitTextToSize(
+      'Transcricao automatica, gerada no proprio computador. "VOCE" e a fala captada pelo microfone de ' +
+      'quem gravou; "PARTICIPANTES" reune as demais vozes, captadas pelo audio da chamada e nao ' +
+      'separadas individualmente. O texto pode conter erros de reconhecimento.', CW), M, 51);
+    doc.setTextColor(30);
+
+    let y = 68;
+    doc.setFontSize(9.6);
+    falas.forEach(f => {
+      const quem = f.quem === 'voce' ? 'VOCE' : 'PARTICIPANTES';
+      const linhas = doc.splitTextToSize(f.texto, CW - 42);   // espaço para o rótulo mais longo
+      const alt = Math.max(6, linhas.length * 4.6 + 2.5);
+      if (y + alt > PH - 20) { rodape(); doc.addPage(); y = M + 4; }
+      doc.setFont('helvetica', 'normal').setTextColor(140).setFontSize(8.4);
+      doc.text(fmt(f.a), M, y);
+      doc.setFont('helvetica', 'bold').setTextColor(f.quem === 'voce' ? 60 : 110).setFontSize(8.4);
+      doc.text(quem, M + 12, y);
+      doc.setFont('helvetica', 'normal').setTextColor(35).setFontSize(9.6);
+      doc.text(linhas, M + 42, y, { lineHeightFactor: 1.3 });
+      y += alt;
+    });
+    rodape();
+    doc.save(nomeArquivo() + '.pdf');
+  };
 
   $('baixarTxt').onclick = () => baixar(comoTexto(), 'txt');
   $('baixarVtt').onclick = () => baixar(comoVtt(), 'vtt');

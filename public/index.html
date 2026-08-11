@@ -3,480 +3,227 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Salavox — grave a reunião, receba a ata</title>
-<meta name="description" content="Grava a reunião, transcreve e entrega a ata. Sem robô entrando na chamada e sem nada sair do seu computador.">
-<style>
-  :root{
-    --bg:#faf9f7; --panel:#fff; --ink:#1f1e1c; --muted:#6b6862;
-    --line:#e5e2dc; --accent:#2f6f66; --accent-ink:#fff; --warn:#8a6d1f; --err:#b3402a;
-    --you:#2f6f66; --them:#8a5a2b;
-  }
-  @media (prefers-color-scheme:dark){
-    :root{--bg:#161917;--panel:#1f2422;--ink:#eef0ee;--muted:#9aa39f;
-          --line:#2f3733;--accent:#5aa79b;--accent-ink:#161917;--warn:#d4b25f;--err:#e8846b;
-          --you:#5aa79b;--them:#d09a5e}
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-       font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  .wrap{max-width:900px;margin:0 auto;padding:30px 20px 90px}
-  h1{font-size:23px;margin:0 0 4px;letter-spacing:-.015em}
-  h1 b{color:var(--accent)}
-  h2{font-size:13.5px;margin:0 0 14px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-  .sub{color:var(--muted);margin:0 0 24px;font-size:14px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:20px;margin-bottom:16px}
-  .step{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;
-        background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:600;
-        margin-right:8px;vertical-align:2px}
-  button{font:inherit;font-weight:550;border:0;border-radius:8px;padding:11px 20px;cursor:pointer;
-         background:var(--accent);color:var(--accent-ink);transition:.15s}
-  button:hover{filter:brightness(1.08)}
-  button:disabled{opacity:.42;cursor:not-allowed}
-  button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
-  button.sm{padding:7px 13px;font-size:13px}
-  button.rec{background:var(--err)}
-  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  label.chk{display:flex;gap:7px;align-items:center;font-size:13.5px;color:var(--muted);cursor:pointer}
-  select{padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);
-         color:var(--ink);font:inherit;font-size:14px}
-  .status{font-size:13px;color:var(--muted);min-height:19px}
-  .bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin:14px 0 8px}
-  .bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
-  .hide{display:none}
-  .ok{color:var(--accent);font-weight:600}
-  .err{color:var(--err);font-weight:600}
-  .note{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding:2px 0 2px 12px;margin-top:14px}
-  .note b{color:var(--warn)}
-  .vu{display:flex;gap:14px;margin-top:14px}
-  .vu div{flex:1}
-  .vu span{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
-  .vu i{display:block;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
-  .vu i>u{display:block;height:100%;width:0;background:var(--accent);transition:width .08s}
-  .vu .them u{background:var(--them)}
-  .tempo{font:600 30px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:-.02em;margin:4px 0 0}
-  #ata{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px;
-       font:13.5px/1.7 ui-sans-serif,system-ui,sans-serif;white-space:pre-wrap;margin-top:14px;
-       max-height:420px;overflow:auto}
-  .fala{margin-bottom:9px}
-  .fala b{font-weight:650;font-size:12px;letter-spacing:.02em}
-  .fala .t{font:11px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:7px}
-  .voce b{color:var(--you)}
-  .outros b{color:var(--them)}
-</style>
+<title>Salavox — a ata da reunião sem nada sair do seu computador</title>
+<meta name="description" content="Grave a reunião, transcreva e receba a ata com quem falou o quê. Nenhum robô entra na chamada e nenhum áudio é enviado para servidor. Feito para quem trata de assunto confidencial.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Salavox — a ata da reunião sem nada sair do seu computador">
+<meta property="og:description" content="Sem robô na chamada, sem áudio na nuvem. A gravação e a transcrição acontecem no seu navegador.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site.css">
 </head>
 <body>
-<div class="wrap">
 
-  <h1>Sala<b>vox</b></h1>
-  <p class="sub">Grave a reunião, receba a ata. Nenhum robô entra na chamada e nada sai do seu computador —
-  a gravação e a transcrição acontecem aqui, no seu navegador.</p>
-
-  <div class="card">
-    <h2><span class="step">1</span>Gravar</h2>
-    <div class="row">
-      <button id="rec">Começar a gravar</button>
-      <button class="rec hide" id="stop">Encerrar</button>
-      <label class="chk"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
-      <label class="chk"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
-    </div>
-    <p class="tempo hide" id="tempo">00:00</p>
-    <div class="vu hide" id="vu">
-      <div><span>você (microfone)</span><i><u id="vuYou"></u></i></div>
-      <div class="them"><span>participantes (áudio da reunião)</span><i><u id="vuThem"></u></i></div>
-    </div>
-    <div class="status" id="recMsg" style="margin-top:10px"></div>
-    <p class="note"><b>Como funciona:</b> ao começar, o navegador pergunta qual janela ou tela compartilhar —
-    escolha a da reunião e marque a opção de compartilhar o áudio. Seu microfone entra por um caminho
-    separado, e é isso que permite saber depois quem falou o quê.</p>
+<header>
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo.svg" alt=""><span>Sala<b>vox</b></span></a>
+    <nav>
+      <a href="#como" class="hide-sm">Como funciona</a>
+      <a href="#comparar" class="hide-sm">Comparação</a>
+      <a href="#precos">Preços</a>
+      <a href="/app">Abrir o Salavox</a>
+    </nav>
   </div>
+</header>
 
-  <div class="card">
-    <h2><span class="step">2</span>Transcrever</h2>
-    <div class="row">
-      <button id="trans" disabled>Gerar a transcrição</button>
-      <select id="modelo">
-        <option value="onnx-community/whisper-base">Modelo rápido</option>
-        <option value="onnx-community/whisper-small" selected>Modelo preciso</option>
-      </select>
-      <select id="idioma">
-        <option value="pt" selected>Português</option>
-        <option value="en">Inglês</option>
-        <option value="es">Espanhol</option>
-      </select>
-    </div>
-    <div class="bar hide" id="barWrap"><i id="bar"></i></div>
-    <div class="status" id="trMsg"></div>
-    <p class="note hide" id="fique">Mantenha esta aba aberta e visível. A transcrição roda no seu navegador
-    e fica muito mais lenta se a aba for para segundo plano.</p>
+<section style="padding-top:76px">
+  <div class="wrap">
+    <p class="eyebrow">Reunião → transcrição → ata</p>
+    <h1>A ata da reunião sem<br>nada sair do seu computador</h1>
+    <p class="lead">Nenhum robô entra na chamada. Nenhum áudio vai para a nuvem. O Salavox grava, transcreve
+    e monta a ata dentro do seu navegador — e ainda separa o que você falou do que os participantes falaram.</p>
+    <p><a class="btn" href="/app">Abrir o Salavox — é grátis</a></p>
+    <p class="small muted" style="margin-top:16px">Sem cadastro e sem instalação. Funciona no Chrome e no Edge.</p>
   </div>
+</section>
 
-  <div class="card hide" id="ataCard">
-    <h2><span class="step">3</span>Ata</h2>
-    <div class="row">
-      <button id="baixarTxt" class="ghost sm">Baixar .txt</button>
-      <button id="baixarVtt" class="ghost sm">Baixar .vtt</button>
-      <button id="copiarPrompt" class="ghost sm">Copiar prompt para a IA</button>
-      <span class="status" id="ataMsg"></span>
-    </div>
-    <div id="ata"></div>
+<section>
+  <div class="wrap">
+    <h2>O problema de quem trata de assunto confidencial</h2>
+    <p class="lead" style="margin-bottom:0">As ferramentas de ata que existem hoje colocam um participante
+    robô na chamada, visível para todo mundo, e enviam o áudio da conversa para servidores de outra empresa,
+    quase sempre em outro país. Para uma reunião de contador com cliente, de advogado com parte, de médico
+    com paciente ou de RH com funcionário, isso não é um detalhe técnico — é um problema de sigilo.</p>
   </div>
+</section>
 
-</div>
+<section id="como">
+  <div class="wrap">
+    <p class="eyebrow">Como funciona</p>
+    <h2>Três passos, nenhuma conta</h2>
+    <ol class="steps">
+      <li>
+        <h3>Grave</h3>
+        <p>Avise os participantes, compartilhe a janela da reunião e clique em gravar. O áudio da chamada e
+        o seu microfone são captados por caminhos separados.</p>
+      </li>
+      <li>
+        <h3>Transcreva</h3>
+        <p>O reconhecimento de voz roda no seu próprio computador, usando a placa de vídeo. Nada é enviado
+        para lugar nenhum.</p>
+      </li>
+      <li>
+        <h3>Receba a ata</h3>
+        <p>Sai em PDF, texto ou legenda, com o instante de cada fala e a marcação de quem falou. E um prompt
+        pronto, se quiser pedir o resumo a uma IA.</p>
+      </li>
+    </ol>
+  </div>
+</section>
 
-<script>(function () {
-  const $ = id => document.getElementById(id);
-  const pad2 = n => String(n).padStart(2, '0');
-  const fmt = t => { t = Math.max(0, t | 0);
-    const h = (t/3600)|0, m = ((t%3600)/60)|0, s = t%60;
-    return (h ? h + ':' : '') + pad2(m) + ':' + pad2(s); };
+<section>
+  <div class="wrap">
+    <h2>Por que ele sabe quem falou</h2>
+    <p class="lead">Os concorrentes usam separação de locutor na nuvem, que é cara e por isso fica nos planos
+    pagos. Aqui a solução é outra: <strong>as duas fontes de áudio já chegam separadas</strong>. Seu microfone
+    é você; o áudio da chamada são os outros. O Salavox grava cada um em um canal e transcreve os dois
+    isoladamente.</p>
+    <p class="small muted">Sendo exato: isso distingue você dos demais, mas não separa os participantes entre
+    si — todos aparecem como um grupo. É o suficiente para saber o que <em>você</em> se comprometeu a fazer,
+    e não pretendemos vender como mais do que é.</p>
+  </div>
+</section>
 
-  /* ============================================================
-     Ideia central: o microfone e o áudio da reunião chegam por
-     caminhos diferentes. Em vez de misturar tudo, gravamos cada
-     um em um canal do estéreo — você à esquerda, participantes à
-     direita. Na hora de transcrever, os canais voltam separados e
-     a ata já sai sabendo quem falou.
-     ============================================================ */
+<section id="comparar">
+  <div class="wrap">
+    <h2>Comparação honesta</h2>
+    <table class="cmp">
+      <tr><th>&nbsp;</th><th>Salavox</th><th>Ferramentas de nuvem</th></tr>
+      <tr><td>Robô visível na chamada</td><td class="sim">não existe</td><td class="nao">na maioria, sim</td></tr>
+      <tr><td>Onde o áudio é processado</td><td class="sim">no seu computador</td><td class="nao">servidor da empresa</td></tr>
+      <tr><td>Precisa de conta</td><td class="sim">não</td><td class="nao">sim</td></tr>
+      <tr><td>Separa cada participante</td><td class="nao">não, só você × os outros</td><td class="sim">sim</td></tr>
+      <tr><td>Integra com agenda e CRM</td><td class="nao">não</td><td class="sim">sim</td></tr>
+      <tr><td>Funciona sem internet</td><td class="sim">depois de baixar o modelo, sim</td><td class="nao">não</td></tr>
+      <tr><td>Preço</td><td class="sim">grátis</td><td class="nao">US$ 8 a 35 por pessoa/mês</td></tr>
+    </table>
+    <p class="small muted" style="margin-top:18px">Se o que você precisa é integração com calendário e
+    identificação individual de cada participante, as ferramentas de nuvem fazem isso melhor. O Salavox é
+    para quem não pode mandar o áudio para fora.</p>
+  </div>
+</section>
 
-  let gravador = null, pedacos = [], blobGravacao = null;
-  let ctxAudio = null, fluxos = [], relogio = null, segundos = 0;
-  let ocupado = false;
+<section id="precos">
+  <div class="wrap">
+    <h2>Preços</h2>
+    <p class="lead">A ferramenta no navegador é gratuita e vai continuar. Ela não nos custa nada, porque não
+    há servidor processando suas reuniões.</p>
+    <div class="plans">
+      <div class="plan hi">
+        <span class="badge">disponível agora</span>
+        <h3 style="margin-top:14px">Individual</h3>
+        <div class="price">R$ 0<span> / para sempre</span></div>
+        <ul>
+          <li>Gravação com áudio da chamada e microfone</li>
+          <li>Transcrição local, sem limite de minutos</li>
+          <li>Ata em PDF, texto e legenda</li>
+          <li>Marcação de você × participantes</li>
+          <li>Aviso de consentimento pronto para colar</li>
+        </ul>
+        <a class="btn" href="/app" style="width:100%;text-align:center">Abrir o Salavox</a>
+      </div>
+      <div class="plan">
+        <span class="badge">em desenvolvimento</span>
+        <h3 style="margin-top:14px">Profissional</h3>
+        <div class="price">a definir<span> / mês</span></div>
+        <ul>
+          <li>Aplicativo de desktop, sem depender do navegador</li>
+          <li>Modelos de ata por tipo de reunião</li>
+          <li>Ata com a identidade do seu escritório</li>
+          <li>Histórico organizado das reuniões</li>
+          <li>Suporte com resposta garantida</li>
+        </ul>
+        <a class="btn ghost" href="#aviso" style="width:100%;text-align:center">Saber quando sair</a>
+      </div>
+      <div class="plan">
+        <span class="badge">em desenvolvimento</span>
+        <h3 style="margin-top:14px">Escritório</h3>
+        <div class="price">por profissional<span> / mês</span></div>
+        <ul>
+          <li>Licença para toda a equipe</li>
+          <li>Documentação de conformidade para auditoria</li>
+          <li>Modelo de aviso e política de retenção</li>
+          <li>Treinamento da equipe</li>
+          <li>Contrato e nota fiscal</li>
+        </ul>
+        <a class="btn ghost" href="#aviso" style="width:100%;text-align:center">Falar sobre o escritório</a>
+      </div>
+    </div>
+    <p class="small muted" style="margin-top:26px">Os planos pagos ainda não existem. Estão listados para
+    deixar claro o que será cobrado — e o que nunca será: gravar, transcrever e gerar a ata continua de graça.</p>
+  </div>
+</section>
 
-  window.addEventListener('beforeunload', e => {
-    if (!ocupado) return;
-    e.preventDefault();
-    e.returnValue = 'A gravação ou a transcrição ainda está em andamento.';
-    return e.returnValue;
-  });
+<section id="aviso">
+  <div class="wrap">
+    <h2>Antes de gravar, avise</h2>
+    <p class="lead">Gravar uma conversa sem que os participantes saibam pode ser ilegal, e as regras mudam
+    conforme o país e o estado. O Salavox exige que você confirme que vai avisar, e oferece o texto pronto
+    para colar no chat da reunião. A responsabilidade por obter esse consentimento é de quem grava — a
+    ferramenta não tem como verificar isso por você.</p>
+    <p class="small muted">Detalhes nos <a href="/termos" style="color:var(--accent)">termos de uso</a> e na
+    <a href="/privacidade" style="color:var(--accent)">política de privacidade</a>.</p>
+  </div>
+</section>
 
-  function formatoSuportado() {
-    for (const m of ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'])
-      if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
-    return '';
-  }
+<section>
+  <div class="wrap">
+    <h2>Perguntas frequentes</h2>
+    <div class="faq">
+      <details open>
+        <summary>Funciona com Zoom, Teams e Google Meet?</summary>
+        <p>Com qualquer reunião que apareça na sua tela. No Windows dá para capturar o áudio do sistema
+        inteiro, o que cobre também os aplicativos instalados. No macOS o navegador só captura áudio de aba,
+        então funciona com Meet e Teams pelo navegador, mas não com o Zoom em aplicativo.</p>
+      </details>
+      <details>
+        <summary>Os outros participantes veem alguma coisa?</summary>
+        <p>Não. Nenhum robô entra na chamada e nada aparece na lista de participantes. Justamente por isso
+        avisar é obrigação sua — e o Salavox insiste nisso antes de deixar você gravar.</p>
+      </details>
+      <details>
+        <summary>Quanto tempo demora a transcrição?</summary>
+        <p>Depende do seu computador e do modelo escolhido. Blocos sem fala são pulados, o que ajuda bastante
+        em reunião real. A tela mostra percentual e previsão enquanto roda.</p>
+      </details>
+      <details>
+        <summary>Preciso de internet?</summary>
+        <p>Para abrir a página e baixar o modelo de transcrição na primeira vez, sim. Depois disso o modelo
+        fica no seu navegador e a transcrição funciona sem conexão.</p>
+      </details>
+      <details>
+        <summary>Onde ficam as gravações?</summary>
+        <p>No seu computador, e só. O Salavox não tem servidor, não tem banco de dados e não tem conta de
+        usuário — não haveria onde guardar nada seu.</p>
+      </details>
+      <details>
+        <summary>A transcrição erra?</summary>
+        <p>Erra, como toda transcrição automática, principalmente com áudio ruim, sotaques e várias pessoas
+        falando ao mesmo tempo. A ata sai marcada como automática justamente por isso, e decisões importantes
+        devem ser conferidas na gravação.</p>
+      </details>
+    </div>
+  </div>
+</section>
 
-  /* medidor de nível, só para a pessoa ver que está captando */
-  function medidor(ctx, node, alvo) {
-    const an = ctx.createAnalyser();
-    an.fftSize = 512;
-    node.connect(an);
-    const buf = new Uint8Array(an.frequencyBinCount);
-    return () => {
-      an.getByteTimeDomainData(buf);
-      let pico = 0;
-      for (const v of buf) pico = Math.max(pico, Math.abs(v - 128));
-      alvo.style.width = Math.min(100, pico / 60 * 100) + '%';
-    };
-  }
+<section style="text-align:center">
+  <div class="wrap">
+    <h2>Teste na sua próxima reunião</h2>
+    <p class="lead" style="margin:0 auto 26px">Leva menos tempo que ler esta página.</p>
+    <a class="btn" href="/app">Abrir o Salavox</a>
+  </div>
+</section>
 
-  $('rec').onclick = async () => {
-    if (!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia && window.MediaRecorder)) {
-      $('recMsg').innerHTML = '<span class="err">Este navegador não grava a tela. Use Chrome ou Edge no computador.</span>';
-      return;
-    }
-    $('rec').disabled = true;
-    $('recMsg').textContent = 'Escolha a janela da reunião e marque a opção de compartilhar o áudio…';
+<footer>
+  <div class="wrap">
+    <div>
+      <a href="/app">Abrir</a>
+      <a href="#precos">Preços</a>
+      <a href="/privacidade">Privacidade</a>
+      <a href="/termos">Termos</a>
+    </div>
+    <div>Salavox — a reunião fica na sala</div>
+  </div>
+</footer>
 
-    let telaFluxo, micFluxo = null;
-    try {
-      telaFluxo = await navigator.mediaDevices.getDisplayMedia({
-        video: $('tela').checked ? { frameRate: 8 } : { frameRate: 2 },
-        audio: true
-      });
-    } catch (e) {
-      $('recMsg').innerHTML = '<span class="err">Compartilhamento cancelado ou negado pelo navegador.</span>';
-      $('rec').disabled = false;
-      return;
-    }
-
-    if ($('mic').checked) {
-      try {
-        micFluxo = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true }
-        });
-      } catch (e) {
-        $('recMsg').innerHTML = '<span class="err">Sem acesso ao microfone: a ata sairá sem as suas falas.</span>';
-      }
-    }
-
-    const temSistema = telaFluxo.getAudioTracks().length > 0;
-    if (!temSistema && !micFluxo) {
-      telaFluxo.getTracks().forEach(t => t.stop());
-      $('recMsg').innerHTML = '<span class="err">Nenhuma fonte de áudio. Ao compartilhar, marque "compartilhar áudio".</span>';
-      $('rec').disabled = false;
-      return;
-    }
-
-    // canal 0 = você, canal 1 = participantes
-    ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
-    const juntador = ctxAudio.createChannelMerger(2);
-    const medidores = [];
-
-    if (micFluxo) {
-      const n = ctxAudio.createMediaStreamSource(micFluxo);
-      n.connect(juntador, 0, 0);
-      medidores.push(medidor(ctxAudio, n, $('vuYou')));
-    }
-    if (temSistema) {
-      const n = ctxAudio.createMediaStreamSource(new MediaStream(telaFluxo.getAudioTracks()));
-      n.connect(juntador, 0, 1);
-      medidores.push(medidor(ctxAudio, n, $('vuThem')));
-    }
-
-    const destino = ctxAudio.createMediaStreamDestination();
-    juntador.connect(destino);
-
-    const trilhas = [destino.stream.getAudioTracks()[0]];
-    if ($('tela').checked) trilhas.unshift(telaFluxo.getVideoTracks()[0]);
-    const fluxoFinal = new MediaStream(trilhas);
-    fluxos = [telaFluxo, micFluxo].filter(Boolean);
-
-    pedacos = [];
-    const tipo = formatoSuportado();
-    gravador = new MediaRecorder(fluxoFinal, tipo ? { mimeType: tipo, audioBitsPerSecond: 96000 } : undefined);
-    gravador.ondataavailable = ev => { if (ev.data && ev.data.size) pedacos.push(ev.data); };
-
-    gravador.onstop = () => {
-      clearInterval(relogio);
-      cancelAnimationFrame(anima);
-      fluxos.forEach(f => f.getTracks().forEach(t => t.stop()));
-      try { ctxAudio.close(); } catch (e) {}
-      ocupado = false;
-      $('rec').classList.remove('hide'); $('rec').disabled = false;
-      $('stop').classList.add('hide'); $('vu').classList.add('hide');
-      blobGravacao = new Blob(pedacos, { type: pedacos[0] ? pedacos[0].type : 'video/webm' });
-      if (!blobGravacao.size) {
-        $('recMsg').innerHTML = '<span class="err">A gravação saiu vazia. Tente de novo.</span>';
-        return;
-      }
-      $('recMsg').innerHTML = `<span class="ok">Gravação de ${fmt(segundos)} pronta</span> — ` +
-        `${(blobGravacao.size/1048576).toFixed(1)} MB, ${temSistema ? 'com' : 'sem'} áudio da reunião, ` +
-        `${micFluxo ? 'com' : 'sem'} microfone.`;
-      $('trans').disabled = false;
-      janelas = { voce: !!micFluxo, outros: temSistema };
-    };
-
-    telaFluxo.getVideoTracks()[0].addEventListener('ended', () => {
-      if (gravador && gravador.state !== 'inactive') gravador.stop();
-    });
-
-    let anima;
-    const desenhar = () => { medidores.forEach(m => m()); anima = requestAnimationFrame(desenhar); };
-    desenhar();
-
-    gravador.start(2000);
-    segundos = 0; ocupado = true;
-    $('rec').classList.add('hide');
-    $('stop').classList.remove('hide');
-    $('tempo').classList.remove('hide'); $('vu').classList.remove('hide');
-    $('tempo').textContent = '00:00';
-    $('recMsg').textContent = 'Gravando. Pode minimizar esta aba, mas não feche.';
-    relogio = setInterval(() => { segundos++; $('tempo').textContent = fmt(segundos); }, 1000);
-  };
-
-  $('stop').onclick = () => { if (gravador && gravador.state !== 'inactive') gravador.stop(); };
-
-  /* ================= transcrição por canal ================= */
-  let janelas = { voce: false, outros: false };
-  let falas = [];
-
-  const TJS = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';
-  const WASM_BASES = [
-    'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260416-b7804b056c/dist/',
-    'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/',
-    'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/'
-  ];
-
-  async function acharWasm() {
-    for (const b of WASM_BASES) {
-      try {
-        const r = await fetch(b + 'ort-wasm-simd-threaded.jsep.wasm', { headers: { Range: 'bytes=0-16' } });
-        if (r.ok || r.status === 206) return b;
-      } catch (e) {}
-    }
-    return null;
-  }
-
-  async function carregarModelo(modelo, aviso) {
-    const mod = await import(TJS);
-    mod.env.allowLocalModels = false;
-    mod.env.allowRemoteModels = true;
-    const base = await acharWasm();
-    try {
-      const w = mod.env.backends && mod.env.backends.onnx && mod.env.backends.onnx.wasm;
-      if (w) { w.numThreads = 1; if (base) w.wasmPaths = base; }
-    } catch (e) {}
-    const visto = {};
-    const progress_callback = p => {
-      if (p.status === 'progress' && p.file) {
-        visto[p.file] = p.progress || 0;
-        const v = Object.values(visto);
-        const pct = v.reduce((a, b) => a + b, 0) / v.length;
-        $('bar').style.width = pct + '%';
-        aviso(`Etapa 1 de 2 — baixando o modelo: ${pct.toFixed(0)}% (só na primeira vez)`);
-      }
-    };
-    try {
-      return await mod.pipeline('automatic-speech-recognition', modelo,
-        { device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' }, progress_callback });
-    } catch (e) {
-      aviso('WebGPU indisponível — usando o processador, vai demorar mais.');
-      return await mod.pipeline('automatic-speech-recognition', modelo, { dtype: 'q8', progress_callback });
-    }
-  }
-
-  /* separa os dois canais gravados: 0 = você, 1 = participantes */
-  async function canais(blob) {
-    const buf = await blob.arrayBuffer();
-    const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-    const dec = await ctx.decodeAudioData(buf);
-    ctx.close();
-    const n = dec.numberOfChannels;
-    return {
-      voce: n > 1 ? dec.getChannelData(0) : (janelas.voce && !janelas.outros ? dec.getChannelData(0) : null),
-      outros: n > 1 ? dec.getChannelData(1) : (janelas.outros && !janelas.voce ? dec.getChannelData(0) : null)
-    };
-  }
-
-  async function transcreverCanal(pipe, dados, quem, idioma, prog) {
-    if (!dados || !dados.length) return [];
-    const SR = 16000, WIN = 30 * SR, total = Math.ceil(dados.length / WIN);
-    const saida = [];
-    for (let i = 0; i < total; i++) {
-      const off = i * WIN;
-      const seg = dados.slice(off, Math.min(off + WIN, dados.length));
-      // pula blocos silenciosos: economiza muito tempo em reunião real
-      let pico = 0;
-      for (let k = 0; k < seg.length; k += 40) pico = Math.max(pico, Math.abs(seg[k]));
-      if (pico < 0.012) { prog(i + 1, total); continue; }
-      const opts = { return_timestamps: true, task: 'transcribe' };
-      if (idioma) opts.language = idioma;
-      const r = await pipe(seg, opts);
-      const chunks = (r && r.chunks && r.chunks.length) ? r.chunks
-        : [{ timestamp: [0, seg.length / SR], text: (r && r.text) || '' }];
-      chunks.forEach(c => {
-        const txt = (c.text || '').trim();
-        if (txt) saida.push({ quem, a: off / SR + (c.timestamp[0] ?? 0), texto: txt });
-      });
-      prog(i + 1, total);
-    }
-    return saida;
-  }
-
-  $('trans').onclick = async () => {
-    if (!blobGravacao) return;
-    $('trans').disabled = true;
-    ocupado = true;
-    $('barWrap').classList.remove('hide');
-    $('fique').classList.remove('hide');
-    const aviso = m => { $('trMsg').innerHTML = m; };
-    try {
-      aviso('Separando os canais de áudio…');
-      const c = await canais(blobGravacao);
-      const pipe = await carregarModelo($('modelo').value, aviso);
-
-      const tarefas = [];
-      if (c.voce) tarefas.push(['voce', c.voce]);
-      if (c.outros) tarefas.push(['outros', c.outros]);
-
-      const inicio = performance.now();
-      let feitos = 0;
-      const totalBlocos = tarefas.reduce((s, [, d]) => s + Math.ceil(d.length / (30 * 16000)), 0);
-
-      falas = [];
-      for (const [quem, dados] of tarefas) {
-        const r = await transcreverCanal(pipe, dados, quem, $('idioma').value, () => {
-          feitos++;
-          const pct = feitos / totalBlocos * 100;
-          $('bar').style.width = pct + '%';
-          const resta = (performance.now() - inicio) / feitos * (totalBlocos - feitos) / 1000;
-          const falta = feitos >= 2 && resta > 5
-            ? ` — faltam ~${resta < 90 ? Math.ceil(resta) + 's' : Math.ceil(resta / 60) + ' min'}` : '';
-          aviso(`Etapa 2 de 2 — transcrevendo ${quem === 'voce' ? 'você' : 'os participantes'}: ` +
-                `${pct.toFixed(0)}%${falta}`);
-        });
-        falas = falas.concat(r);
-      }
-
-      falas.sort((a, b) => a.a - b.a);
-      mostrarAta();
-      aviso(`<span class="ok">Ata pronta</span> — ${falas.length} trechos.`);
-    } catch (e) {
-      aviso(`<span class="err">Não consegui transcrever: ${(e && e.message) || e}</span>`);
-    } finally {
-      $('trans').disabled = false;
-      $('fique').classList.add('hide');
-      ocupado = false;
-    }
-  };
-
-  function mostrarAta() {
-    $('ataCard').classList.remove('hide');
-    $('ata').innerHTML = falas.map(f =>
-      `<div class="fala ${f.quem}"><span class="t">${fmt(f.a)}</span>` +
-      `<b>${f.quem === 'voce' ? 'VOCÊ' : 'PARTICIPANTES'}</b> ${f.texto}</div>`).join('');
-  }
-
-  /* ================= saídas ================= */
-  const nomeArquivo = () => 'ata-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
-
-  function baixar(texto, ext) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([texto], { type: 'text/plain;charset=utf-8' }));
-    a.download = nomeArquivo() + '.' + ext;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  }
-
-  const comoTexto = () => falas.map(f =>
-    `[${fmt(f.a)}] ${f.quem === 'voce' ? 'VOCÊ' : 'PARTICIPANTES'}: ${f.texto}`).join('\n');
-
-  function comoVtt() {
-    const t = s => {
-      const h = Math.floor(s/3600), m = Math.floor(s%3600/60), sc = s%60;
-      return `${pad2(h)}:${pad2(m)}:${sc.toFixed(3).padStart(6,'0')}`;
-    };
-    return 'WEBVTT\n\n' + falas.map((f, i) => {
-      const fim = i + 1 < falas.length ? Math.min(falas[i+1].a, f.a + 12) : f.a + 5;
-      return `${t(f.a)} --> ${t(Math.max(fim, f.a + 0.5))}\n` +
-             `<v ${f.quem === 'voce' ? 'Você' : 'Participantes'}>${f.texto}`;
-    }).join('\n\n') + '\n';
-  }
-
-  $('baixarTxt').onclick = () => baixar(comoTexto(), 'txt');
-  $('baixarVtt').onclick = () => baixar(comoVtt(), 'vtt');
-
-  $('copiarPrompt').onclick = async () => {
-    const prompt =
-`Abaixo está a transcrição de uma reunião de ${fmt(segundos)}, gerada automaticamente.
-
-Cada linha traz o instante e quem falou. "VOCÊ" é o dono da gravação, captado pelo microfone.
-"PARTICIPANTES" reúne todas as outras pessoas, captadas pelo áudio da chamada — elas não estão
-separadas individualmente.
-
-Ao responder:
-- cite o instante (por exemplo, 12:34) ao mencionar qualquer ponto;
-- separe claramente o que foi dito por VOCÊ do que foi dito pelos PARTICIPANTES;
-- a transcrição é automática e contém erros: se um trecho parecer incoerente, sinalize em vez de interpretar;
-- quando a informação não estiver na transcrição, diga que não é possível saber.
-
-Tarefa: produza uma ata com os assuntos tratados, as decisões, as pendências com responsável
-quando houver, e os próximos passos.
-
----
-${comoTexto()}`;
-    try {
-      await navigator.clipboard.writeText(prompt);
-      $('ataMsg').innerHTML = '<span class="ok">prompt copiado</span>';
-    } catch (e) {
-      $('ataMsg').textContent = 'não consegui copiar automaticamente';
-    }
-    setTimeout(() => { $('ataMsg').textContent = ''; }, 3000);
-  };
-
-  window.__salavox = { falas: () => falas, comoTexto, comoVtt,
-    gravacao: () => blobGravacao, canais };   // usado pelos testes
-})();
-</script>
 </body>
 </html>

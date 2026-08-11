@@ -53,6 +53,10 @@
   .vu i{display:block;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
   .vu i>u{display:block;height:100%;width:0;background:var(--accent);transition:width .08s}
   .vu .them u{background:var(--them)}
+  .consent{border:1px solid var(--line);border-radius:8px;padding:13px;margin-bottom:14px;
+           background:color-mix(in srgb,var(--accent) 5%,transparent)}
+  .consent .chk{color:var(--ink);align-items:flex-start}
+  .consent input{margin-top:3px}
   .tempo{font:600 30px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:-.02em;margin:4px 0 0}
   #ata{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px;
        font:13.5px/1.7 ui-sans-serif,system-ui,sans-serif;white-space:pre-wrap;margin-top:14px;
@@ -67,14 +71,23 @@
 <body>
 <div class="wrap">
 
+  <p style="margin:0 0 10px"><a href="/" style="color:var(--muted);text-decoration:none;font-size:13.5px">&larr; salavox</a></p>
   <h1>Sala<b>vox</b></h1>
   <p class="sub">Grave a reunião, receba a ata. Nenhum robô entra na chamada e nada sai do seu computador —
   a gravação e a transcrição acontecem aqui, no seu navegador.</p>
 
   <div class="card">
     <h2><span class="step">1</span>Gravar</h2>
+    <div class="consent" id="consent">
+      <label class="chk"><input type="checkbox" id="okConsent">
+        <span>Confirmo que vou avisar os participantes de que a reunião está sendo gravada.</span></label>
+      <div class="row" style="margin-top:9px">
+        <button class="ghost sm" id="copiarAviso">Copiar o aviso para colar no chat</button>
+        <span class="status" id="avisoMsg"></span>
+      </div>
+    </div>
     <div class="row">
-      <button id="rec">Começar a gravar</button>
+      <button id="rec" disabled>Começar a gravar</button>
       <button class="rec hide" id="stop">Encerrar</button>
       <label class="chk"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
       <label class="chk"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
@@ -113,6 +126,7 @@
   <div class="card hide" id="ataCard">
     <h2><span class="step">3</span>Ata</h2>
     <div class="row">
+      <button id="baixarPdf">Baixar a ata em PDF</button>
       <button id="baixarTxt" class="ghost sm">Baixar .txt</button>
       <button id="baixarVtt" class="ghost sm">Baixar .vtt</button>
       <button id="copiarPrompt" class="ghost sm">Copiar prompt para a IA</button>
