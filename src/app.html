@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Salavox — grave a reunião, receba a ata</title>
+<meta name="description" content="Grava a reunião, transcreve e entrega a ata. Sem robô entrando na chamada e sem nada sair do seu computador.">
+<style>
+  :root{
+    --bg:#faf9f7; --panel:#fff; --ink:#1f1e1c; --muted:#6b6862;
+    --line:#e5e2dc; --accent:#2f6f66; --accent-ink:#fff; --warn:#8a6d1f; --err:#b3402a;
+    --you:#2f6f66; --them:#8a5a2b;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#161917;--panel:#1f2422;--ink:#eef0ee;--muted:#9aa39f;
+          --line:#2f3733;--accent:#5aa79b;--accent-ink:#161917;--warn:#d4b25f;--err:#e8846b;
+          --you:#5aa79b;--them:#d09a5e}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:30px 20px 90px}
+  h1{font-size:23px;margin:0 0 4px;letter-spacing:-.015em}
+  h1 b{color:var(--accent)}
+  h2{font-size:13.5px;margin:0 0 14px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .sub{color:var(--muted);margin:0 0 24px;font-size:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:20px;margin-bottom:16px}
+  .step{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;
+        background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:600;
+        margin-right:8px;vertical-align:2px}
+  button{font:inherit;font-weight:550;border:0;border-radius:8px;padding:11px 20px;cursor:pointer;
+         background:var(--accent);color:var(--accent-ink);transition:.15s}
+  button:hover{filter:brightness(1.08)}
+  button:disabled{opacity:.42;cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  button.sm{padding:7px 13px;font-size:13px}
+  button.rec{background:var(--err)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  label.chk{display:flex;gap:7px;align-items:center;font-size:13.5px;color:var(--muted);cursor:pointer}
+  select{padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);
+         color:var(--ink);font:inherit;font-size:14px}
+  .status{font-size:13px;color:var(--muted);min-height:19px}
+  .bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin:14px 0 8px}
+  .bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+  .hide{display:none}
+  .ok{color:var(--accent);font-weight:600}
+  .err{color:var(--err);font-weight:600}
+  .note{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding:2px 0 2px 12px;margin-top:14px}
+  .note b{color:var(--warn)}
+  .vu{display:flex;gap:14px;margin-top:14px}
+  .vu div{flex:1}
+  .vu span{font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px}
+  .vu i{display:block;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+  .vu i>u{display:block;height:100%;width:0;background:var(--accent);transition:width .08s}
+  .vu .them u{background:var(--them)}
+  .tempo{font:600 30px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:-.02em;margin:4px 0 0}
+  #ata{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px;
+       font:13.5px/1.7 ui-sans-serif,system-ui,sans-serif;white-space:pre-wrap;margin-top:14px;
+       max-height:420px;overflow:auto}
+  .fala{margin-bottom:9px}
+  .fala b{font-weight:650;font-size:12px;letter-spacing:.02em}
+  .fala .t{font:11px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:7px}
+  .voce b{color:var(--you)}
+  .outros b{color:var(--them)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Sala<b>vox</b></h1>
+  <p class="sub">Grave a reunião, receba a ata. Nenhum robô entra na chamada e nada sai do seu computador —
+  a gravação e a transcrição acontecem aqui, no seu navegador.</p>
+
+  <div class="card">
+    <h2><span class="step">1</span>Gravar</h2>
+    <div class="row">
+      <button id="rec">Começar a gravar</button>
+      <button class="rec hide" id="stop">Encerrar</button>
+      <label class="chk"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
+      <label class="chk"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
+    </div>
+    <p class="tempo hide" id="tempo">00:00</p>
+    <div class="vu hide" id="vu">
+      <div><span>você (microfone)</span><i><u id="vuYou"></u></i></div>
+      <div class="them"><span>participantes (áudio da reunião)</span><i><u id="vuThem"></u></i></div>
+    </div>
+    <div class="status" id="recMsg" style="margin-top:10px"></div>
+    <p class="note"><b>Como funciona:</b> ao começar, o navegador pergunta qual janela ou tela compartilhar —
+    escolha a da reunião e marque a opção de compartilhar o áudio. Seu microfone entra por um caminho
+    separado, e é isso que permite saber depois quem falou o quê.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2</span>Transcrever</h2>
+    <div class="row">
+      <button id="trans" disabled>Gerar a transcrição</button>
+      <select id="modelo">
+        <option value="onnx-community/whisper-base">Modelo rápido</option>
+        <option value="onnx-community/whisper-small" selected>Modelo preciso</option>
+      </select>
+      <select id="idioma">
+        <option value="pt" selected>Português</option>
+        <option value="en">Inglês</option>
+        <option value="es">Espanhol</option>
+      </select>
+    </div>
+    <div class="bar hide" id="barWrap"><i id="bar"></i></div>
+    <div class="status" id="trMsg"></div>
+    <p class="note hide" id="fique">Mantenha esta aba aberta e visível. A transcrição roda no seu navegador
+    e fica muito mais lenta se a aba for para segundo plano.</p>
+  </div>
+
+  <div class="card hide" id="ataCard">
+    <h2><span class="step">3</span>Ata</h2>
+    <div class="row">
+      <button id="baixarTxt" class="ghost sm">Baixar .txt</button>
+      <button id="baixarVtt" class="ghost sm">Baixar .vtt</button>
+      <button id="copiarPrompt" class="ghost sm">Copiar prompt para a IA</button>
+      <span class="status" id="ataMsg"></span>
+    </div>
+    <div id="ata"></div>
+  </div>
+
+</div>
+<script>/*__JSPDF__*/</script>
+<script>/*__APP__*/</script>
+</body>
+</html>
