@@ -11,10 +11,11 @@ def main() -> int:
         print("marcador /*__APP__*/ ausente", file=sys.stderr)
         return 1
     saida = html.replace("/*__APP__*/", js).replace("<script>/*__JSPDF__*/</script>", "")
-    destino = ROOT / "public" / "app.html"
+    # a raiz precisa existir: sem index.html a Vercel devolve 404 no "/"
+    destino = ROOT / "public" / "index.html"
     destino.parent.mkdir(exist_ok=True)
     destino.write_text(saida, encoding="utf-8")
-    print(f"public/app.html  {len(saida)/1024:.1f} KB")
+    print(f"public/index.html  {len(saida)/1024:.1f} KB")
     return 0
 
 if __name__ == "__main__":
