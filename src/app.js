@@ -1047,7 +1047,8 @@ registerProcessor('toca', Toca);`;
 
   function mostrarAta() {
     $('ataCard').classList.remove('hide');
-    $('iaCard').classList.remove('hide');
+    ataNaTela = true;
+    desenharIa();
     mostrarConsentimento();
     $('ata').innerHTML = linhaDoTempo().map(i => {
       if (i.tipo === 'fala')
@@ -1263,7 +1264,7 @@ registerProcessor('toca', Toca);`;
       'Declaração de quem gravou, não verificação feita pelo Salavox.\n\n'
     : '';
 
-  const blocosResumo = () => resumos.filter(r => r.noPdf)
+  const blocosResumo = () => resumos
     .map(r => r.titulo.toUpperCase() + '\n' + r.texto + '\n').join('\n');
 
   const RODAPE_MARCA = '\n---\nAta gerada pelo Salavox (salavox.com) — a gravação e a transcrição ' +
@@ -1345,7 +1346,7 @@ registerProcessor('toca', Toca);`;
     /* Resumo e pendências vêm antes da transcrição: é o que o cliente lê.
        O texto pode ter vindo de um modelo, então sai marcado como tal — a ata
        não pode dar a entender que alguém revisou o que a máquina escreveu. */
-    resumos.filter(r => r.noPdf).forEach(r => {
+    resumos.forEach(r => {
       const titulo = r.titulo.toUpperCase();
       const corpo = doc.setFont('helvetica', 'normal').setFontSize(9.6)
         .splitTextToSize(r.texto, CW - 6);
@@ -1361,7 +1362,7 @@ registerProcessor('toca', Toca);`;
       });
       y += 6;
     });
-    if (resumos.some(r => r.noPdf)) {
+    if (resumos.length) {
       doc.setFont('helvetica', 'normal').setFontSize(7.6).setTextColor(150);
       doc.text('Texto acima gerado por modelo de linguagem a partir da transcrição, sem revisão humana.', M, y);
       doc.setDrawColor(225).line(M, y + 4, PW - M, y + 4);
@@ -1420,61 +1421,27 @@ registerProcessor('toca', Toca);`;
   $('baixarTxt').onclick = () => baixar(comoTexto() + '\n' + RODAPE_MARCA, 'txt');
   $('baixarVtt').onclick = () => baixar(comoVtt(), 'vtt');
 
-  $('copiarPrompt').onclick = async () => {
-    const prompt =
-`Abaixo está a transcrição de uma reunião de ${fmt(segundos)}, gerada automaticamente.
-
-Cada linha traz o instante e quem falou. As linhas "(nova tela compartilhada)" marcam o instante em
-que a tela apresentada mudou; use-as para saber quando o assunto passou de um documento para outro.
-As linhas "*** momento marcado ***" foram marcadas à mão por quem estava na reunião: trate o que
-está em volta delas como importante.
-
-Ao responder:
-- cite o instante (por exemplo, 12:34) ao mencionar qualquer ponto;
-- separe claramente o que cada interlocutor disse, usando os nomes que aparecem na transcrição;
-- a transcrição é automática e contém erros: se um trecho parecer incoerente, sinalize em vez de interpretar;
-- quando a informação não estiver na transcrição, diga que não é possível saber.
-
-Tarefa: produza uma ata com os assuntos tratados, as decisões, as pendências com responsável
-quando houver, e os próximos passos.
-
----
-${comoTexto()}`;
-    try {
-      await navigator.clipboard.writeText(prompt);
-      $('ataMsg').innerHTML = '<span class="ok">prompt copiado</span>';
-    } catch (e) {
-      $('ataMsg').textContent = 'não consegui copiar automaticamente';
-    }
-    setTimeout(() => { $('ataMsg').textContent = ''; }, 3000);
-  };
-
-
   /* ============================================================
-     Resumo, decisões e pendências — com IA, mas sem trair a promessa.
+     Resumo, decisões e pendências — a IA do Salavox.
 
-     Os concorrentes vendem resumo por IA como funcionalidade
-     principal, e não dá para competir sem ter. O problema é que a
-     forma óbvia — mandar a transcrição para um servidor nosso —
-     destruiria a única vantagem que este produto tem.
+     Houve aqui, por um tempo, três motores: um prompt para colar à
+     mão, o Ollama do próprio computador e um campo para a chave de
+     um serviço de terceiro. Os três saíram. O prompt empurrava o
+     trabalho para quem usa; o Ollama exige instalar um servidor de
+     modelos e ajustar variável de ambiente, coisa que contador
+     nenhum vai fazer; e pedir a chave de outro fornecedor é vender
+     um produto que depende de o cliente já ter comprado outro.
 
-     Então são três motores, escolhidos por quem usa, e o padrão
-     não envia nada:
+     Sobrou um caminho só, e ele é nosso: a chave fica no servidor,
+     a cota é contada por assinatura, e a tela diz — antes de
+     qualquer clique — que o texto da ata sai daqui quando o botão
+     é apertado. O áudio e o vídeo, nunca.
 
-     1. PROMPT   — monta o texto pronto com a ata dentro. Você cola
-                   na IA que já usa. Nada sai daqui por conta nossa.
-     2. OLLAMA   — modelo rodando no computador de quem usa. Sai da
-                   aba e não sai da máquina.
-     3. CHAVE    — serviço externo, com a chave do próprio usuário,
-                   desligado por padrão e atrás de uma confirmação
-                   explícita, porque aqui o texto realmente sai.
-
-     A chave nunca é gravada: vive numa variável desta aba e morre
-     com ela. Guardar em localStorage seria conveniente e seria a
-     forma mais fácil de vazar a chave de alguém.
+     Sem conta, o cartão nem aparece: gravar, transcrever e exportar
+     continua funcionando inteiro e de graça, no computador de quem
+     gravou.
      ============================================================ */
 
-  const OLLAMA = 'http://127.0.0.1:11434';
   let resumos = [];
 
   const TAREFAS = {
@@ -1518,69 +1485,38 @@ ${comoTexto()}`;
     return CONTEXTO + '\n' + tarefa + '\n\n---\n' + comoTexto();
   }
 
-  /* ---------- motores ---------- */
+  /* ---------- o estado do cartão, que é o estado da conta ----------
 
-  $('iaMotor').onchange = () => {
-    const m = $('iaMotor').value;
-    $('iaChave').classList.toggle('hide', m !== 'chave');
-    $('iaProcurar').classList.toggle('hide', m !== 'ollama');
-    $('iaModeloSalavox').classList.toggle('hide', m !== 'salavox');
-    $('iaModelo').classList.add('hide');
-    $('iaMotorMsg').textContent = m === 'ollama'
-      ? 'O Ollama precisa estar aberto e aceitar esta página. Clique em procurar.'
-      : '';
-  };
+     Três situações, e a tela precisa dizer qual é sem que ninguém
+     tenha de clicar para descobrir:
 
-  $('iaProcurar').onclick = async () => {
-    $('iaMotorMsg').textContent = 'Procurando o Ollama neste computador…';
-    try {
-      const r = await fetch(OLLAMA + '/api/tags');
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const dados = await r.json();
-      const nomes = (dados.models || []).map(m => m.name || m.model).filter(Boolean);
-      if (!nomes.length) throw new Error('nenhum modelo instalado');
-      $('iaModelo').innerHTML = nomes.map(n => `<option>${escapar(n)}</option>`).join('');
-      $('iaModelo').classList.remove('hide');
-      $('iaMotorMsg').innerHTML = `<span class="ok">Ollama encontrado</span> — ${nomes.length} ` +
-        (nomes.length === 1 ? 'modelo' : 'modelos') + ' disponíveis.';
-    } catch (e) {
-      // o motivo mais comum não é o Ollama estar fechado: é ele recusar a página
-      $('iaMotorMsg').innerHTML = '<span class="err">Não achei o Ollama.</span> Ele precisa estar aberto e ' +
-        'permitir esta página — inicie com <code>OLLAMA_ORIGINS=' + location.origin + ' ollama serve</code>.';
+       sem configuração  → o cartão não existe. É a instalação local.
+       sem conta / grátis → o cartão aparece, os botões não. Dizer o
+                            preço aqui é mais honesto do que deixar
+                            clicar e recusar depois.
+       assinante         → os botões aparecem. */
+
+  /* Um dono só para a visibilidade deste cartão. Já esteve em dois lugares —
+     aqui e no mostrarAta — e o resultado foi uma sabotagem que a suíte não
+     pegou: quebrar um dos dois não mudava nada, porque o outro consertava. Duas
+     linhas que se corrigem mutuamente não são segurança, são um ponto cego. */
+  let ataNaTela = false;
+
+  function desenharIa() {
+    $('iaCard').classList.toggle('hide', !(cfg && ataNaTela));
+    if (!cfg) return;
+    const pago = temPlano();
+    $('iaAcoes').classList.toggle('hide', !pago);
+    if (pago) {
+      $('iaEstado').innerHTML = 'A <b>IA do Salavox</b> lê o texto da ata e devolve o resumo, ' +
+        'as decisões e as pendências. O texto sai daqui só quando você clica.';
+    } else if (!sessao) {
+      $('iaEstado').innerHTML = 'O resumo por IA é do <b>plano profissional</b>, R$ 19,90 por mês. ' +
+        'Entre na sua conta no cartão acima — gravar, transcrever e exportar continua de graça.';
+    } else {
+      $('iaEstado').innerHTML = 'Sua conta está no <b>plano grátis</b>. O resumo por IA é do ' +
+        '<b>plano profissional</b>, R$ 19,90 por mês.';
     }
-  };
-
-  async function pedirOllama(prompt, aviso) {
-    const modelo = $('iaModelo').value;
-    if (!modelo) throw new Error('escolha um modelo do Ollama (clique em procurar).');
-    aviso('Pensando no seu computador, com ' + modelo + '…');
-    const r = await fetch(OLLAMA + '/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: modelo, prompt, stream: false })
-    });
-    if (!r.ok) throw new Error('o Ollama respondeu HTTP ' + r.status);
-    const d = await r.json();
-    return (d.response || '').trim();
-  }
-
-  async function pedirServico(prompt, aviso) {
-    if (!$('iaOk').checked) throw new Error('marque a confirmação: neste modo o texto da ata sai daqui.');
-    const base = ($('iaBase').value || '').trim().replace(/\/+$/, '');
-    const modelo = ($('iaNome').value || '').trim();
-    const segredo = $('iaSegredo').value;
-    if (!base || !modelo || !segredo) throw new Error('preencha endereço, modelo e chave.');
-    aviso('Enviando o texto da ata para ' + base + '…');
-    const r = await fetch(base + '/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + segredo },
-      body: JSON.stringify({ model: modelo, messages: [{ role: 'user', content: prompt }] })
-    });
-    if (!r.ok) throw new Error('o serviço respondeu HTTP ' + r.status);
-    const d = await r.json();
-    const t = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
-    if (!t) throw new Error('resposta do serviço veio vazia.');
-    return t.trim();
   }
 
   /* ---------- execução ---------- */
@@ -1588,28 +1524,14 @@ ${comoTexto()}`;
   async function rodarTarefa(chave, pergunta) {
     if (!falas.length) return;
     const aviso = m => { $('iaMsg').innerHTML = m; };
-    const motor = $('iaMotor').value;
     const prompt = montarPrompt(chave, pergunta);
     const titulo = chave === 'pergunta' ? 'Pergunta: ' + pergunta : TAREFAS[chave].titulo;
-
-    if (motor === 'prompt') {
-      try {
-        await navigator.clipboard.writeText(prompt);
-        aviso('<span class="ok">Prompt copiado</span> — cole na IA que você usa. Nada saiu daqui.');
-      } catch (e) {
-        aviso('Copie o texto abaixo e cole na IA que você usa. Nada saiu daqui.');
-      }
-      guardarResumo('prompt:' + chave, 'Prompt pronto — ' + titulo, prompt);
-      return;
-    }
 
     ocupado = true;
     $('iaBarWrap').classList.remove('hide');
     $('iaBar').style.width = '35%';
     try {
-      const texto = motor === 'salavox' ? await pedirSalavox(prompt, aviso)
-                  : motor === 'ollama'  ? await pedirOllama(prompt, aviso)
-                                        : await pedirServico(prompt, aviso);
+      const texto = await pedirSalavox(prompt, aviso);
       $('iaBar').style.width = '100%';
       guardarResumo(chave, titulo, texto);
       aviso(`<span class="ok">${titulo} pronto.</span> Ele entra no PDF e no texto da ata.`);
@@ -1623,7 +1545,7 @@ ${comoTexto()}`;
 
   function guardarResumo(chave, titulo, texto) {
     const i = resumos.findIndex(r => r.chave === chave);
-    const item = { chave, titulo, texto, noPdf: chave.indexOf('prompt:') !== 0 };
+    const item = { chave, titulo, texto };
     if (i >= 0) resumos[i] = item; else resumos.push(item);
     desenharResumos();
   }
@@ -1634,7 +1556,7 @@ ${comoTexto()}`;
       `<div class="corpo" contenteditable="true" data-i="${i}">${escapar(r.texto)}</div>` +
       `<div class="pe"><button class="ghost sm" data-copiar="${i}">Copiar</button>` +
       `<button class="ghost sm" data-tirar="${i}">Tirar</button>` +
-      `<span class="status">${r.noPdf ? 'entra no PDF e no texto da ata' : 'não entra na ata: é o prompt'}</span>` +
+      `<span class="status">entra no PDF e no texto da ata</span>` +
       `</div></div>`).join('');
   }
 
@@ -1726,8 +1648,6 @@ ${comoTexto()}`;
 
     $('contaCard').classList.remove('hide');
     $('diagnostico').classList.remove('hide');
-    $('iaMotor').insertAdjacentHTML('afterbegin',
-      '<option value="salavox">IA do Salavox — resumo pronto, sem instalar nada</option>');
 
     if (!pegarTokens()) {
       try { sessao = JSON.parse(localStorage.getItem(CHAVE_SESSAO) || 'null'); } catch (e) {}
@@ -1774,6 +1694,7 @@ ${comoTexto()}`;
 
   function desenharConta() {
     if (!cfg) return;
+    desenharIa();
     if (!sessao || !perfil) {
       $('contaEstado').innerHTML = 'Entre para usar a <b>IA do Salavox</b> e o envio da ata por e-mail. ' +
         'Gravar, transcrever e gerar a ata continua funcionando sem conta.';

@@ -1,6 +1,6 @@
 /* Auditor que só sabe dizer "ok" não é trava.
 
-   Este arquivo quebra o aplicativo de propósito, de quatro maneiras diferentes,
+   Este arquivo quebra o aplicativo de propósito, de um jeito diferente por cenário,
    e exige que a verificação correspondente FALHE. Se ela passar mesmo com o
    defeito plantado, quem está quebrado é o teste — e é isso que este script
    existe para descobrir.
@@ -122,36 +122,33 @@ const SABOTAGENS = [
     pega: 'escolher inglês não mudaria nada e a ata sairia em português assim mesmo'
   },
   {
-    nome: 'o modo padrão manda a ata para fora sem avisar',
-    teste: 'ia',
+    nome: 'o resumo da IA não chega ao PDF nem ao texto',
+    teste: 'conta',
     porta: 8154,
-    trocas: [["    if (motor === 'prompt') {\n      try {\n        await navigator.clipboard.writeText(prompt);",
-              "    if (motor === 'prompt') {\n      try {\n        await fetch('https://api.exemplo-de-ia.com/v1/chat/completions', { method: 'POST', body: prompt });\n        await navigator.clipboard.writeText(prompt);"]],
-    pega: 'a promessa da página inicial viraria mentira sem ninguém perceber'
-  },
-  {
-    nome: 'a chave de IA é guardada no navegador',
-    teste: 'ia',
-    porta: 8155,
-    trocas: [["    const segredo = $('iaSegredo').value;",
-              "    const segredo = $('iaSegredo').value; try { localStorage.setItem('chave', segredo); } catch (e) {}"]],
-    pega: 'a chave do usuário ficaria no disco, à disposição de qualquer script da página'
-  },
-  {
-    nome: 'serviço externo é chamado sem a confirmação',
-    teste: 'ia',
-    porta: 8156,
-    trocas: [["    if (!$('iaOk').checked) throw new Error('marque a confirmação: neste modo o texto da ata sai daqui.');",
-              '    /* sabotado */']],
-    pega: 'o texto da ata sairia do computador sem que ninguém tivesse consentido'
-  },
-  {
-    nome: 'resumo da IA não chega ao PDF nem ao texto',
-    teste: 'ia',
-    porta: 8157,
-    trocas: [["    const item = { chave, titulo, texto, noPdf: chave.indexOf('prompt:') !== 0 };",
-              '    const item = { chave, titulo, texto, noPdf: false };']],
+    trocas: [['  const blocosResumo = () => resumos\n', '  const blocosResumo = () => []\n']],
     pega: 'o resumo apareceria na tela e sumiria justamente no documento que vai para o cliente'
+  },
+  {
+    nome: 'os botões da IA ficam disponíveis para quem não assinou',
+    teste: 'conta',
+    porta: 8155,
+    trocas: [["    $('iaAcoes').classList.toggle('hide', !pago);", "    $('iaAcoes').classList.remove('hide');"]],
+    pega: 'quem está no grátis clicaria, esperaria e levaria uma recusa do servidor no fim'
+  },
+  {
+    nome: 'o envio da ata por e-mail fica disponível no plano grátis',
+    teste: 'conta',
+    porta: 8156,
+    trocas: [["    $('enviarEmail').classList.toggle('hide', !pago);", "    $('enviarEmail').classList.remove('hide');"]],
+    pega: 'o custo de envio correria por conta de quem não paga nada'
+  },
+  {
+    nome: 'o cartão de IA aparece na instalação sem servidor',
+    teste: 'telas',
+    porta: 8157,
+    trocas: [["    $('iaCard').classList.toggle('hide', !(cfg && ataNaTela));",
+              "    $('iaCard').classList.remove('hide');"]],
+    pega: 'quem serve o código sozinho veria um cartão de resumo que do lado dele não faz nada'
   },
   {
     nome: 'tela preta do começo do compartilhamento entra na ata',
@@ -169,10 +166,11 @@ const SABOTAGENS = [
     pega: 'quem clicasse no link com a aba já aberta voltaria deslogado, sem entender por quê'
   },
   {
-    nome: 'a IA do Salavox aparece sem configuração de servidor',
+    nome: 'a camada paga aparece sem configuração de servidor',
     teste: 'conta',
     porta: 8160,
-    trocas: [["      if (!r.ok) return;\n      cfg = await r.json();", '      cfg = { supabaseUrl: "x", supabaseAnonKey: "y" };']],
+    trocas: [['    if (!bruto || (vazio(bruto.supabaseUrl) && vazio(bruto.supabaseAnonKey))) return;',
+              '    /* sabotado */']],
     pega: 'quem serve o código sozinho veria um botão de camada paga que não existe do lado dele'
   },
   {
@@ -195,6 +193,12 @@ function copiar(destino) {
     fs.cpSync(path.join(RAIZ, item), path.join(destino, item), { recursive: true });
   }
   fs.mkdirSync(path.join(destino, 'public'), { recursive: true });
+  /* O config.json em branco tem de vir junto. Sem ele o servidor devolve
+     "nao achei" para /config.json, o teste de conta estoura ao ler o JSON e
+     todas as seis sabotagens dessa área aparecem como "pegas" — pegas por um
+     defeito do instrumento, não pelo defeito plantado. Isso já aconteceu, e é
+     exatamente o tipo de falso verde que este arquivo existe para impedir. */
+  fs.cpSync(path.join(RAIZ, 'public', 'config.json'), path.join(destino, 'public', 'config.json'));
   fs.symlinkSync(path.join(RAIZ, 'node_modules'), path.join(destino, 'node_modules'));
 }
 
@@ -266,10 +270,11 @@ async function executar(s) {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
-/* Cenários do mesmo bloco NUNCA rodam juntos: o bloco de IA sobe um Ollama de
-   mentira na porta 11434, que é a porta que o aplicativo procura, e dois ao
-   mesmo tempo derrubam um ao outro. Isso já apareceu como três sabotagens
-   "não pegas" que na verdade nem chegaram a rodar. */
+/* Cenários do mesmo bloco NUNCA rodam juntos. A regra nasceu de três cenários
+   que disputavam uma mesma porta fixa e se derrubavam: apareceram no relatório
+   como sabotagens "não pegas" que na verdade nem chegaram a rodar. O servidor
+   de mentira mudou desde então, a regra fica — cenário que não roda mentindo
+   que passou é o pior defeito possível numa trava. */
 const filas = {};
 for (const s of LISTA) (filas[s.teste] = filas[s.teste] || []).push(s);
 const grupos = Object.values(filas);

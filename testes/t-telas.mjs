@@ -24,6 +24,12 @@ export default async function (ctx, url, erros) {
   await transcrever(p);
   b.verdade('a ata sai com trechos', /Ata pronta/.test(await p.textContent('#trMsg')));
 
+  /* Este bloco roda sem /config.json — é a instalação local, que é o padrão.
+     A IA do Salavox é a única que existe hoje, e ela precisa de servidor nosso:
+     mostrar o cartão aqui seria oferecer um botão que do lado de quem serve o
+     código sozinho não leva a lugar nenhum. */
+  b.verdade('sem camada paga configurada, o cartão de IA nem aparece', await p.isHidden('#iaCard'));
+
   await p.click('#varrer');
   await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), null, { timeout: 180000 });
 
@@ -53,11 +59,18 @@ export default async function (ctx, url, erros) {
   b.conferir('ata intercalada em ordem cronológica', ordem.join(' '),
              'fala fala TELA TELA TELA fala fala TELA');
 
-  await p.click('.telas figure');                // descarta a primeira tela
-  const depois = await p.$$eval('#ata > *', e => e.map(x => x.className.includes('telaAta') ? 'TELA' : 'fala'));
-  b.conferir('descartar uma tela a remove da ata', depois.join(' '),
-             'fala fala TELA TELA fala fala TELA');   // some a primeira das três
-  b.conferir('o contador acompanha o descarte', (await p.textContent('#telasTag')).trim(), '3 de 4 na ata');
+  /* Se a varredura não achou tela nenhuma, este clique estoura por tempo e o
+     bloco morre com "o teste quebrou" em vez de dizer o que falhou. Prefiro
+     uma verificação vermelha com nome a um estouro sem diagnóstico. */
+  const temFigura = !!(await p.$('.telas figure'));
+  b.verdade('há tela na tira para descartar', temFigura);
+  if (temFigura) {
+    await p.click('.telas figure');              // descarta a primeira tela
+    const depois = await p.$$eval('#ata > *', e => e.map(x => x.className.includes('telaAta') ? 'TELA' : 'fala'));
+    b.conferir('descartar uma tela a remove da ata', depois.join(' '),
+               'fala fala TELA TELA fala fala TELA');   // some a primeira das três
+    b.conferir('o contador acompanha o descarte', (await p.textContent('#telasTag')).trim(), '3 de 4 na ata');
+  }
 
   const esperaPdf = p.waitForEvent('download', { timeout: 60000 });
   await p.click('#baixarPdf');

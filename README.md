@@ -27,12 +27,13 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
   texto e a legenda.
 - **Registra o consentimento com carimbo de hora**: quando a confirmação foi marcada, quando o aviso foi
   copiado e quando a gravação começou, com o texto exato oferecido — na ata, no PDF e no `.txt`.
-- Exporta a ata em **PDF com as telas embutidas**, em `.txt` e em `.vtt`, permite baixar a gravação bruta,
-  e copia um prompt pronto para pedir a ata a uma IA.
-- **Resumo, decisões e pendências por IA, em três motores**, escolhidos por quem usa: prompt pronto para
-  colar (padrão, não faz nenhuma requisição), Ollama rodando na própria máquina, ou serviço externo com a
-  chave do usuário — este último atrás de uma confirmação explícita, porque nele o texto realmente sai.
-  A chave vive numa variável da aba e nunca é gravada.
+- Exporta a ata em **PDF com as telas embutidas**, em `.txt` e em `.vtt`, e permite baixar a gravação bruta.
+- **Resumo, decisões e pendências por IA — a IA do Salavox, no plano pago.** Quatro botões: resumo
+  executivo, decisões e pendências, e-mail de acompanhamento e pergunta livre à ata. O que sobe é o
+  **texto** da ata, no clique, com a chave do modelo vivendo só no servidor; o áudio e o vídeo não saem.
+  Sem `config.json` o cartão nem aparece — a instalação local continua inteira e sem cadastro.
+- **Conta por link no e-mail, sem senha** (Supabase Auth por REST, sem biblioteca), com plano, validade e
+  cota de resumos do mês. A sessão fica no `localStorage`; o texto da reunião, nunca.
 - **Dois modos de gravação**: reunião on-line (tela + áudio da chamada + microfone) e reunião presencial
   (só o microfone) — este último é o que funciona no celular, onde navegador nenhum compartilha tela.
 - **Pede o microfone antes de abrir o seletor de tela.** Ao contrário, o navegador troca para o seletor e o
@@ -70,9 +71,9 @@ PROTOCOLO.md         como se trabalha neste projeto
 ```bash
 python3 build.py                     # gera public/app.html e public/versao.txt
 node testes/rodar-tudo.mjs           # os seis blocos em paralelo — 69 s
-node testes/rodar-tudo.mjs ia        # só um bloco
-node testes/sabotagem.mjs            # 18 defeitos plantados, exige que os testes peguem — 4 min 30 s
-node testes/sabotagem.mjs ia         # só as sabotagens de uma área
+node testes/rodar-tudo.mjs conta     # só um bloco
+node testes/sabotagem.mjs            # 21 defeitos plantados, exige que os testes peguem
+node testes/sabotagem.mjs conta      # só as sabotagens de uma área
 node ferramentas/gerar-imagens.mjs   # refaz as imagens da página inicial a partir do app
 node ferramentas/ver-home.mjs        # confere a página inicial
 node ferramentas/ver-app.mjs         # confere a ferramenta, com uma reunião de exemplo processada
@@ -99,11 +100,12 @@ A versão aparece no rodapé da ferramenta e em `/versao.txt`. Para saber o que 
 ## O que foi verificado
 
 `node testes/rodar-tudo.mjs` roda tudo isto e sai com erro se algo falhar; `node testes/sabotagem.mjs`
-planta cinco defeitos no código e exige que a verificação correspondente pegue cada um.
+planta 21 defeitos no código, um de cada vez, e exige que a verificação correspondente pegue cada um —
+inclusive um cenário de controle, que precisa **passar**.
 
 Com captura sintética no Chromium: a gravação sai com **dois canais** de energias distintas (0,14 e 0,21
 no teste), a separação por canal chega à transcrição, a ata sai ordenada com os dois rótulos, e as saídas
-`.txt`, `.vtt` e o prompt saem corretos. A transcrição foi exercitada com um modelo simulado — o modelo
+`.txt` e `.vtt` saem corretos. A transcrição foi exercitada com um modelo simulado — o modelo
 real ainda não foi testado neste projeto.
 
 A varredura de telas foi verificada com uma tela sintética que troca de slide a cada 4 segundos: as 4
@@ -133,12 +135,15 @@ janelas de trinta segundos leem trechos diferentes do arquivo, "detectar o idiom
 ao modelo, o nome digitado e o nome escolhido por clique aparecem na ata, no texto e na legenda, e duas
 marcas feitas durante a gravação (uma pela tecla M, outra pelo botão) chegam à ata, ao texto e ao PDF.
 
-### O que a suíte de IA protege
+### O que a suíte de conta protege
 
-Não é a qualidade do resumo — é a promessa. O teste registra **toda** requisição que a página tenta fazer e
-exige que o modo padrão não faça nenhuma; que o modo Ollama só fale com `127.0.0.1`; que o modo com chave
-recuse funcionar antes da confirmação; e que, depois de digitar uma chave, `localStorage`, `sessionStorage`
-e os cookies continuem **vazios**.
+Não é a qualidade do resumo — é a promessa e a porteira. `testes/t-conta.mjs` registra **toda** requisição
+que a página tenta fazer e exige que a única de fora seja a do nosso servidor; que o `config.json` que vai
+no repositório esteja em branco e que em branco signifique produto local, sem cadastro e sem cartão de IA;
+que um `config.json` pela metade seja **denunciado na tela** em vez de falhar em silêncio; que o link do
+e-mail entre na conta mesmo com a aba já aberta; que no plano grátis os botões da IA nem existam; que o
+corpo da requisição seja o texto da ata com o token de quem pediu; que o resumo chegue ao PDF e ao `.txt`;
+e que a única coisa gravada no navegador seja a sessão — nada da reunião.
 
 ## Limites conhecidos, a testar antes de prometer
 
@@ -147,11 +152,11 @@ e os cookies continuem **vazios**.
 - **Reunião longa:** a memória deixou de ser o limite, mas o **tempo de transcrição** com o modelo real
   ainda não foi medido, e o disco passa a contar — cerca de 225 MB por hora só de áudio cru, mais o vídeo.
 - **Qualidade em português** com várias vozes e sotaques é incógnita.
-- **Ollama de verdade não foi testado aqui.** A integração foi verificada contra um Ollama de mentira que
-  responde como o real, inclusive nos cabeçalhos de CORS. Falta confirmar num computador com Ollama
-  instalado que o navegador aceita a conversa de uma página `https` com `http://127.0.0.1` — o Chrome
-  trata `localhost` como origem confiável, mas há a regra de rede privada, e o Ollama precisa ser iniciado
-  com `OLLAMA_ORIGINS` apontando para o endereço do Salavox. A tela já diz isso quando não encontra.
+- **A camada paga foi verificada só contra servidores de mentira.** As rotas de conta, de resumo e de
+  envio de e-mail respondem nos testes como as de verdade responderiam, e é isso que garante o
+  comportamento do navegador. Falta rodar uma vez com Supabase, Anthropic e Resend reais: a migration
+  aplicada, o link do e-mail chegando na caixa, a cota descontando e a chave do modelo funcionando do lado
+  do servidor.
 - **Eco:** se você usar alto-falante em vez de fone, sua voz volta pelo canal dos participantes. O
   cancelamento de eco do microfone ajuda, mas o caso precisa ser testado.
 - **Consentimento:** gravar reunião exige avisar os participantes. Isso tem que estar na interface.

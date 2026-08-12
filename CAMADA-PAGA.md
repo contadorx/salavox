@@ -1,7 +1,12 @@
 # Como ligar a camada paga
 
 Quatro peças, nesta ordem. Enquanto nenhuma delas existir, o Salavox continua funcionando inteiro,
-local e sem cadastro — o cartão de conta simplesmente não aparece.
+local e sem cadastro — o cartão de conta e o cartão de resumo simplesmente não aparecem.
+
+Desde 12/08/2026 a **IA do Salavox é o único motor de resumo do produto**. Os três anteriores (prompt para
+colar, Ollama local, chave de terceiro) foram removidos. Consequência prática: sem esta camada ligada, o
+produto não tem resumo por IA nenhum — o que ele tem é gravação, transcrição, telas, ata e exportação,
+ilimitados e sem cadastro.
 
 ---
 
@@ -71,16 +76,22 @@ where email = 'cliente@exemplo.com.br';
 
 ## O que foi verificado e o que não foi
 
-**Verificado** (`testes/t-conta.mjs`, com servidor simulado): sem `config.json` a conta não aparece e a IA
-do Salavox nem é oferecida; o link por e-mail entra na conta inclusive quando a aba já está aberta; plano
-grátis recebe recusa clara; assinante recebe o resumo e o botão de e-mail; a chamada leva o token de quem
-pediu e o corpo é o texto da ata; e o navegador guarda **apenas** a sessão — nenhum pedaço da reunião.
+**Verificado** (`testes/t-conta.mjs` e `testes/t-telas.mjs`, com servidor simulado): sem `config.json` nem
+a conta nem o cartão de resumo aparecem; com o config pela metade a tela denuncia; o link por e-mail entra
+na conta inclusive quando a aba já está aberta; no plano grátis os botões da IA **nem existem** — a porta é
+fechada antes do clique, não depois da viagem; assinante recebe o resumo, e ele chega ao PDF e ao `.txt`; a
+chamada leva o token de quem pediu e o corpo é o texto da ata; a página não fala com mais nenhum servidor;
+e o navegador guarda **apenas** a sessão — nenhum pedaço da reunião.
 
 **Não verificado**, porque depende de credencial real: a chamada à Anthropic, o envio pelo Resend, a
 migration rodando no Supabase de verdade e o fluxo do link de e-mail ponta a ponta. As funções em `api/`
 estão escritas e revisadas, mas nunca executaram contra os serviços reais. Rode uma vez com uma conta de
 teste antes de anunciar.
 
-**Antes do primeiro cliente pagante:** a política de privacidade e os termos precisam de uma seção nova
-dizendo o que sai do computador no plano pago, para onde vai, quanto tempo fica (não fica) e o que a
-Anthropic faz com isso. Hoje os dois documentos descrevem só o produto local.
+**Feito em 12/08/2026:** a política de privacidade e os termos ganharam as seções da camada paga — o que
+sai do computador, para onde vai, que é usado e descartado, o que fica no cadastro (e-mail, plano, contagem
+do mês) e como pedir a exclusão. Os termos ganharam ainda conta e assinatura, cota mensal não acumulável,
+a natureza do texto gerado por modelo e a limitação de responsabilidade da parte paga.
+
+**Ainda antes do primeiro cliente pagante:** rodar uma vez ponta a ponta com credenciais reais e ligar a
+cobrança (item 4).

@@ -30,9 +30,6 @@ export default async function (ctx, url, erros) {
               return c && !c.supabaseUrl && !c.supabaseAnonKey;
             }));
   b.verdade('com o config em branco o cartão de conta não aparece', await semConta.isHidden('#contaCard'));
-  b.conferir('com o config em branco a IA do Salavox nem é oferecida',
-             await semConta.$$eval('#iaMotor option', e => e.map(o => o.value)),
-             ['prompt', 'ollama', 'chave']);
   await semConta.close();
 
   /* ---------- 1b. config pela metade: falar alto, não ficar mudo ----------
@@ -54,7 +51,14 @@ export default async function (ctx, url, erros) {
   /* ---------- 2. com configuração ---------- */
   const p = await paginaLimpa(ctx, erros);
   const enviados = [];
+  const pedidos = [];
   let plano = 'gratis', ate = null;
+
+  p.on('request', r => {
+    const u = r.url();
+    if (!u.startsWith(url) && !u.startsWith('data:') && !u.startsWith('blob:') &&
+        !/cdn\.jsdelivr|huggingface/.test(u)) pedidos.push(u);
+  });
 
   await p.route('**/config.json', r => r.fulfill({
     contentType: 'application/json',
@@ -87,8 +91,8 @@ export default async function (ctx, url, erros) {
   await p.goto(url + '/app');
   await p.waitForFunction(() => !document.getElementById('contaCard').classList.contains('hide'), null, { timeout: 15000 });
   b.verdade('com configuração o cartão de conta aparece', true);
-  b.verdade('a IA do Salavox entra na lista de motores',
-            (await p.$$eval('#iaMotor option', e => e.map(o => o.value))).includes('salavox'));
+  b.verdade('a IA do Salavox é o único caminho — não há mais lista de motores',
+            await p.evaluate(() => !document.getElementById('iaMotor')));
 
   await p.fill('#contaEmail', 'contador@exemplo.com.br');
   await p.click('#contaEntrar');
@@ -108,7 +112,6 @@ export default async function (ctx, url, erros) {
   b.verdade('o token some da barra de endereço depois de entrar', !(await p.evaluate(() => location.hash)));
   b.verdade('quem está no grátis vê que a IA do Salavox é do pago',
             /plano grátis/.test(await p.textContent('#contaEstado')));
-  b.verdade('o botão de enviar por e-mail fica escondido no grátis', await p.isHidden('#enviarEmail'));
 
   /* ---------- 3. grava, transcreve e pede o resumo ---------- */
   await p.check('#okConsent');
@@ -119,11 +122,19 @@ export default async function (ctx, url, erros) {
   await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
   await transcrever(p);
 
-  await p.selectOption('#iaMotor', 'salavox');
-  await p.click('#iaResumo');
-  await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent), null, { timeout: 30000 });
-  b.verdade('no grátis a recusa é clara, não erro genérico',
-            /cota|assinatura/.test(await p.textContent('#iaMsg')));
+  /* No grátis nem se clica: os botões não estão lá. A porta é fechada antes,
+     não depois — recusar só no servidor gastaria uma viagem para dizer não. */
+  b.verdade('no grátis os botões da IA nem ficam disponíveis', await p.isHidden('#iaAcoes'));
+  /* Este conferir tem de vir DEPOIS da ata na tela. Enquanto o cartão da ata
+     está escondido, o botão de e-mail está escondido junto — e a verificação
+     passava mesmo com a trava do plano arrancada. Foi a sabotagem que mostrou:
+     um teste verde por acidente é pior do que teste nenhum. */
+  b.verdade('com a ata na tela, o envio por e-mail continua fora do grátis',
+            await p.isHidden('#enviarEmail'));
+  b.verdade('o cartão de resumo aparece assim mesmo, explicando o plano', !(await p.isHidden('#iaCard')));
+  b.verdade('e a tela diz que é do plano profissional, com o preço',
+            /profissional/.test(await p.textContent('#iaEstado')) &&
+            /19,90/.test(await p.textContent('#iaEstado')));
 
   /* vira assinante e tenta de novo */
   plano = 'profissional';
@@ -144,7 +155,6 @@ export default async function (ctx, url, erros) {
   // o botão de e-mail mora no cartão da ata, que só existe depois de transcrever
   b.verdade('assinante ganha o botão de enviar por e-mail', !(await p.isHidden('#enviarEmail')));
 
-  await p.selectOption('#iaMotor', 'salavox');
   await p.click('#iaPendencias');
   await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent), null, { timeout: 30000 });
 
@@ -156,6 +166,25 @@ export default async function (ctx, url, erros) {
   b.verdade('o que sai é o texto da ata, com a instrução da tarefa',
             /decisões/i.test(pedido.corpo.prompt) && /PARTICIPANTES|VOCÊ/.test(pedido.corpo.prompt));
   b.verdade('a cota que sobrou aparece na tela', /restam/.test(await p.textContent('#iaMotorMsg')));
+
+  /* ---------- 3b. o resumo chega ao PDF e ao texto ---------- */
+  const texto = await p.evaluate(() => window.__salavox.comoTexto());
+  b.verdade('o resumo entra no texto exportado', /RESUMO DO SALAVOX/.test(texto));
+
+  const espera = p.waitForEvent('download', { timeout: 60000 });
+  await p.click('#baixarPdf');
+  const arq = await espera;
+  const fluxo = await arq.createReadStream();
+  let tam = 0;
+  for await (const parte of fluxo) tam += parte.length;
+  b.entre('o PDF com o resumo sai (bytes)', tam, 3000, 3000000);
+
+  /* Só o nosso servidor. Houve aqui um modo com a chave de um serviço de
+     terceiro e outro falando com um modelo local na porta 11434; os dois foram
+     fechados, e este é o teste que impede alguém de reabrir qualquer saída sem
+     perceber. */
+  const forasteiros = pedidos.filter(u => !/127\.0\.0\.1|localhost|projeto-de-teste\.supabase\.co/.test(u));
+  b.conferir('a página não fala com mais ninguém', forasteiros, []);
 
   /* ---------- 4. o que fica guardado no navegador ---------- */
   const guardado = await p.evaluate(() => {

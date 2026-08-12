@@ -173,6 +173,14 @@ Depois de paralelizar, a mesma lição voltou duas vezes seguidas, e das duas o 
 
 Em ambos os casos a saída fácil era afrouxar a margem — e teria escondido o defeito seguinte.
 
+**Uma suíte de cada vez.** Em 12/08/2026 o bloco de telas falhou duas vezes em oito corridas e passou nas
+outras seis. Não era o produto nem o teste: eu tinha deixado uma corrida anterior ainda viva ao começar a
+seguinte, e duas suítes de três faixas na mesma máquina derrubam quadros da captura sintética. Cinco
+corridas sequenciais depois disso saíram limpas. Antes de investigar um teste que pisca, confira se não há
+outro `node` seu ainda rodando — `ps` custa dois segundos e me economizou uma tarde de caça a um defeito
+que não existia. **É a mesma lição do diretório de teste velho, de outro ângulo: metade dos defeitos
+fantasma vem do ambiente, não do código.**
+
 ---
 
 ## 4. Publicação — o elo mais fraco da corrente

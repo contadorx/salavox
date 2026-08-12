@@ -29,7 +29,6 @@ import pedacos from './t-pedacos.mjs';
 import recuperacao from './t-recuperacao.mjs';
 import extras from './t-extras.mjs';
 import conformidade from './t-conformidade.mjs';
-import ia from './t-ia.mjs';
 import conta from './t-conta.mjs';
 
 const TODOS = [
@@ -38,13 +37,12 @@ const TODOS = [
   ['recuperacao', recuperacao],
   ['extras', extras],
   ['conformidade', conformidade],
-  ['ia', ia],
   ['conta', conta]
 ];
 
 const pedidos = process.argv.slice(2).filter(a => !a.startsWith('--'));
 // o mais demorado entra primeiro: senão ele começa por último e todo mundo espera
-const DEMORA = { pedacos: 70, conta: 45, recuperacao: 31, telas: 18, extras: 18, conformidade: 16, ia: 16 };
+const DEMORA = { pedacos: 70, conta: 45, recuperacao: 31, telas: 18, extras: 18, conformidade: 16 };
 const TESTES = (pedidos.length ? TODOS.filter(([n]) => pedidos.includes(n)) : TODOS.slice())
   .sort((a, b) => (DEMORA[b[0]] || 0) - (DEMORA[a[0]] || 0));
 const PORTA = Number(process.env.PORTA || 8131);
