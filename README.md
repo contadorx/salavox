@@ -22,8 +22,8 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
 
 ## A ideia que separa dos concorrentes
 
-Otter, Fireflies e Fathom identificam quem falou com separação de locutor na nuvem — caro, e por isso
-fica nos planos pagos. Aqui o problema se resolve por outro caminho: **as fontes já chegam separadas.**
+As ferramentas de ata que existem hoje identificam quem falou com separação de locutor na nuvem — caro,
+e por isso fica nos planos pagos. Aqui o problema se resolve por outro caminho: **as fontes já chegam separadas.**
 O microfone é você, o áudio da chamada são os outros. Gravando um em cada canal do estéreo, a atribuição
 sai de graça.
 
@@ -34,17 +34,29 @@ comprometi a fazer"), não o de identificar cada pessoa.
 ## Estrutura
 
 ```
-src/app.html     interface
-src/app.js       toda a lógica
-public/app.html  gerado pelo build — não edite
-build.py         junta os dois
+src/app.html         interface
+src/app.js           toda a lógica
+public/app.html      gerado pelo build — não edite, o build reescreve por cima
+public/versao.txt    carimbo do que foi publicado
+build.py             junta os dois e carimba a versão
+testes/              verificações que falham de verdade
+interno/             estratégia e concorrência — fora do repositório
+PROTOCOLO.md         como se trabalha neste projeto
 ```
 
 ```bash
-python3 build.py
+python3 build.py                  # gera public/app.html e public/versao.txt
+node testes/rodar-tudo.mjs        # telas, gravação em pedaços, recuperação
+node testes/sabotagem.mjs         # quebra o app de propósito e exige que os testes peguem
 ```
 
+A versão aparece no rodapé da ferramenta e em `/versao.txt`. Para saber o que está publicado:
+`curl https://salavox.com/versao.txt` — se não bater com o zip, o que está no ar é outro produto.
+
 ## O que foi verificado
+
+`node testes/rodar-tudo.mjs` roda tudo isto e sai com erro se algo falhar; `node testes/sabotagem.mjs`
+planta cinco defeitos no código e exige que a verificação correspondente pegue cada um.
 
 Com captura sintética no Chromium: a gravação sai com **dois canais** de energias distintas (0,14 e 0,21
 no teste), a separação por canal chega à transcrição, a ata sai ordenada com os dois rótulos, e as saídas
@@ -86,5 +98,5 @@ A gravação em pedaços foi medida em execuções de 60, 90 e 180 segundos:
 3. Nomear os participantes e registrar o consentimento com carimbo de hora.
 4. Modelos de ata por tipo de reunião: cliente, equipe, entrevista.
 
-O roadmap completo, montado funcionalidade a funcionalidade contra o concorrente mais completo do mercado,
-está em [ROADMAP.md](ROADMAP.md). O modelo de negócio, em [MODELO-DE-NEGOCIO.md](MODELO-DE-NEGOCIO.md).
+O roadmap e o modelo de negócio ficam em `interno/`, fora do repositório: tratam de concorrência e preço,
+e material desse tipo não se publica.

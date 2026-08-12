@@ -1,0 +1,11 @@
+{
+  "name": "salavox",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "python3 build.py",
+    "teste": "node testes/rodar-tudo.mjs",
+    "sabotagem": "node testes/sabotagem.mjs"
+  },
+  "devDependencies": { "playwright": "^1.49.0" }
+}

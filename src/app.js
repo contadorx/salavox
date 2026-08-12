@@ -14,6 +14,7 @@
      ============================================================ */
 
   let gravador = null, blobGravacao = null, blobPcm = null;
+  let marcoInicio = 0, marcoFim = 0;          // instantes reais de início e fim, para conferência
   let depGrav = null, depPcm = null;
   let ctxAudio = null, ctxPcm = null, fluxos = [], relogio = null, segundos = 0;
   let ocupado = false;
@@ -357,6 +358,7 @@ registerProcessor('toca', Toca);`;
     const modoPcm = await ligarPcm(micFluxo, telaFluxo, temSistema, ab => depPcm.escrever(new Blob([ab])));
 
     gravador.onstop = async () => {
+      marcoFim = performance.now();
       clearInterval(relogio);
       cancelAnimationFrame(anima);
       fluxos.forEach(f => f.getTracks().forEach(t => t.stop()));
@@ -396,6 +398,7 @@ registerProcessor('toca', Toca);`;
 
     gravador.start(10000);          // um arquivo a cada dez segundos
     marcarInicioPcm();              // zera o áudio cru no mesmo instante do vídeo
+    marcoInicio = performance.now();
     segundos = 0; ocupado = true;
     $('rec').classList.add('hide');
     $('stop').classList.remove('hide');
@@ -541,7 +544,10 @@ registerProcessor('toca', Toca);`;
 
       for (let i = 0; i < nJanelas; i++) {
         const ini = i * JANELA, fim = Math.min(ini + JANELA, totalAmostras);
-        if (fim <= ini) break;
+        // A última janela costuma ser um resto de fração de segundo. Mandar isso
+        // ao modelo produz texto inventado, com instante além do fim da reunião:
+        // um teste com 60,05 s gerou fala datada em 01:09. Resto curto não entra.
+        if (fim - ini < SR) break;
         const bruto = new Int16Array(
           await blobPcm.slice(ini * BYTES_POR_AMOSTRA, fim * BYTES_POR_AMOSTRA).arrayBuffer());
         const q = fim - ini;
@@ -557,7 +563,10 @@ registerProcessor('toca', Toca);`;
               : [{ timestamp: [0, q / SR], text: (r && r.text) || '' }];
             trechos.forEach(c => {
               const txt = (c.text || '').trim();
-              if (txt) falas.push({ quem, a: ini / SR + ((c.timestamp && c.timestamp[0]) || 0), texto: txt });
+              // o instante devolvido pelo modelo é preso ao tamanho da janela:
+              // sem isso, um trecho mal datado joga a fala para depois do fim
+              const dentro = Math.min(Math.max((c.timestamp && c.timestamp[0]) || 0, 0), q / SR);
+              if (txt) falas.push({ quem, a: ini / SR + dentro, texto: txt });
             });
           }
           feitos++;
@@ -935,5 +944,6 @@ ${comoTexto()}`;
   window.__salavox = { falas: () => falas, comoTexto, comoVtt,
     gravacao: () => blobGravacao, pcm: () => blobPcm,
     tamanhos: () => ({ grav: depGrav ? depGrav.bytes : 0, pcm: depPcm ? depPcm.bytes : 0,
-                       disco: !!(depGrav && depGrav.emDisco) }) };   // usado pelos testes
+                       disco: !!(depGrav && depGrav.emDisco) }),
+    duracaoReal: () => (marcoFim - marcoInicio) / 1000 };   // usado pelos testes
 })();

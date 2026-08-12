@@ -4,8 +4,8 @@ Grava a reunião, transcreve e entrega a ata. Nada sai do computador.
 
 ## A ideia que separa dos concorrentes
 
-Otter, Fireflies e Fathom identificam quem falou usando modelos de separação de
-locutor na nuvem — é caro e por isso está nos planos pagos.
+As ferramentas de ata do mercado identificam quem falou usando modelos de
+separação de locutor na nuvem — é caro e por isso está nos planos pagos.
 
 Aqui o problema se resolve de graça, por um caminho diferente: **as duas fontes
 de áudio já chegam separadas**. O microfone é você; o áudio do sistema ou da aba
