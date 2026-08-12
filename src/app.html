@@ -53,6 +53,17 @@
   .vu i{display:block;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
   .vu i>u{display:block;height:100%;width:0;background:var(--accent);transition:width .08s}
   .vu .them u{background:var(--them)}
+  .telas{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;margin-top:14px}
+  .telas figure{margin:0;cursor:pointer;border:2px solid transparent;border-radius:7px;overflow:hidden;
+                position:relative;transition:.12s}
+  .telas figure:hover{border-color:var(--accent)}
+  .telas figure.off{opacity:.3}
+  .telas figure.off::after{content:'fora da ata';position:absolute;inset:auto 0 0 0;background:var(--err);
+        color:#fff;font-size:10px;text-align:center;padding:2px;font-weight:600}
+  .telas img{width:100%;display:block}
+  .telas figcaption{font:11px ui-monospace,Menlo,monospace;color:var(--muted);padding:3px 0 5px;text-align:center}
+  .tag{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:99px;
+       padding:3px 11px;font-size:12.5px;color:var(--muted)}
   .consent{border:1px solid var(--line);border-radius:8px;padding:13px;margin-bottom:14px;
            background:color-mix(in srgb,var(--accent) 5%,transparent)}
   .consent .chk{color:var(--ink);align-items:flex-start}
@@ -64,6 +75,9 @@
   .fala{margin-bottom:9px}
   .fala b{font-weight:650;font-size:12px;letter-spacing:.02em}
   .fala .t{font:11px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:7px}
+  .telaAta{margin:12px 0 14px;border:1px solid var(--line);border-radius:8px;overflow:hidden;max-width:420px}
+  .telaAta img{width:100%;display:block}
+  .telaAta figcaption{font:11px ui-monospace,Menlo,monospace;color:var(--muted);padding:5px 8px}
   .voce b{color:var(--you)}
   .outros b{color:var(--them)}
 </style>
@@ -75,6 +89,15 @@
   <h1>Sala<b>vox</b></h1>
   <p class="sub">Grave a reunião, receba a ata. Nenhum robô entra na chamada e nada sai do seu computador —
   a gravação e a transcrição acontecem aqui, no seu navegador.</p>
+
+  <div class="card hide" id="recupCard" style="border-color:var(--warn)">
+    <h2 style="color:var(--warn)">Gravação interrompida</h2>
+    <div class="status" id="recupMsg"></div>
+    <div class="row" style="margin-top:11px">
+      <button id="recupUsar">Usar esta gravação</button>
+      <button class="ghost sm" id="recupApagar">Apagar</button>
+    </div>
+  </div>
 
   <div class="card">
     <h2><span class="step">1</span>Gravar</h2>
@@ -101,6 +124,9 @@
     <p class="note"><b>Como funciona:</b> ao começar, o navegador pergunta qual janela ou tela compartilhar —
     escolha a da reunião e marque a opção de compartilhar o áudio. Seu microfone entra por um caminho
     separado, e é isso que permite saber depois quem falou o quê.</p>
+    <p class="note">A reunião é gravada <b>em pedaços, direto no disco</b>, e não na memória da aba: não há
+    limite prático de duração, e o que já foi gravado sobrevive se o navegador fechar sozinho. Continua tudo
+    no seu computador — o navegador guarda esses pedaços numa área privada do próprio site.</p>
   </div>
 
   <div class="card">
@@ -123,10 +149,25 @@
     e fica muito mais lenta se a aba for para segundo plano.</p>
   </div>
 
+  <div class="card hide" id="telasCard">
+    <h2><span class="step">3</span>Telas compartilhadas</h2>
+    <div class="row">
+      <button id="varrer">Procurar as telas mostradas</button>
+      <button class="ghost hide" id="pararVarre">Parar</button>
+      <span class="tag" id="telasTag"></span>
+      <button class="ghost sm hide" id="todasTelas">Manter todas</button>
+    </div>
+    <div class="bar hide" id="tbarWrap"><i id="tbar"></i></div>
+    <div class="status" id="telasMsg"></div>
+    <p class="status hide" id="telasDica">Clique em qualquer tela para tirá-la da ata.</p>
+    <div class="telas" id="telas"></div>
+  </div>
+
   <div class="card hide" id="ataCard">
-    <h2><span class="step">3</span>Ata</h2>
+    <h2><span class="step">4</span>Ata</h2>
     <div class="row">
       <button id="baixarPdf">Baixar a ata em PDF</button>
+      <button id="baixarGrav" class="ghost sm">Baixar a gravação</button>
       <button id="baixarTxt" class="ghost sm">Baixar .txt</button>
       <button id="baixarVtt" class="ghost sm">Baixar .vtt</button>
       <button id="copiarPrompt" class="ghost sm">Copiar prompt para a IA</button>
@@ -135,6 +176,7 @@
     <div id="ata"></div>
   </div>
 
+  <video id="vid" class="hide" muted playsinline preload="auto"></video>
 </div>
 <script>/*__JSPDF__*/</script>
 <script>/*__APP__*/</script>
