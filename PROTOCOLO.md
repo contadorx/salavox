@@ -86,7 +86,7 @@ Sai com código diferente de zero quando falha. É isso que permite dizer "passo
 **Três regras que valem mais que a lista:**
 
 - **Todo teste novo é sabotado de propósito antes de ser aceito.** Auditor que só sabe dizer "ok" não é
-  trava. `testes/sabotagem.mjs` planta 28 defeitos, um de cada vez, e exige que a verificação correspondente falhe — e já
+  trava. `testes/sabotagem.mjs` planta 37 defeitos, um de cada vez, e exige que a verificação correspondente falhe — e já
   reprovou dois testes meus, um deles que "pegava" o defeito pelo motivo errado.
 - **Valor esperado é golden, escrito no arquivo.** `['00:00','00:04','00:08','00:12']` está lá em letra de
   forma. Recalcular o esperado com a mesma função que se testa faz o teste passar sempre, inclusive depois
@@ -186,6 +186,22 @@ simulado alucina em laço quando a entrada é quase silenciosa, e a peneira tem 
 
 **A regra que fica:** ao simular um componente externo, a primeira pergunta não é "como ele se comporta
 quando dá certo", é **"como ele falha"** — e é esse comportamento que precisa estar no simulacro.
+
+### A medição que reprovou, e o que ela consertou
+
+Transcrever durante a gravação foi construído com a promessa de medir antes de ligar, porque o risco era
+claro: adiantar a ata às custas da gravação seria trocar o essencial pelo conveniente. A primeira medição
+**reprovou** — o bloco de gravação em pedaços passou a falhar na detecção das telas.
+
+A causa não era a transcrição em si. Era que preparar o modelo começa com duas idas à rede, e elas tinham
+passado a acontecer **no primeiro segundo da gravação** — o momento em que o navegador ainda está montando
+a captura e a janela compartilhada ainda não pintou. A correção foi no produto, não no teste: a preparação
+espera cinco segundos, e a primeira janela só fecha aos trinta. Cinco execuções seguidas depois disso
+saíram idênticas.
+
+**A regra:** quando uma medição reprova, a primeira pergunta é o que o produto passou a fazer de diferente
+— não como afrouxar o limite. E a medição vira verificação permanente, senão ela vale só pelo dia em que
+foi feita.
 
 **Uma suíte de cada vez.** Em 12/08/2026 o bloco de telas falhou duas vezes em oito corridas e passou nas
 outras seis. Não era o produto nem o teste: eu tinha deixado uma corrida anterior ainda viva ao começar a

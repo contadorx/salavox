@@ -258,6 +258,7 @@
       <button class="ghost hide" id="calar">Fechar meu microfone</button>
       <label class="chk" id="labelMic"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
       <label class="chk" id="labelTela"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
+      <label class="chk" id="labelVivo"><input type="checkbox" id="aoVivo" checked> transcrever durante a reunião</label>
     </div>
     <p class="tempo hide" id="tempo">00:00</p>
     <div class="status" id="marcasMsg"></div>
@@ -265,6 +266,7 @@
       <div><span>você (microfone)</span><i><u id="vuYou"></u></i></div>
       <div class="them"><span>participantes (áudio da reunião)</span><i><u id="vuThem"></u></i></div>
     </div>
+    <div class="status" id="vivoMsg"></div>
     <div class="status" id="recMsg" style="margin-top:10px"></div>
     <p class="note"><b>Como funciona:</b> ao começar, o navegador pergunta qual janela ou tela compartilhar —
     escolha a da reunião e marque a opção de compartilhar o áudio. Seu microfone entra por um caminho
@@ -276,6 +278,11 @@
     <p class="note">A reunião é gravada <b>em pedaços, direto no disco</b>, e não na memória da aba: não há
     limite prático de duração, e o que já foi gravado sobrevive se o navegador fechar sozinho. Continua tudo
     no seu computador — o navegador guarda esses pedaços numa área privada do próprio site.</p>
+    <p class="note"><b>Transcrever durante a reunião</b> adianta o trabalho: a cada trinta segundos gravados,
+    esse trecho já vira texto enquanto a conversa continua. Ao encerrar, quase tudo está pronto. O modelo roda
+    numa linha separada do navegador, para não atrapalhar a gravação — e no fim o áudio é medido por inteiro
+    e o que foi adiantado é conferido de novo. Se o computador for modesto, desmarque: a ata sai igual, só
+    demora mais depois.</p>
 
     <div class="ou"><span>ou</span></div>
     <div class="solta" id="solta">
@@ -396,7 +403,7 @@
 </div>
 
 <footer class="rodape">
-  Salavox versão <code>2026-08-12.76d2b99</code> — tudo roda neste computador.
+  Salavox versão <code>2026-08-12.c231519</code> — tudo roda neste computador.
   <a href="/privacidade">privacidade</a><a href="/termos">termos</a><a href="/">site</a>
 </footer>
 <script>/** @license
@@ -1196,6 +1203,9 @@ registerProcessor('toca', Toca);`;
     }
 
     const temSistema = !!(telaFluxo && telaFluxo.getAudioTracks().length);
+    /* Quais canais existem já se sabe agora, e não só ao encerrar: a
+       transcrição ao vivo precisa disso desde o primeiro trecho. */
+    janelas = { voce: !!micFluxo, outros: temSistema };
     if (!temSistema && !micFluxo) {
       if (telaFluxo) telaFluxo.getTracks().forEach(t => t.stop());
       $('recMsg').innerHTML = '<span class="err">Nenhuma fonte de áudio. Ao compartilhar, marque "compartilhar áudio".</span>';
@@ -1262,7 +1272,11 @@ registerProcessor('toca', Toca);`;
     };
     await salvarMeta();
 
-    const modoPcm = await ligarPcm(micFluxo, telaFluxo, temSistema, ab => depPcm.escrever(new Blob([ab])));
+    const modoPcm = await ligarPcm(micFluxo, telaFluxo, temSistema, ab => {
+      const escrita = depPcm.escrever(new Blob([ab]));
+      passoAoVivo();      // de propósito sem await: escrever no disco não espera o modelo
+      return escrita;
+    });
 
     gravador.onstop = async () => {
       marcoFim = performance.now();
@@ -1284,7 +1298,12 @@ registerProcessor('toca', Toca);`;
         $('recMsg').innerHTML = '<span class="err">A gravação saiu vazia. Tente de novo.</span>';
         return;
       }
-      janelas = { voce: !!micFluxo, outros: temSistema };
+      vivo.ativo = false;          // a partir daqui quem manda é a medição completa
+      if (vivo.ligado && !vivo.erro && vivo.proxima) {
+        $('vivoMsg').innerHTML = `<span class="ok">${vivo.proxima} ` +
+          `${vivo.proxima === 1 ? 'trecho de 30 s já foi transcrito' : 'trechos de 30 s já foram transcritos'} ` +
+          'durante a reunião</span> — o passo 2 vai aproveitá-los.';
+      }
       const ondeFica = depGrav.emDisco && depPcm.emDisco ? 'em disco' : 'na memória da aba';
       $('recMsg').innerHTML = `<span class="ok">Gravação de ${fmt(segundos)} pronta</span> — ` +
         `${(blobGravacao.size/1048576).toFixed(1)} MB ${ondeFica} ` +
@@ -1319,6 +1338,33 @@ registerProcessor('toca', Toca);`;
     let anima;
     const desenhar = () => { medidores.forEach(m => m()); anima = requestAnimationFrame(desenhar); };
     desenhar();
+
+    /* O modelo começa a carregar agora, junto com a gravação, e não depois
+       dela. Numa reunião real o download só acontece na primeira vez; nas
+       seguintes ele vem do cache do navegador e a primeira janela já sai
+       transcrita aos trinta segundos. */
+    zerarVivo();
+    vivo.ligado = $('aoVivo').checked;
+    if (vivo.ligado) {
+      mostrarVivo();
+      /* Com folga de propósito, e a folga tem motivo medido.
+
+         Preparar o modelo começa com duas idas à rede — procurar o espelho
+         local e achar o runtime — e elas caíam no primeiro segundo da
+         gravação, que é o momento mais sensível que existe aqui: o navegador
+         ainda está montando a captura, a janela compartilhada ainda não pintou
+         e o gravador acabou de começar. Numa medição, essa disputa moveu a
+         detecção da primeira tela e sujou a ata com um quadro do começo.
+
+         A primeira janela só fecha aos trinta segundos. Esperar cinco não
+         atrasa nada e devolve o começo da gravação a quem ele pertence. */
+      setTimeout(() => {
+        if (!vivo.ligado || !gravador || gravador.state === 'inactive') return;
+        prepararModelo($('modelo').value, () => {})
+          .then(() => { vivo.ativo = true; mostrarVivo(); passoAoVivo(); })
+          .catch(e => { vivo.erro = (e && e.message) || String(e); mostrarVivo(); });
+      }, 5000);
+    }
 
     gravador.start(10000);          // um arquivo a cada dez segundos
     marcarInicioPcm();              // zera o áudio cru no mesmo instante do vídeo
@@ -1442,6 +1488,7 @@ registerProcessor('toca', Toca);`;
          pé faria "salvar a gravação" escrever um arquivo vazio, apontando para
          pedaços que não existem mais. */
       depGrav = null; depPcm = null;
+      zerarVivo(); vivo.ligado = false; $('vivoMsg').textContent = '';
       esconderRecuperacao();
       momentos = []; telas = []; falas = [];
       $('telasCard').classList.add('hide'); $('ataCard').classList.add('hide');
@@ -1583,43 +1630,139 @@ registerProcessor('toca', Toca);`;
     } catch (e) { return null; }
   }
 
-  async function carregarModelo(modelo, aviso) {
-    const mod = await import(TJS);
-    const espelho = await espelhoLocal(modelo);
-    if (espelho) {
-      mod.env.remoteHost = espelho;
-      mod.env.remotePathTemplate = '{model}';
-      origemModelo = 'servidor do Salavox';
-    } else {
-      origemModelo = 'CDN pública';
-    }
-    mod.env.allowLocalModels = false;
-    mod.env.allowRemoteModels = true;
-    mod.env.useBrowserCache = true;      // sem isto, alguns navegadores baixam de novo toda vez
-    const base = await acharWasm();
-    try {
-      const w = mod.env.backends && mod.env.backends.onnx && mod.env.backends.onnx.wasm;
-      if (w) { w.numThreads = 1; if (base) w.wasmPaths = base; }
-    } catch (e) {}
-    const visto = {};
-    const progress_callback = p => {
-      if (p.status === 'progress' && p.file) {
-        visto[p.file] = p.progress || 0;
-        const v = Object.values(visto);
-        const pct = v.reduce((a, b) => a + b, 0) / v.length;
-        // a primeira etapa ocupa os primeiros 20% da barra; os 80% restantes são
-        // da transcrição, que é a parte demorada
-        $('bar').style.width = (pct * 0.2).toFixed(1) + '%';
-        aviso(`Etapa 1 de 2 — baixando o modelo do ${origemModelo}: ${pct.toFixed(0)}% (só na primeira vez)`);
+  /* ============================================================
+     O modelo mora numa linha de trabalho separada.
+
+     Antes ele rodava aqui mesmo, na linha principal da página. Enquanto a
+     transcrição só acontecia depois de a reunião acabar, isso era apenas
+     desconfortável: a tela congelava por alguns segundos a cada janela.
+
+     Quando a transcrição passou a rodar DURANTE a gravação, virou risco de
+     verdade. A linha principal é quem escreve os pedaços no disco — e uma
+     linha principal bloqueada por dez segundos é uma fila de pedaços parada na
+     memória, esperando. Se a aba morresse nesse intervalo, sumiria justamente
+     o material que o produto promete não perder. Adiantar a ata às custas da
+     gravação seria trocar o essencial pelo conveniente.
+
+     Numa linha separada o modelo pode demorar o quanto quiser: o gravador
+     continua escrevendo, o cronômetro continua andando e os medidores continuam
+     se mexendo. É a razão de existir deste trecho.
+     ============================================================ */
+
+  const CODIGO_TRABALHADOR = `
+    let pipe = null;
+
+    self.onmessage = async ev => {
+      const m = ev.data;
+      try {
+        if (m.tipo === 'carregar') {
+          const mod = await import(m.tjs);
+          if (m.espelho) { mod.env.remoteHost = m.espelho; mod.env.remotePathTemplate = '{model}'; }
+          mod.env.allowLocalModels = false;
+          mod.env.allowRemoteModels = true;
+          mod.env.useBrowserCache = true;   // sem isto, alguns navegadores baixam de novo toda vez
+          try {
+            const w = mod.env.backends && mod.env.backends.onnx && mod.env.backends.onnx.wasm;
+            if (w) { w.numThreads = 1; if (m.wasm) w.wasmPaths = m.wasm; }
+          } catch (e) {}
+          const visto = {};
+          const progress_callback = p => {
+            if (p.status === 'progress' && p.file) {
+              visto[p.file] = p.progress || 0;
+              const v = Object.values(visto);
+              self.postMessage({ tipo: 'progresso', pct: v.reduce((a, b) => a + b, 0) / v.length });
+            }
+          };
+          try {
+            pipe = await mod.pipeline('automatic-speech-recognition', m.modelo,
+              { device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
+                progress_callback });
+          } catch (e) {
+            self.postMessage({ tipo: 'aviso',
+              msg: 'WebGPU indisponível — usando o processador, vai demorar mais.' });
+            pipe = await mod.pipeline('automatic-speech-recognition', m.modelo,
+              { dtype: 'q8', progress_callback });
+          }
+          self.postMessage({ tipo: 'pronto' });
+          return;
+        }
+        if (m.tipo === 'transcrever') {
+          if (!pipe) throw new Error('o modelo ainda não está pronto');
+          const r = await pipe(m.dados, m.opts);
+          self.postMessage({ tipo: 'trecho', id: m.id, opcoes: m.opts,
+                             chunks: (r && r.chunks) || null, texto: (r && r.text) || '' });
+          return;
+        }
+      } catch (e) {
+        self.postMessage({ tipo: 'erro', id: m.id, msg: (e && e.message) || String(e) });
       }
     };
-    try {
-      return await mod.pipeline('automatic-speech-recognition', modelo,
-        { device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' }, progress_callback });
-    } catch (e) {
-      aviso('WebGPU indisponível — usando o processador, vai demorar mais.');
-      return await mod.pipeline('automatic-speech-recognition', modelo, { dtype: 'q8', progress_callback });
-    }
+  `;
+
+  let trabalhador = null, promessaModelo = null, avisoModelo = null;
+  const pendentes = new Map();
+  let proximoPedido = 1;
+
+  function ligarTrabalhador() {
+    if (trabalhador) return trabalhador;
+    const url = URL.createObjectURL(new Blob([CODIGO_TRABALHADOR], { type: 'text/javascript' }));
+    trabalhador = new Worker(url, { type: 'module' });
+    trabalhador.onmessage = ev => {
+      const m = ev.data;
+      if (m.tipo === 'progresso' && avisoModelo) avisoModelo(m.pct);
+      else if (m.tipo === 'aviso' && avisoModelo) avisoModelo(null, m.msg);
+      else if (m.tipo === 'pronto') { const p = pendentes.get('modelo'); if (p) { pendentes.delete('modelo'); p.ok(); } }
+      else if (m.tipo === 'trecho') {
+        /* A resposta devolve as opções com que foi pedida. Serve para
+           correlacionar pedido e resposta quando há mais de um em voo, e é o
+           único jeito de a página saber o que de fato foi entregue ao modelo —
+           que agora roda longe daqui. */
+        window.__opcoes = m.opcoes;
+        const p = pendentes.get(m.id);
+        if (p) { pendentes.delete(m.id); p.ok(m); }
+      }
+      else if (m.tipo === 'erro') {
+        const chave = m.id != null ? m.id : 'modelo';
+        const p = pendentes.get(chave);
+        if (p) { pendentes.delete(chave); p.falhou(new Error(m.msg)); }
+      }
+    };
+    trabalhador.onerror = e => {
+      for (const [, p] of pendentes) p.falhou(new Error((e && e.message) || 'a linha de transcrição caiu'));
+      pendentes.clear();
+    };
+    return trabalhador;
+  }
+
+  /* Prepara o modelo uma vez só. Chamado tanto pelo botão de transcrever quanto
+     pelo começo da gravação, quando a transcrição ao vivo está ligada — e nos
+     dois casos é a mesma promessa, então o modelo nunca é carregado em
+     duplicata. */
+  function prepararModelo(modelo, aoProgresso) {
+    avisoModelo = aoProgresso;
+    if (promessaModelo && promessaModelo.modelo === modelo) return promessaModelo.p;
+    const w = ligarTrabalhador();
+    const p = (async () => {
+      const espelho = await espelhoLocal(modelo);
+      origemModelo = espelho ? 'servidor do Salavox' : 'CDN pública';
+      const wasm = await acharWasm();
+      return new Promise((ok, falhou) => {
+        pendentes.set('modelo', { ok, falhou });
+        w.postMessage({ tipo: 'carregar', tjs: TJS, modelo, espelho, wasm });
+      });
+    })();
+    promessaModelo = { modelo, p };
+    p.catch(() => { promessaModelo = null; });     // erro não pode ficar grudado na promessa
+    return p;
+  }
+
+  function transcreverNoTrabalhador(dados, opts) {
+    const w = ligarTrabalhador();
+    const id = proximoPedido++;
+    return new Promise((ok, falhou) => {
+      pendentes.set(id, { ok, falhou });
+      w.postMessage({ tipo: 'transcrever', id, dados, opts }, [dados.buffer]);
+    });
   }
 
   /* ============================================================
@@ -1816,8 +1959,138 @@ registerProcessor('toca', Toca);`;
      manda a transcrição ler sempre a primeira fatia passou a alterar só a
      primeira cópia, e o teste que devia pegá-la ficou verde. Trecho repetido é
      trecho que só metade das travas protege. */
-  const lerJanela = async (ini, fim) => new Int16Array(
-    await blobPcm.slice(ini * BYTES_POR_AMOSTRA, fim * BYTES_POR_AMOSTRA).arrayBuffer());
+  /* Um leitor só, e ele serve os dois momentos: a gravação encerrada (que já
+     tem o blob costurado) e a gravação em curso (que só tem pedaços no disco).
+     Ler os pedaços através de `pedacos()` também espera a fila de escrita, o
+     que garante que nunca se transcreve um pedaço que ainda não chegou ao
+     disco. */
+  async function lerJanela(ini, fim) {
+    const fonte = blobPcm && blobPcm.size ? blobPcm : new Blob(await depPcm.pedacos());
+    return new Int16Array(
+      await fonte.slice(ini * BYTES_POR_AMOSTRA, fim * BYTES_POR_AMOSTRA).arrayBuffer());
+  }
+
+  const JANELA = 30 * SR;
+  const canaisAtivos = () => {
+    const q = [];
+    if (janelas.voce) q.push(['voce', 0]);
+    if (janelas.outros) q.push(['outros', 1]);
+    return q.length ? q : [['voce', 0], ['outros', 1]];
+  };
+
+  /* ============================================================
+     Transcrever enquanto a reunião acontece.
+
+     A queixa que originou isto: numa reunião de uma hora, a ata só começava a
+     ser feita quando todo mundo já tinha desligado — e aí eram mais dezenas de
+     minutos de espera olhando uma barra.
+
+     O material já estava pronto para isso. O áudio cru é escrito no disco em
+     pedaços desde o primeiro segundo, e a medição de voz já lê janela por
+     janela. Transcrever a janela N enquanto se grava a N+1 é a mesma leitura,
+     só antecipada.
+
+     O que muda, e é a parte delicada: durante a gravação não se conhece o nível
+     do canal inteiro, que é o que define o limiar de voz. Usa-se uma estimativa
+     do que já passou, e **no fim tudo é reconciliado**: janela transcrita ao
+     vivo cujo canal se revelou mudo é descartada, e janela pulada ao vivo que
+     com o limiar final passa a ter voz é transcrita então. O trabalho adiantado
+     é uma otimização; quem manda no resultado continua sendo a medição
+     completa.
+     ============================================================ */
+
+  const vivo = {
+    ligado: false, ativo: false, erro: null,
+    quadros: { voce: [], outros: [] },   // rms por quadro, acumulado enquanto grava
+    porJanela: [],                       // os mesmos quadros, janela a janela
+    falas: new Map(),                    // indice da janela -> { quem: [falas] }
+    feitas: new Set(),                   // "indice:quem" já transcritos
+    proxima: 0, ocupado: false
+  };
+
+  function zerarVivo() {
+    vivo.ativo = false; vivo.erro = null;
+    vivo.quadros = { voce: [], outros: [] };
+    vivo.porJanela = []; vivo.falas = new Map(); vivo.feitas = new Set();
+    vivo.proxima = 0; vivo.ocupado = false;
+  }
+
+  /* Chamado a cada pedaço de áudio escrito. Faz no máximo uma janela por vez:
+     enfileirar transcrições atrasaria o encerramento sem adiantar nada. */
+  async function passoAoVivo() {
+    if (!vivo.ativo || vivo.ocupado || vivo.erro) return;
+    const prontas = Math.floor(depPcm.bytes / BYTES_POR_AMOSTRA / JANELA);
+    if (prontas <= vivo.proxima) return;
+    vivo.ocupado = true;
+    const i = vivo.proxima;
+    try {
+      const ini = i * JANELA, fim = ini + JANELA;
+      const bruto = await lerJanela(ini, fim);
+      const desta = { voce: [], outros: [] };
+      const quais = canaisAtivos();
+      for (const [quem, desl] of quais) {
+        rmsPorQuadro(bruto, JANELA, desl, desta[quem]);
+        for (const r of desta[quem]) vivo.quadros[quem].push(r);
+      }
+      vivo.porJanela[i] = desta;
+
+      for (const [quem, desl] of quais) {
+        // limiar provisório, do que já se ouviu deste canal até agora
+        const limiar = limiarDoCanal(nivelAlto(vivo.quadros[quem]));
+        if (!janelaTemVoz(desta[quem], limiar)) continue;
+        const r = await transcreverNoTrabalhador(separar(bruto, JANELA, desl), opcoesDoModelo());
+        guardarTrechos(vivo.falas, i, quem, ini, JANELA, r);
+        vivo.feitas.add(i + ':' + quem);
+      }
+      vivo.proxima = i + 1;
+      mostrarVivo();
+    } catch (e) {
+      vivo.erro = (e && e.message) || String(e);
+      mostrarVivo();
+    } finally {
+      vivo.ocupado = false;
+    }
+  }
+
+  function mostrarVivo() {
+    if (!vivo.ligado) { $('vivoMsg').textContent = ''; return; }
+    if (vivo.erro) {
+      $('vivoMsg').innerHTML = `<span class="err">A transcrição ao vivo parou: ${escapar(vivo.erro)}</span>` +
+        ' — a gravação segue normal e a ata será feita inteira no fim.';
+      return;
+    }
+    if (!vivo.ativo) { $('vivoMsg').textContent = 'Preparando o modelo para transcrever durante a reunião…'; return; }
+    const min = Math.round(vivo.proxima * 30 / 60 * 10) / 10;
+    $('vivoMsg').innerHTML = vivo.proxima
+      ? `<span class="ok">Transcrevendo enquanto grava</span> — ${vivo.proxima} ` +
+        `${vivo.proxima === 1 ? 'janela pronta' : 'janelas prontas'} (${min} min de reunião já viraram texto).`
+      : 'Transcrevendo enquanto grava — a primeira janela fecha aos 30 segundos.';
+  }
+
+  const opcoesDoModelo = () => {
+    const o = { return_timestamps: true, task: $('saida').value };
+    const idioma = $('idioma').value;
+    if (idioma) o.language = idioma;
+    return o;
+  };
+
+  /* Converte a resposta do modelo em falas datadas. Estava escrito duas vezes —
+     uma no laço ao vivo, outra no final — e trecho repetido é trecho que só
+     metade das travas protege. */
+  function guardarTrechos(onde, i, quem, ini, q, r) {
+    const trechos = (r && r.chunks && r.chunks.length) ? r.chunks
+      : [{ timestamp: [0, q / SR], text: (r && r.texto) || '' }];
+    const lista = [];
+    trechos.forEach(c => {
+      const txt = (c.text || '').trim();
+      // o instante devolvido pelo modelo é preso ao tamanho da janela:
+      // sem isso, um trecho mal datado joga a fala para depois do fim
+      const dentro = Math.min(Math.max((c.timestamp && c.timestamp[0]) || 0, 0), q / SR);
+      if (txt) lista.push({ quem, a: ini / SR + dentro, texto: txt });
+    });
+    if (!onde.has(i)) onde.set(i, {});
+    onde.get(i)[quem] = lista;
+  }
 
   /* E o veredito do canal inteiro: se o mais alto que ele chega, sustentado por
      quase um segundo, não é nível de voz, então não há voz nenhuma ali. */
@@ -1863,15 +2136,17 @@ registerProcessor('toca', Toca);`;
         blobPcm = await pcmDoArquivo(blobGravacao);
       }
 
-      const pipe = await carregarModelo($('modelo').value, aviso);
+      await prepararModelo($('modelo').value, (pct, msg) => {
+        if (msg) return aviso(msg);
+        // a primeira etapa ocupa os primeiros 20% da barra; os 80% restantes são
+        // da transcrição, que é a parte demorada
+        $('bar').style.width = (pct * 20).toFixed(1) + '%';
+        aviso(`Etapa 1 de 2 — baixando o modelo do ${origemModelo}: ${(pct * 100).toFixed(0)}% (só na primeira vez)`);
+      });
 
-      const JANELA = 30 * SR;
       const totalAmostras = Math.floor(blobPcm.size / BYTES_POR_AMOSTRA);
       const nJanelas = Math.max(1, Math.ceil(totalAmostras / JANELA));
-      const quais = [];
-      if (janelas.voce) quais.push(['voce', 0]);
-      if (janelas.outros) quais.push(['outros', 1]);
-      if (!quais.length) quais.push(['voce', 0], ['outros', 1]);
+      const quais = canaisAtivos();
 
       /* ---- pré-varredura: medir antes de chamar o modelo ----
          A decisão mais importante desta função é a de NÃO transcrever, e ela
@@ -1883,12 +2158,15 @@ registerProcessor('toca', Toca);`;
       for (let i = 0; i < nJanelas; i++) {
         const ini = i * JANELA, fim = Math.min(ini + JANELA, totalAmostras);
         if (fim - ini < SR) break;
-        const bruto = await lerJanela(ini, fim);
-        const desta = { voce: [], outros: [] };
-        for (const [quem, desl] of quais) {
-          rmsPorQuadro(bruto, fim - ini, desl, desta[quem]);
-          for (const r of desta[quem]) quadros[quem].push(r);
+        /* A medição das janelas já feitas ao vivo é reaproveitada: ler o mesmo
+           áudio de novo só para recontar a mesma coisa seria desperdício puro. */
+        let desta = vivo.porJanela[i];
+        if (!desta) {
+          const bruto = await lerJanela(ini, fim);
+          desta = { voce: [], outros: [] };
+          for (const [quem, desl] of quais) rmsPorQuadro(bruto, fim - ini, desl, desta[quem]);
         }
+        for (const [quem] of quais) for (const r of desta[quem]) quadros[quem].push(r);
         porJanela.push(desta);
         $('bar').style.width = (2 + (i + 1) / nJanelas * 16).toFixed(1) + '%';
       }
@@ -1913,8 +2191,8 @@ registerProcessor('toca', Toca);`;
 
       const totalBlocos = nJanelas * ativos.length;
       const inicio = performance.now();
-      let feitos = 0, puladas = 0;
-      const idioma = $('idioma').value;
+      let feitos = 0, adiantados = 0, descartados = 0;
+      const guardadas = new Map();
       falas = [];
 
       for (let i = 0; i < porJanela.length; i++) {
@@ -1929,26 +2207,32 @@ registerProcessor('toca', Toca);`;
            algum tiver — em reunião com um lado calado isso corta metade do
            trabalho, e é o mesmo cálculo que impede a invenção. */
         const comVoz = ativos.filter(([quem]) => janelaTemVoz(porJanela[i][quem], limiar[quem]));
-        puladas += ativos.length - comVoz.length;
         feitos += ativos.length - comVoz.length;
 
-        let bruto = null;
-        if (comVoz.length) bruto = await lerJanela(ini, fim);
+        /* Reconciliação com o que foi adiantado durante a gravação.
 
-        for (const [quem, desl] of comVoz) {
-          const dados = separar(bruto, q, desl);
-          const opts = { return_timestamps: true, task: $('saida').value };
-          if (idioma) opts.language = idioma;
-          const r = await pipe(dados, opts);
-          const trechos = (r && r.chunks && r.chunks.length) ? r.chunks
-            : [{ timestamp: [0, q / SR], text: (r && r.text) || '' }];
-          trechos.forEach(c => {
-            const txt = (c.text || '').trim();
-            // o instante devolvido pelo modelo é preso ao tamanho da janela:
-            // sem isso, um trecho mal datado joga a fala para depois do fim
-            const dentro = Math.min(Math.max((c.timestamp && c.timestamp[0]) || 0, 0), q / SR);
-            if (txt) falas.push({ quem, a: ini / SR + dentro, texto: txt });
-          });
+           O que já foi transcrito ao vivo só continua valendo se passar pela
+           medição completa: o limiar de lá era uma estimativa feita com parte
+           da reunião. O que não passa é descartado, e é por isso que a ata
+           final não depende de a estimativa ter acertado. */
+        const faltando = [];
+        for (const par of comVoz) {
+          const quem = par[0];
+          if (vivo.feitas.has(i + ':' + quem)) {
+            if (!guardadas.has(i)) guardadas.set(i, {});
+            guardadas.get(i)[quem] = (vivo.falas.get(i) || {})[quem] || [];
+            adiantados++; feitos++;
+          } else faltando.push(par);
+        }
+        for (const [quem] of ativos)
+          if (vivo.feitas.has(i + ':' + quem) && !comVoz.some(par => par[0] === quem)) descartados++;
+
+        let bruto = null;
+        if (faltando.length) bruto = await lerJanela(ini, fim);
+
+        for (const [quem, desl] of faltando) {
+          const r = await transcreverNoTrabalhador(separar(bruto, q, desl), opcoesDoModelo());
+          guardarTrechos(guardadas, i, quem, ini, q, r);
           feitos++;
         }
 
@@ -1961,6 +2245,9 @@ registerProcessor('toca', Toca);`;
               `${pct.toFixed(0)}%${falta}`);
       }
 
+      for (const [, porCanal] of guardadas)
+        for (const quem of Object.keys(porCanal)) falas = falas.concat(porCanal[quem]);
+
       mostrarModeloGuardado();
       falas.sort((a, b) => a.a - b.a);
       const laco = tirarLacos(falas);
@@ -1968,13 +2255,19 @@ registerProcessor('toca', Toca);`;
       const trocas = corrigirComVocabulario();
       mostrarAta();
       const nome = q => q === 'voce' ? 'do seu microfone' : 'dos participantes';
+      const adianto = adiantados
+        ? `<br>${adiantados} ${adiantados === 1 ? 'trecho já estava pronto' : 'trechos já estavam prontos'} ` +
+          'quando a reunião acabou — foram transcritos durante a gravação' +
+          (descartados ? `, e ${descartados} ${descartados === 1 ? 'foi descartado' : 'foram descartados'} ` +
+            'pela medição completa do áudio.' : '.')
+        : '';
       aviso(`<span class="ok">Ata pronta</span> — ${falas.length} trechos` +
             (trocas ? `, ${trocas} ${trocas === 1 ? 'termo corrigido' : 'termos corrigidos'} pelo vocabulário` : '') +
             '.' +
             (mudos.length ? `<br><span class="err">O canal ${mudos.map(nome).join(' e o ')} ficou em ` +
               'silêncio e não foi transcrito</span> — sem isso o modelo inventaria texto.' : '') +
             (laco.tirados ? `<br>${laco.tirados} ${laco.tirados === 1 ? 'trecho repetido foi descartado' :
-              'trechos repetidos foram descartados'}: o modelo entrou em laço sobre ruído.` : ''));
+              'trechos repetidos foram descartados'}: o modelo entrou em laço sobre ruído.` : '') + adianto);
     } catch (e) {
       aviso(`<span class="err">Não consegui transcrever: ${(e && e.message) || e}</span>`);
     } finally {
@@ -2989,6 +3282,7 @@ registerProcessor('toca', Toca);`;
     $('recupUsar').onclick = async () => {
       $('recupUsar').disabled = true;
       $('recupMsg').textContent = 'Costurando os pedaços…';
+      zerarVivo(); vivo.ligado = false; $('vivoMsg').textContent = '';
       blobGravacao = await juntarPrefixo('gravacao');
       blobPcm = await juntarPrefixo('pcm');
       segundos = Math.round(dur);
@@ -3015,7 +3309,8 @@ registerProcessor('toca', Toca);`;
     consentimento: () => consentimento, aplicarVocabulario, corrigirComVocabulario,
     resumos: () => resumos, montarPrompt, perfil: () => perfil, temPlano, cfg: () => cfg,
     tirarLacos, nivelAlto, janelaTemVoz, limiarDoCanal, canalMudo, rmsPorQuadro,
-    podeSalvarEmFluxo,
+    podeSalvarEmFluxo, pedidosAoModelo: () => proximoPedido - 1, vivo: () => ({ ligado: vivo.ligado, ativo: vivo.ativo, erro: vivo.erro,
+                                      janelas: vivo.proxima, feitas: [...vivo.feitas] }),
     QUADRO, PISO_VOZ, QUADROS_MIN,
     micLigado: () => !!(micFluxoAtual && micFluxoAtual.getAudioTracks()[0] &&
                         micFluxoAtual.getAudioTracks()[0].enabled),

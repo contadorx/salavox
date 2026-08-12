@@ -258,6 +258,7 @@
       <button class="ghost hide" id="calar">Fechar meu microfone</button>
       <label class="chk" id="labelMic"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
       <label class="chk" id="labelTela"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
+      <label class="chk" id="labelVivo"><input type="checkbox" id="aoVivo" checked> transcrever durante a reunião</label>
     </div>
     <p class="tempo hide" id="tempo">00:00</p>
     <div class="status" id="marcasMsg"></div>
@@ -265,6 +266,7 @@
       <div><span>você (microfone)</span><i><u id="vuYou"></u></i></div>
       <div class="them"><span>participantes (áudio da reunião)</span><i><u id="vuThem"></u></i></div>
     </div>
+    <div class="status" id="vivoMsg"></div>
     <div class="status" id="recMsg" style="margin-top:10px"></div>
     <p class="note"><b>Como funciona:</b> ao começar, o navegador pergunta qual janela ou tela compartilhar —
     escolha a da reunião e marque a opção de compartilhar o áudio. Seu microfone entra por um caminho
@@ -276,6 +278,11 @@
     <p class="note">A reunião é gravada <b>em pedaços, direto no disco</b>, e não na memória da aba: não há
     limite prático de duração, e o que já foi gravado sobrevive se o navegador fechar sozinho. Continua tudo
     no seu computador — o navegador guarda esses pedaços numa área privada do próprio site.</p>
+    <p class="note"><b>Transcrever durante a reunião</b> adianta o trabalho: a cada trinta segundos gravados,
+    esse trecho já vira texto enquanto a conversa continua. Ao encerrar, quase tudo está pronto. O modelo roda
+    numa linha separada do navegador, para não atrapalhar a gravação — e no fim o áudio é medido por inteiro
+    e o que foi adiantado é conferido de novo. Se o computador for modesto, desmarque: a ata sai igual, só
+    demora mais depois.</p>
 
     <div class="ou"><span>ou</span></div>
     <div class="solta" id="solta">

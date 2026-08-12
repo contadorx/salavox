@@ -57,8 +57,8 @@ const SABOTAGENS = [
     nome: 'transcrição lê sempre a primeira fatia',
     teste: 'pedacos',
     porta: 8144,
-    trocas: [['    await blobPcm.slice(ini * BYTES_POR_AMOSTRA, fim * BYTES_POR_AMOSTRA).arrayBuffer());',
-              '    await blobPcm.slice(0, (fim - ini) * BYTES_POR_AMOSTRA).arrayBuffer());']],
+    trocas: [['      await fonte.slice(ini * BYTES_POR_AMOSTRA, fim * BYTES_POR_AMOSTRA).arrayBuffer());',
+              '      await fonte.slice(0, (fim - ini) * BYTES_POR_AMOSTRA).arrayBuffer());']],
     pega: 'toda a reunião viraria repetição dos primeiros trinta segundos'
   },
   {
@@ -87,7 +87,7 @@ const SABOTAGENS = [
     nome: '"detectar o idioma" força português assim mesmo',
     teste: 'extras',
     porta: 8149,
-    trocas: [['if (idioma) opts.language = idioma;', "opts.language = idioma || 'pt';"]],
+    trocas: [['    if (idioma) o.language = idioma;', "    o.language = idioma || 'pt';"]],
     pega: 'reunião em inglês ou espanhol sairia transcrita como se fosse português'
   },
   {
@@ -117,8 +117,8 @@ const SABOTAGENS = [
     nome: '"ata em inglês" não pede tradução',
     teste: 'conformidade',
     porta: 8153,
-    trocas: [["const opts = { return_timestamps: true, task: $('saida').value };",
-              "const opts = { return_timestamps: true, task: 'transcribe' };"]],
+    trocas: [["    const o = { return_timestamps: true, task: $('saida').value };",
+              "    const o = { return_timestamps: true, task: 'transcribe' };"]],
     pega: 'escolher inglês não mudaria nada e a ata sairia em português assim mesmo'
   },
   {
@@ -208,6 +208,29 @@ const SABOTAGENS = [
     arquivo: 'api/resumo.js',
     trocas: [['  if (!cota.ok || restante < 0) {', '  if (false) {']],
     pega: 'cada recusa passaria a custar dinheiro, e nada na tela mudaria para denunciar isso'
+  },
+  {
+    nome: 'o texto adiantado ao vivo é jogado fora na hora de montar a ata',
+    teste: 'pedacos',
+    porta: 8176,
+    trocas: [["            guardadas.get(i)[quem] = (vivo.falas.get(i) || {})[quem] || [];",
+              '            guardadas.get(i)[quem] = [];']],
+    pega: 'a reunião seria transcrita durante a gravação e a ata sairia vazia mesmo assim'
+  },
+  {
+    nome: 'a ata final ignora o que já foi transcrito e refaz tudo',
+    teste: 'pedacos',
+    porta: 8177,
+    trocas: [["          if (vivo.feitas.has(i + ':' + quem)) {", '          if (false) {']],
+    pega: 'transcrever durante a reunião não adiantaria nada, e ninguém perceberia porque a ata sai igual'
+  },
+  {
+    nome: 'a transcrição ao vivo lê áudio que ainda não chegou ao disco',
+    teste: 'pedacos',
+    porta: 8178,
+    trocas: [['    const prontas = Math.floor(depPcm.bytes / BYTES_POR_AMOSTRA / JANELA);',
+              '    const prontas = Math.ceil(depPcm.bytes / BYTES_POR_AMOSTRA / JANELA) + 1;']],
+    pega: 'janelas seriam transcritas pela metade, com o fim em branco, e a ata perderia falas'
   },
   {
     nome: 'o resumo da IA não chega ao PDF nem ao texto',

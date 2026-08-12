@@ -153,12 +153,18 @@ export default async function (ctx, url, erros) {
   b.conferir('nenhuma fala é atribuída ao microfone fechado', porCanal.voce, 0);
   b.verdade('e o canal dos participantes continua sendo transcrito', porCanal.outros > 0);
 
-  /* A prova de que a peneira agiu ANTES do modelo, e não depois: o modelo
-     simulado conta quantas vezes alucinou. Se o canal mudo tivesse chegado
-     nele, o contador seria maior que zero — e as 88 linhas da ata de verdade
-     estariam aqui de novo. */
-  b.conferir('o áudio mudo nem chegou ao modelo',
-             await p.evaluate(() => globalThis.__alucinou || 0), 0);
+  /* A prova de que a peneira agiu ANTES do modelo, e não depois.
+
+     Onze segundos de gravação dão uma janela; dois canais dariam dois pedidos
+     ao modelo. Como o canal do microfone é mudo, o número certo é UM. Se
+     alguém afrouxar a peneira, este contador vira dois e as 88 linhas da ata
+     de verdade voltam.
+
+     Contar pedidos, e não alucinações, também sobreviveu à mudança de casa do
+     modelo: ele agora roda numa linha separada, e um contador guardado lá
+     dentro seria invisível daqui — o teste continuaria verde sem medir nada. */
+  b.conferir('o áudio mudo nem chegou ao modelo: um canal, um pedido',
+             await p.evaluate(() => window.__salavox.pedidosAoModelo()), 1);
 
   const texto = await p.evaluate(() => window.__salavox.comoTexto());
   b.verdade('nada de "O que é isso?" no texto exportado', !/O que é isso\?/.test(texto));

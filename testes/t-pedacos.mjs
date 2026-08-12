@@ -39,6 +39,23 @@ export default async function (ctx, url, erros) {
   b.verdade('o disco cresce enquanto a memória não', marcos[marcos.length - 1].tam.pcm > marcos[0].tam.pcm * 3);
   b.verdade('os pedaços estão indo para o disco, não para a memória', marcos[0].tam.disco === true);
 
+  /* ---------- transcrever durante a reunião ----------
+
+     A medição que autorizou ligar isto por padrão. A pergunta não é se a
+     transcrição adiantada funciona — é se ela **estraga a gravação**, que é a
+     parte que não pode ser perdida. Por isso as verificações de integridade
+     abaixo (memória parada, 62,5 KB/s, áudio do tamanho do relógio, telas nos
+     instantes certos) rodam com o ao vivo LIGADO: são elas que respondem.
+
+     Uma medição anterior reprovou e foi consertada no produto: preparar o
+     modelo começava com duas idas à rede no primeiro segundo da gravação, e
+     isso deslocava a detecção da primeira tela. Agora essa preparação espera
+     cinco segundos — a primeira janela só fecha aos trinta. */
+  const vivoAntes = await p.evaluate(() => window.__salavox.vivo());
+  b.verdade('a transcrição ao vivo está ligada por padrão', vivoAntes.ligado);
+  b.conferir('e não quebrou durante a gravação', vivoAntes.erro, null);
+  b.verdade('ao menos uma janela de 30 s já virou texto antes de encerrar', vivoAntes.janelas >= 1);
+
   await p.click('#stop');
   await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
 
@@ -57,6 +74,9 @@ export default async function (ctx, url, erros) {
     };
   });
 
+  b.verdade('ao encerrar, a tela diz o que já foi adiantado',
+            /já (foi|foram) transcrit/.test(await p.textContent('#vivoMsg')));
+
   const duracao = info.pcmBytes / 4 / 16000;                  // 2 canais Int16 a 16 kHz
   b.entre('taxa do áudio cru em KB/s', info.pcmBytes / duracao / 1024, 62.4, 62.6);
   /* Conferência grossa: o arquivo de áudio tem a duração da gravação. A margem é
@@ -69,6 +89,8 @@ export default async function (ctx, url, erros) {
   b.verdade('os metadados da sessão foram gravados', info.meta);
 
   await transcrever(p);
+  b.verdade('a ata final diz que aproveitou o trabalho adiantado',
+            /já estava(m)? pronto|já estavam prontos/.test(await p.textContent('#trMsg')));
   const falas = await p.evaluate(() => window.__salavox.falas().map(f => ({ a: Math.round(f.a), quem: f.quem, texto: f.texto })));
   // uma janela de 30 s por vez; o modelo falso devolve dois trechos por janela
   b.conferir('as falas são datadas a partir do início de cada janela',
@@ -95,7 +117,19 @@ export default async function (ctx, url, erros) {
   await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), null, { timeout: 240000 });
   const legendas = await p.$$eval('.telas figcaption', e => e.map(x => x.textContent.trim()));
   const segundosDe = t => { const [m, s] = t.split(':').map(Number); return m * 60 + s; };
-  const telaDoMeio = legendas[1] ? segundosDe(legendas[1]) : null;
+
+  /* A tela procurada é a da troca dos 20 s — que a tela sintética faz por
+     construção —, e não "a segunda da lista".
+
+     Pegar pelo índice era uma suposição que nunca foi a afirmação deste teste,
+     e ela quebrou quando o começo da captura passou a ser detectado em dois
+     pedaços sob máquina carregada: o preto e um quadro pintado pela metade. A
+     lista ganhou um item, todos os índices andaram, e o teste acusou
+     desalinhamento onde havia só uma contagem diferente. O que se afirma aqui é
+     o instante, então é pelo instante que ela é procurada. */
+  const instantes = legendas.map(segundosDe);
+  const telaDoMeio = instantes.filter(t => t >= 10 && t <= 30)[0] ?? null;
+  b.verdade('as três trocas de slide foram detectadas', instantes.length >= 3);
 
   const primeira = falas.find(f => f.quem === 'outros' && f.a === 1 && /quieto=/.test(f.texto));
   const quieto = primeira ? Number(primeira.texto.match(/quieto=(-?[0-9.]+)/)[1]) : null;

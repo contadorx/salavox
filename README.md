@@ -12,6 +12,12 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
   ao reabrir a página, o Salavox oferece recuperar.
 - Transcreve cada canal isoladamente com o Whisper rodando local, e monta a ata em ordem cronológica
   já marcando **VOCÊ** e **PARTICIPANTES**.
+- **Transcreve durante a reunião**: a cada trinta segundos gravados, aquele trecho já vira texto enquanto
+  a conversa continua. Numa reunião de uma hora, ao encerrar quase tudo está pronto. O modelo roda numa
+  **linha separada do navegador**, para não travar quem escreve os pedaços no disco — e no fim o áudio é
+  medido por inteiro e o que foi adiantado é reconciliado: janela cujo canal se revelou mudo é descartada,
+  janela pulada que passa a ter voz é transcrita então. O adiantamento é otimização; quem manda no
+  resultado é a medição completa.
 - **Não transcreve silêncio, e diz que não transcreveu.** Antes de chamar o modelo, o áudio cru é medido
   em quadros de 20 ms: um canal que nunca chega a nível de voz é declarado mudo e não é enviado; uma janela
   sem pelo menos 200 ms de fala é pulada. Isso economiza tempo em reunião real e, principalmente, impede
@@ -88,7 +94,7 @@ PROTOCOLO.md         como se trabalha neste projeto
 python3 build.py                     # gera public/app.html e public/versao.txt
 node testes/rodar-tudo.mjs           # os nove blocos em paralelo — 70 s
 node testes/rodar-tudo.mjs silencio  # só um bloco
-node testes/sabotagem.mjs            # 34 defeitos plantados, exige que os testes peguem
+node testes/sabotagem.mjs            # 37 defeitos plantados, exige que os testes peguem
 node testes/sabotagem.mjs silencio   # só as sabotagens de uma área
 node ferramentas/gerar-imagens.mjs   # refaz as imagens da página inicial a partir do app
 node ferramentas/ver-home.mjs        # confere a página inicial
@@ -117,7 +123,7 @@ A versão aparece no rodapé da ferramenta e em `/versao.txt`. Para saber o que 
 ## O que foi verificado
 
 `node testes/rodar-tudo.mjs` roda tudo isto e sai com erro se algo falhar; `node testes/sabotagem.mjs`
-planta 34 defeitos no código, um de cada vez, e exige que a verificação correspondente pegue cada um —
+planta 37 defeitos no código, um de cada vez, e exige que a verificação correspondente pegue cada um —
 inclusive um cenário de controle, que precisa **passar**.
 
 Com captura sintética no Chromium: a gravação sai com **dois canais** de energias distintas (0,14 e 0,21
@@ -187,6 +193,10 @@ e que a única coisa gravada no navegador seja a sessão — nada da reunião.
   web). Zoom em aplicativo, não.
 - **Reunião longa:** a memória deixou de ser o limite, mas o **tempo de transcrição** com o modelo real
   ainda não foi medido, e o disco passa a contar — cerca de 225 MB por hora só de áudio cru, mais o vídeo.
+  Transcrever durante a reunião muda a conta a favor, mas **com o modelo real ainda não foi medido**: se
+  uma janela de 30 s levar mais de 30 s para transcrever, o adiantamento não acompanha a gravação e vira
+  apenas uma dianteira parcial. Isso não quebra nada — a ata sai igual —, mas a promessa de "pronta ao
+  encerrar" só vale onde o computador acompanha.
 - **Qualidade em português** com várias vozes e sotaques é incógnita.
 - **Canal com ruído alto e sem fala** — música de espera, ventilador perto do microfone — passa pela
   peneira de energia, porque ela mede nível, não fala. O filtro de laço é a rede que sobra, e ela só pega
