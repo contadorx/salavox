@@ -117,12 +117,14 @@ O conserto não foi cortar cobertura. Foi tirar o desperdício:
 | | Antes | Agora |
 |---|---|---|
 | Suíte completa | ~5 a 6 min, um bloco de cada vez | **69 s**, três blocos em paralelo |
-| Sabotagem completa | ~25 min | **3 min 40 s** |
+| Sabotagem completa | ~25 min | **4 min 30 s** |
 
 Cada bloco roda com o seu próprio servidor, numa porta própria — porta diferente é origem diferente, e
 origem diferente é armazenamento diferente, senão um bloco apagaria a gravação do outro. E o paralelismo
-para em **três**: estes testes gravam mídia em tempo real, e com a máquina saturada o navegador perde
-quadros e o teste acusa defeito que não existe.
+para em **três** na suíte e em **dois** na sabotagem: estes testes gravam mídia em tempo real, e com a
+máquina saturada o navegador perde quadros e o teste acusa defeito que não existe. Cada cenário de
+sabotagem roda um bloco inteiro numa cópia própria do projeto — é o dobro do peso, e com três faixas até o
+controle do experimento começou a piscar.
 
 Com esse custo, a regra de quando rodar o quê:
 
@@ -133,8 +135,8 @@ Com esse custo, a regra de quando rodar o quê:
 | Alteração numa área com sabotagem própria | `sabotagem.mjs <área>` | ~1 min |
 | Teste novo entrando | sabotagem da área dele | ~1 min |
 | Teste que piscou | a suíte três vezes seguidas | 3,5 min |
-| **Antes de gerar o zip de entrega** | suíte + `sabotagem.mjs` inteira | 5 min |
-| Mexeu em gravação, disco ou linha do tempo | sabotagem inteira | 3,5 min |
+| **Antes de gerar o zip de entrega** | suíte + `sabotagem.mjs` inteira | 6 min |
+| Mexeu em gravação, disco ou linha do tempo | sabotagem inteira | 4,5 min |
 
 O que **não** vale cortar em nome da velocidade: o valor golden escrito no arquivo, a sabotagem antes de
 aceitar um teste novo, e a regra de só marcar como passado o que foi verificado por inteiro. O que vale
@@ -156,6 +158,20 @@ tolerância.** Afrouxar a margem é o remédio errado e o mais tentador.
 
 Três corridas seguidas verdes valem mais que uma. Um teste que passa numa e falha na outra é um teste que
 não se pode usar para dizer "passou".
+
+Depois de paralelizar, a mesma lição voltou duas vezes seguidas, e das duas o defeito estava no instrumento:
+
+- **Golden preciso demais.** A varredura amostra o vídeo de 0,6 em 0,6 segundo, e o instante que ela
+  registra depende de onde a grade de amostragem calha de bater: uma troca aos 8 s aparece como 00:07 ou
+  00:08. O golden exigia o segundo exato. Agora exige quatro telas, cada uma a menos de um segundo da
+  troca, e nenhuma tela preta — que é o que de fato importa.
+- **Dois relógios onde devia haver um.** A tela sintética trocava de slide por leitura de
+  `performance.now()` e baixava o volume por um `setTimeout` separado. Com a máquina carregada o
+  `setTimeout` atrasava algumas centenas de milissegundos, os dois eventos se descolavam, e o teste de
+  alinhamento acusava um desencontro que era dele mesmo. Agora as duas coisas acontecem na mesma leitura
+  de relógio, e não há como se descolarem.
+
+Em ambos os casos a saída fácil era afrouxar a margem — e teria escondido o defeito seguinte.
 
 ---
 

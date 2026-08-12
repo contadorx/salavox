@@ -178,7 +178,10 @@ function copiar(destino) {
    arquivo — só pela máquina, e por isso o limite de três. */
 const areas = process.argv.slice(2);
 const LISTA = areas.length ? SABOTAGENS.filter(s => areas.includes(s.teste)) : SABOTAGENS;
-const LADOS = Number(process.env.LADOS || 3);
+/* Duas faixas, não três. Aqui cada cenário roda um bloco inteiro numa cópia
+   própria do projeto: é o dobro do peso da suíte normal, e com três ao mesmo
+   tempo o próprio controle do experimento começou a piscar. */
+const LADOS = Number(process.env.LADOS || 2);
 const saidas = [];
 let tudoBem = true;
 

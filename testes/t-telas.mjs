@@ -27,9 +27,23 @@ export default async function (ctx, url, erros) {
   await p.click('#varrer');
   await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), { timeout: 180000 });
 
-  const instantes = await p.$$eval('.telas figcaption', e => e.map(x => x.textContent.trim()));
-  // a captura começa preta; a primeira tela guardada é a primeira com conteúdo
-  b.conferir('instantes das telas detectadas', instantes, ['00:01', '00:04', '00:08', '00:12']);
+  /* A varredura amostra o vídeo de 0,6 em 0,6 segundo, e o instante que ela
+     registra é o do primeiro quadro amostrado depois da troca — pode cair um
+     segundo antes ou depois, conforme onde a grade de amostragem calha de
+     bater. Exigir o segundo exato era exigir mais precisão do que o
+     instrumento tem, e a suíte piscava por isso. O que o golden guarda é o que
+     importa: quatro telas, uma perto de cada troca, e nenhuma tela preta do
+     começo da captura. */
+  const instantes = await p.$$eval('.telas figcaption', e => e.map(x => {
+    const [m, s] = x.textContent.trim().split(':').map(Number);
+    return m * 60 + s;
+  }));
+  const ESPERADOS = [1, 4, 8, 12];       // a captura começa preta: a 1ª tela é a 1ª com conteúdo
+  b.conferir('quantas telas foram detectadas', instantes.length, ESPERADOS.length);
+  b.conferir('cada tela caiu perto da troca de slide (± 1 s)',
+             instantes.map((t, i) => Math.abs(t - (ESPERADOS[i] ?? -99)) <= 1),
+             ESPERADOS.map(() => true));
+  b.verdade('nenhuma tela preta do começo da captura entrou', instantes[0] >= 1);
 
   /* A primeira tela cai depois das primeiras falas porque a captura passa o
      primeiro segundo preta: a tela só existe a partir de 1,2 s, e as falas do

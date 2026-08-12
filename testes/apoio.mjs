@@ -41,6 +41,7 @@ export function telaFalsa(segundosPorSlide) {
       const c=document.createElement('canvas'); c.width=640; c.height=360;
       const x=c.getContext('2d');
       const cores=['#c0392b','#27ae60','#2980b9','#f1c40f'];
+      let ganho = null;
       // Preto no primeiro segundo e pouco, de propósito: é o que acontece quando
       // a captura começa antes de a janela compartilhada pintar. Sem isso a
       // peneira de tela vazia só era exercitada por sorte de cronometragem, e a
@@ -48,15 +49,20 @@ export function telaFalsa(segundosPorSlide) {
       const t0 = performance.now();
       x.fillStyle='#000'; x.fillRect(0,0,640,360);
       setInterval(()=>{ const dt = performance.now() - t0;
+        /* O volume cai no mesmo instante da troca de slide dos 20 s, e cai aqui
+           dentro, na mesma leitura de relógio que decide o slide. Antes era um
+           setTimeout separado: com a máquina carregada ele disparava algumas
+           centenas de milissegundos depois, os dois eventos se descolavam e o
+           teste de alinhamento acusava um desencontro que era do próprio
+           instrumento. */
+        if (ganho) ganho.gain.value = dt >= 20000 ? .06 : .3;
         if (dt < 1200) { x.fillStyle='#000'; x.fillRect(0,0,640,360); return; }
         const i=Math.floor(dt/1000/spp)%4;
         x.fillStyle=cores[i]; x.fillRect(0,0,640,360);
         x.fillStyle='#fff'; x.font='bold 52px sans-serif'; x.fillText('SLIDE '+(i+1),200,200); },100);
       const ac=new AudioContext(); const o=ac.createOscillator(); o.frequency.value=210;
-      const g=ac.createGain(); g.gain.value=.3; const d=ac.createMediaStreamDestination();
-      // o volume cai aos 20 s: é assim que o teste sabe se a segunda janela de
-      // trinta segundos leu mesmo o segundo trecho do áudio, e não de novo o primeiro
-      setTimeout(()=>{ g.gain.value=.06; }, 20000);
+      const g=ac.createGain(); g.gain.value=.3; ganho = g;
+      const d=ac.createMediaStreamDestination();
       o.connect(g); g.connect(d); o.start();
       const s=c.captureStream(8); s.addTrack(d.stream.getAudioTracks()[0]); return s;
     };
@@ -96,7 +102,10 @@ export async function paginaLimpa(ctx, erros) {
   const p = await ctx.newPage();
   p.on('pageerror', e => erros.push('pageerror: ' + e.message));
   p.on('console', m => {
-    if (m.type() === 'error' && !/TUNNEL|Failed to load resource/.test(m.text())) erros.push('console: ' + m.text());
+    // a CDN do runtime de transcrição não é alcançável daqui: o aplicativo tenta,
+    // falha e segue com o modelo simulado. É ruído do ambiente, não defeito.
+    const ruido = /TUNNEL|Failed to load resource|cdn\.jsdelivr\.net|huggingface\.co/;
+    if (m.type() === 'error' && !ruido.test(m.text())) erros.push('console: ' + m.text());
   });
   await p.route('**/@huggingface/transformers@**', r => r.fulfill(MODELO_FALSO));
   return p;

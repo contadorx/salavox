@@ -64,16 +64,21 @@ PROTOCOLO.md         como se trabalha neste projeto
 python3 build.py                     # gera public/app.html e public/versao.txt
 node testes/rodar-tudo.mjs           # os seis blocos em paralelo — 69 s
 node testes/rodar-tudo.mjs ia        # só um bloco
-node testes/sabotagem.mjs            # 18 defeitos plantados, exige que os testes peguem — 3 min 40 s
+node testes/sabotagem.mjs            # 18 defeitos plantados, exige que os testes peguem — 4 min 30 s
 node testes/sabotagem.mjs ia         # só as sabotagens de uma área
 node ferramentas/gerar-imagens.mjs   # refaz as imagens da página inicial a partir do app
-node ferramentas/ver-home.mjs        # confere a página inicial, tema claro e escuro
+node ferramentas/ver-home.mjs        # confere a página inicial
+node ferramentas/ver-app.mjs         # confere a ferramenta, com uma reunião de exemplo processada
 ```
 
 As imagens da página inicial são **capturas do aplicativo de verdade**, geradas por
 `ferramentas/gerar-imagens.mjs` a partir de uma reunião de exemplo. Se a interface mudar, basta rodar de
 novo — não há maquete para manter sincronizada com nada. Cada captura é recortada para a proporção exata
 da moldura em que entra (4∶5 no alto, 2∶1 nas telas largas, 4∶3 no PDF), nunca esticada.
+
+A ferramenta usa o **mesmo sistema visual da página pública** — mesma paleta, mesmos raios de canto, mesma
+sombra, mesma barra no topo. Antes eram dois produtos com a mesma marca, e quem clicava em "abrir" trocava
+de casa. Sem tema escuro, como no site.
 
 A página pública não faz **nenhuma** chamada a servidor de terceiro: sem fonte hospedada fora, sem
 rastreador, sem estatística. Foi por isso que a tipografia da referência (Plus Jakarta, do Google) virou
