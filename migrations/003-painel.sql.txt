@@ -1,0 +1,134 @@
+-- Salavox — painel de negócio
+-- Ordem de execução: depois de 001 e 002. Pode rodar num banco em uso: as duas
+-- colunas novas entram com valor padrão e nada existente é reescrito.
+--
+-- O QUE ESTE ARQUIVO ACRESCENTA
+--
+-- 1. Contagem de tokens em uso_ia. Sem ela o custo da IA só podia ser
+--    estimado, e cifra estimada apresentada como fato é como se erra um preço.
+--    Continuam sendo NÚMEROS: quantos tokens, nunca o que foi escrito neles.
+--
+-- 2. As funções que o painel lê e usa. Todas security definer e — isto é o que
+--    importa — com execução REVOGADA de anon e authenticated. Só a chave de
+--    serviço, que vive na Vercel, consegue chamá-las. Se alguém descobrir o
+--    nome delas e tentar do navegador, leva 404 do PostgREST.
+
+alter table uso_ia add column if not exists tokens_ent bigint not null default 0;
+alter table uso_ia add column if not exists tokens_sai bigint not null default 0;
+
+-- ------------------------------------------------------------ contabilidade
+create or replace function somar_tokens(p_perfil uuid, p_ent bigint, p_sai bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_mes date := date_trunc('month', now())::date;
+begin
+  insert into uso_ia (perfil_id, mes, tokens_ent, tokens_sai)
+  values (p_perfil, v_mes, greatest(p_ent, 0), greatest(p_sai, 0))
+  on conflict (perfil_id, mes) do update
+    set tokens_ent = uso_ia.tokens_ent + greatest(p_ent, 0),
+        tokens_sai = uso_ia.tokens_sai + greatest(p_sai, 0);
+end $$;
+
+-- ------------------------------------------------------------------ leitura
+-- Um retrato do negócio. Devolve json para o painel não precisar de seis
+-- chamadas e para o formato ficar num lugar só.
+create or replace function painel_numeros()
+returns json language plpgsql security definer set search_path = public as $$
+declare v_mes date := date_trunc('month', now())::date; r json;
+begin
+  select json_build_object(
+    'mes', v_mes,
+    'contas', (select count(*) from perfis),
+    'contas_no_mes', (select count(*) from perfis where criado_em >= v_mes),
+    'assinantes', (select count(*) from perfis
+                     where plano <> 'gratis' and assinante_ate is not null and assinante_ate >= now()),
+    'vencendo_em_7', (select count(*) from perfis
+                        where plano <> 'gratis' and assinante_ate between now() and now() + interval '7 days'),
+    -- quantas contas grátis já provaram a IA, e quantas dessas viraram assinantes:
+    -- é a única medida de conversão que existe enquanto não há checkout
+    'provaram', (select count(distinct perfil_id) from uso_ia where resumos > 0),
+    'provaram_e_assinaram', (select count(*) from perfis p
+                               where p.plano <> 'gratis' and p.assinante_ate >= now()
+                                 and exists (select 1 from uso_ia u where u.perfil_id = p.id and u.resumos > 0)),
+    'resumos_mes', coalesce((select sum(resumos) from uso_ia where mes = v_mes), 0),
+    'premium_mes', coalesce((select sum(premium) from uso_ia where mes = v_mes), 0),
+    'emails_mes', coalesce((select sum(emails) from uso_ia where mes = v_mes), 0),
+    'tokens_ent_mes', coalesce((select sum(tokens_ent) from uso_ia where mes = v_mes), 0),
+    'tokens_sai_mes', coalesce((select sum(tokens_sai) from uso_ia where mes = v_mes), 0),
+    'meses', (select coalesce(json_agg(m order by m.mes), '[]'::json) from (
+                select mes,
+                       sum(resumos) as resumos, sum(premium) as premium, sum(emails) as emails,
+                       sum(tokens_ent) as tokens_ent, sum(tokens_sai) as tokens_sai,
+                       count(distinct perfil_id) as pessoas
+                from uso_ia where mes >= (v_mes - interval '5 months')::date
+                group by mes) m),
+    'ultimas', (select coalesce(json_agg(u order by u.criado_em desc), '[]'::json) from (
+                  select email, plano, assinante_ate, criado_em from perfis
+                  order by criado_em desc limit 20) u)
+  ) into r;
+  return r;
+end $$;
+
+-- Uma conta específica, pelo e-mail. É a tela de atendimento: alguém escreve
+-- dizendo que pagou e não liberou, e a resposta precisa levar dez segundos.
+create or replace function painel_conta(p_email text)
+returns json language plpgsql security definer set search_path = public as $$
+declare v_id uuid; r json;
+begin
+  select id into v_id from perfis where lower(email) = lower(trim(p_email));
+  if v_id is null then return json_build_object('achou', false); end if;
+  select json_build_object(
+    'achou', true,
+    'email', p.email, 'plano', p.plano, 'assinante_ate', p.assinante_ate, 'criado_em', p.criado_em,
+    'cortesia_usada', coalesce((select sum(resumos) from uso_ia where perfil_id = v_id), 0),
+    'uso', coalesce((select json_agg(u order by u.mes desc) from (
+             select mes, resumos, premium, emails, tokens_ent, tokens_sai
+             from uso_ia where perfil_id = v_id order by mes desc limit 12) u), '[]'::json)
+  ) into r from perfis p where p.id = v_id;
+  return r;
+end $$;
+
+-- ------------------------------------------------------------------- ações
+-- Libera ou estende um plano. Estender parte da data que já existe quando ela
+-- está no futuro — senão renovar antes do vencimento roubaria os dias que
+-- faltavam, que é o tipo de erro que o cliente percebe e você não.
+create or replace function painel_liberar(p_email text, p_plano text, p_dias int)
+returns json language plpgsql security definer set search_path = public as $$
+declare v_id uuid; v_ate timestamptz; v_base timestamptz;
+begin
+  select id, assinante_ate into v_id, v_ate from perfis where lower(email) = lower(trim(p_email));
+  if v_id is null then return json_build_object('achou', false); end if;
+  v_base := greatest(coalesce(v_ate, now()), now());
+  update perfis
+     set plano = p_plano::plano,
+         assinante_ate = case when p_dias <= 0 then null else v_base + (p_dias || ' days')::interval end
+   where id = v_id
+   returning assinante_ate into v_ate;
+  return json_build_object('achou', true, 'plano', p_plano, 'assinante_ate', v_ate);
+end $$;
+
+-- Zera a cota do mês corrente. Serve para atendimento — cliente que perdeu
+-- resumos por erro nosso. Não mexe na contagem de tokens: o custo aconteceu.
+create or replace function painel_zerar(p_email text)
+returns json language plpgsql security definer set search_path = public as $$
+declare v_id uuid; v_mes date := date_trunc('month', now())::date;
+begin
+  select id into v_id from perfis where lower(email) = lower(trim(p_email));
+  if v_id is null then return json_build_object('achou', false); end if;
+  update uso_ia set resumos = 0, premium = 0 where perfil_id = v_id and mes = v_mes;
+  return json_build_object('achou', true, 'zerado', v_mes);
+end $$;
+
+-- ------------------------------------------------------------- fechadura
+-- Nenhuma destas funções pode ser chamada pelo navegador de ninguém, nem por
+-- quem está logado. Só a chave de serviço, que só existe na Vercel.
+revoke execute on function painel_numeros()                  from public, anon, authenticated;
+revoke execute on function painel_conta(text)                from public, anon, authenticated;
+revoke execute on function painel_liberar(text, text, int)   from public, anon, authenticated;
+revoke execute on function painel_zerar(text)                from public, anon, authenticated;
+revoke execute on function somar_tokens(uuid, bigint, bigint) from public, anon, authenticated;
+
+grant execute on function painel_numeros()                   to service_role;
+grant execute on function painel_conta(text)                 to service_role;
+grant execute on function painel_liberar(text, text, int)    to service_role;
+grant execute on function painel_zerar(text)                 to service_role;
+grant execute on function somar_tokens(uuid, bigint, bigint) to service_role;

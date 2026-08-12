@@ -15,6 +15,10 @@ ilimitados e sem cadastro.
 1. Crie o projeto. Anote a **URL** e a **anon key** (essas duas são públicas, podem ir no navegador) e a
    **service role key** (esta **nunca** vai ao navegador).
 2. Rode `migrations/001-contas.sql.txt` no editor SQL, de uma vez.
+   Depois `migrations/002-degustacao.sql.txt` — é ele que libera os **3 resumos de cortesia** por conta.
+   Depois `migrations/003-painel.sql.txt` — contagem de tokens e as funções do painel.
+   **Se o 001 já foi aplicado, rode só os que faltam:** nenhum dos dois cria ou apaga tabela; o 002 troca
+   a função `consumir_ia`, e o 003 acrescenta duas colunas de contador e as funções de leitura.
 3. Em Authentication → URL Configuration, aponte o **Site URL** para `https://salavox.com/app` — é para lá
    que o link do e-mail volta.
 
@@ -31,6 +35,7 @@ ser verdade.
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API — **só no servidor** |
 | `RESEND_API_KEY` | resend.com, para o envio de e-mail |
 | `REMETENTE` | ex.: `ata@salavox.com`, com o domínio verificado no Resend |
+| `ADMIN_EMAILS` | os e-mails que abrem `/painel`, separados por vírgula — **sem ela o painel não abre para ninguém** |
 
 ## 3. `public/config.json` — **o arquivo já existe, só preencher**
 
@@ -55,11 +60,58 @@ incompleto acende um aviso vermelho no cartão de conta, com um botão de **Diag
 quatro perguntas de uma vez: o config subiu? é JSON válido? o Supabase responde com essa URL e essa chave?
 a função `/api/resumo` está publicada e com as variáveis de ambiente?
 
+Se faltar variável de ambiente, a função agora responde **com o nome da que falta** — `ANTHROPIC_API_KEY`,
+`SUPABASE_URL` ou `SUPABASE_SERVICE_ROLE_KEY`. Nome de variável é público; só o valor é segredo, e
+"servidor sem configuração" fazia alguém olhar para cinco campos sem saber qual.
+
 ### Se o diagnóstico disser "HTTP 404 — a pasta api/ não subiu"
 
 O projeto na Vercel precisa ter `api/` e `public/` lado a lado na raiz, com `outputDirectory: "public"` no
 `vercel.json` — que já vai configurado assim no repositório. Se você publicou apontando a raiz para
 `public/`, as funções ficam de fora e o 404 é esse.
+
+## 3b. Degustação — quem pode usar a IA
+
+| | Quem é | Cota |
+|---|---|---|
+| Sem conta | não entrou | os botões nem aparecem |
+| Conta grátis | entrou, não assina | **3 resumos rápidos, uma vez na vida da conta** |
+| Assinante | `plano <> 'gratis'` e `assinante_ate` no futuro | 30 rápidos + 5 precisos por mês |
+
+A cortesia é contada somando a coluna `resumos` de todos os meses daquele perfil — não precisa de coluna
+nova, e quem assinou, gastou trinta e cancelou não ganha degustação de novo ao voltar. O modelo preciso
+fica fora da cortesia de propósito: custa cerca de dez vezes mais por chamada.
+
+Para conferir quantas cortesias uma conta já usou:
+
+```sql
+select p.email, coalesce(sum(u.resumos), 0) as resumos_na_vida
+from perfis p left join uso_ia u on u.perfil_id = p.id
+group by p.email order by resumos_na_vida desc;
+```
+
+## 3c. O painel — `/painel`
+
+Endereço não divulgado e não indexado, mas a proteção não é o segredo do endereço: são três trancas
+independentes.
+
+1. **Sessão válida** do Supabase, conferida contra o Supabase a cada chamada.
+2. **E-mail em `ADMIN_EMAILS`**, variável de ambiente da Vercel. Sem a variável, ninguém entra — nem você.
+   Fechado por omissão, e não aberto por omissão.
+3. **As funções de banco do painel têm execução revogada** de `anon` e `authenticated` (migration 003). Só
+   a chave de serviço chama. Mesmo quem descobrir o nome delas não tem caminho do navegador até lá.
+
+O que ele mostra: contas e quantas entraram no mês, assinantes e quantos vencem em sete dias, receita
+mensal, custo de IA do mês **contado por token** (a Anthropic informa o consumo em cada resposta, e o
+número é guardado), margem, quantas contas provaram a cortesia e quantas dessas assinaram, resumos e
+e-mails do mês, e seis meses de histórico em dois gráficos.
+
+O que ele faz: acha uma conta pelo e-mail e mostra plano, validade, cortesia usada e o consumo mês a mês;
+libera ou estende um plano — **estender parte da data que já existe**, então renovar antes do vencimento
+não rouba os dias que faltavam; e zera a cota do mês, para quando o erro foi nosso.
+
+A única suposição da tela é a cotação do dólar, que fica num campo no rodapé e é dita como suposição. O
+resto é medição.
 
 ## 4. Cobrança
 
@@ -76,15 +128,25 @@ where email = 'cliente@exemplo.com.br';
 
 ## O que foi verificado e o que não foi
 
-**Verificado** (`testes/t-conta.mjs` e `testes/t-telas.mjs`, com servidor simulado): sem `config.json` nem
+**Verificado no servidor** (`testes/t-funcoes.mjs`, chamando `api/painel.js` e `api/resumo.js` direto, com
+o `fetch` substituído): sem `ADMIN_EMAILS` o painel responde 500 dizendo o nome da variável que falta;
+conta comum com sessão válida leva 403 e **o banco não chega a ser consultado**; token que o Supabase não
+reconhece leva 401; o e-mail do administrador é comparado sem diferenciar maiúsculas; a consulta vai com a
+chave de serviço e nunca com o token de quem pediu; plano fora da lista é recusado e um número de dias
+absurdo é aparado; a cota é consumida **antes** de a Anthropic ser chamada, e com a cota esgotada a
+Anthropic não é chamada nenhuma vez — recusa não pode custar dinheiro; e nenhuma chamada ao banco leva o
+texto da ata junto.
+
+**Verificado no navegador** (`testes/t-conta.mjs`, `t-painel.mjs` e `t-telas.mjs`, com servidor simulado): sem `config.json` nem
 a conta nem o cartão de resumo aparecem; com o config pela metade a tela denuncia; o link por e-mail entra
 na conta inclusive quando a aba já está aberta; no plano grátis os botões da IA **nem existem** — a porta é
 fechada antes do clique, não depois da viagem; assinante recebe o resumo, e ele chega ao PDF e ao `.txt`; a
 chamada leva o token de quem pediu e o corpo é o texto da ata; a página não fala com mais nenhum servidor;
 e o navegador guarda **apenas** a sessão — nenhum pedaço da reunião.
 
-**Não verificado**, porque depende de credencial real: a chamada à Anthropic, o envio pelo Resend, a
-migration rodando no Supabase de verdade e o fluxo do link de e-mail ponta a ponta. As funções em `api/`
+**Não verificado**, porque depende de credencial real: a chamada à Anthropic, o envio pelo Resend, as
+migrations rodando no Supabase de verdade (inclusive a `cortesia_restante`, cuja resposta o teste simula)
+e o fluxo do link de e-mail ponta a ponta. As funções em `api/`
 estão escritas e revisadas, mas nunca executaram contra os serviços reais. Rode uma vez com uma conta de
 teste antes de anunciar.
 

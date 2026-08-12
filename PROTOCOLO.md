@@ -74,7 +74,7 @@ Nada é anunciado como pronto sem ter rodado:
 
 ```
 python3 build.py                     # embutido no runner, mas vale rodar sozinho quando se mexe no HTML
-node testes/rodar-tudo.mjs           # os seis blocos, em paralelo — 69 s
+node testes/rodar-tudo.mjs           # os sete blocos, em paralelo — 70 s
 node testes/rodar-tudo.mjs ia telas  # só os blocos pedidos
 JUNTOS=1 node testes/rodar-tudo.mjs  # um de cada vez, para depurar
 node testes/sabotagem.mjs            # quebra o app de propósito e exige que os testes falhem — 3 min 40 s
@@ -86,7 +86,7 @@ Sai com código diferente de zero quando falha. É isso que permite dizer "passo
 **Três regras que valem mais que a lista:**
 
 - **Todo teste novo é sabotado de propósito antes de ser aceito.** Auditor que só sabe dizer "ok" não é
-  trava. `testes/sabotagem.mjs` planta cinco defeitos e exige que a verificação correspondente falhe — e já
+  trava. `testes/sabotagem.mjs` planta 28 defeitos, um de cada vez, e exige que a verificação correspondente falhe — e já
   reprovou dois testes meus, um deles que "pegava" o defeito pelo motivo errado.
 - **Valor esperado é golden, escrito no arquivo.** `['00:00','00:04','00:08','00:12']` está lá em letra de
   forma. Recalcular o esperado com a mesma função que se testa faz o teste passar sempre, inclusive depois
@@ -172,6 +172,20 @@ Depois de paralelizar, a mesma lição voltou duas vezes seguidas, e das duas o 
   de relógio, e não há como se descolarem.
 
 Em ambos os casos a saída fácil era afrouxar a margem — e teria escondido o defeito seguinte.
+
+### O modelo simulado tem de errar como o de verdade
+
+Em 12/08/2026 chegou uma ata gravada numa reunião real: onze minutos, microfone fechado, e **88 repetições
+de "O que é isso?"** atribuídas a quem gravou. A suíte inteira estava verde. Ela estava verde porque o
+modelo simulado dos testes era **educado**: dado silêncio, devolvia silêncio. O Whisper de verdade não faz
+isso — diante de silêncio ele inventa, e entra em laço.
+
+Um simulacro só serve se errar do mesmo jeito que o original. Um que só acerta transforma qualquer peneira
+do produto em código que ninguém está protegendo: dá para removê-la e nada fica vermelho. Agora o modelo
+simulado alucina em laço quando a entrada é quase silenciosa, e a peneira tem de calá-lo.
+
+**A regra que fica:** ao simular um componente externo, a primeira pergunta não é "como ele se comporta
+quando dá certo", é **"como ele falha"** — e é esse comportamento que precisa estar no simulacro.
 
 **Uma suíte de cada vez.** Em 12/08/2026 o bloco de telas falhou duas vezes em oito corridas e passou nas
 outras seis. Não era o produto nem o teste: eu tinha deixado uma corrida anterior ainda viva ao começar a

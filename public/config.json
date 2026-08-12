@@ -1,6 +1,6 @@
 {
   "_leia_me": "Preencha as duas linhas abaixo com os dados do SEU projeto no Supabase para ligar a camada paga (conta, IA do Salavox e envio da ata por e-mail). Enquanto estiverem vazias, o Salavox funciona inteiro, local e sem cadastro — que é o padrão. Estes dois valores são públicos por natureza: eles vão para o navegador. A chave de serviço NUNCA entra aqui.",
   "_onde_achar": "Supabase → Settings → API → Project URL e anon public",
-  "supabaseUrl": "https://zyqncemxjobkvdveordz.supabase.co",
-  "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5cW5jZW14am9ia3ZkdmVvcmR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MDk4NjksImV4cCI6MjEwMjA4NTg2OX0.sVMJ3Q9IwbeyKFe5mTp9UrVN90akqW-SnSaoryScBVM"
+  "supabaseUrl": "",
+  "supabaseAnonKey": ""
 }

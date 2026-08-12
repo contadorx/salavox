@@ -12,7 +12,14 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
   ao reabrir a página, o Salavox oferece recuperar.
 - Transcreve cada canal isoladamente com o Whisper rodando local, e monta a ata em ordem cronológica
   já marcando **VOCÊ** e **PARTICIPANTES**.
-- Pula blocos silenciosos na transcrição, o que economiza bastante tempo em reunião real.
+- **Não transcreve silêncio, e diz que não transcreveu.** Antes de chamar o modelo, o áudio cru é medido
+  em quadros de 20 ms: um canal que nunca chega a nível de voz é declarado mudo e não é enviado; uma janela
+  sem pelo menos 200 ms de fala é pulada. Isso economiza tempo em reunião real e, principalmente, impede
+  que o Whisper invente — diante de silêncio ele não devolve silêncio, devolve texto em laço.
+- **Descarta o laço de alucinação**: três repetições seguidas da mesma frase no mesmo canal saem da ata, e
+  o número descartado aparece na tela.
+- **Fecha o microfone durante a gravação**, por botão. Silenciar-se no Meet ou no Teams não fecha o
+  microfone que o navegador entregou à página — isso precisa estar dito e precisa ter um jeito de fazer.
 - **Varre a gravação atrás das telas compartilhadas**, detectando mudança de cena por assinatura RGB, e
   intercala cada tela na ata no instante em que apareceu. Clicar na miniatura tira ou põe a tela na ata.
 - **Marca momentos durante a reunião** pelo botão ou pela tecla M, e eles entram na ata, no PDF e no texto.
@@ -34,6 +41,15 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
   Sem `config.json` o cartão nem aparece — a instalação local continua inteira e sem cadastro.
 - **Conta por link no e-mail, sem senha** (Supabase Auth por REST, sem biblioteca), com plano, validade e
   cota de resumos do mês. A sessão fica no `localStorage`; o texto da reunião, nunca.
+- **3 resumos de cortesia por conta**, sem cartão: criar a conta já dá para experimentar a IA. A conta é da
+  vida inteira da conta, não do mês — degustação, não plano grátis disfarçado. O modelo preciso fica fora.
+- **Salva a gravação em fluxo**, pedaço por pedaço direto do disco do navegador para o arquivo escolhido.
+  O caminho antigo montava tudo num Blob e passava por `createObjectURL` — duas cópias de centenas de
+  megabytes antes de a barra aparecer, e era isso que demorava. Onde a API de salvar não existe, o caminho
+  antigo continua valendo, e a tela diz que vai demorar.
+- **Painel de negócio em `/painel`**, para quem estiver em `ADMIN_EMAILS`: contas, assinantes, receita,
+  custo de IA contado por token, margem, conversão da degustação, e o atendimento de conta — achar pelo
+  e-mail, liberar ou estender plano, zerar cota.
 - **Dois modos de gravação**: reunião on-line (tela + áudio da chamada + microfone) e reunião presencial
   (só o microfone) — este último é o que funciona no celular, onde navegador nenhum compartilha tela.
 - **Pede o microfone antes de abrir o seletor de tela.** Ao contrário, o navegador troca para o seletor e o
@@ -70,13 +86,14 @@ PROTOCOLO.md         como se trabalha neste projeto
 
 ```bash
 python3 build.py                     # gera public/app.html e public/versao.txt
-node testes/rodar-tudo.mjs           # os seis blocos em paralelo — 69 s
-node testes/rodar-tudo.mjs conta     # só um bloco
-node testes/sabotagem.mjs            # 21 defeitos plantados, exige que os testes peguem
-node testes/sabotagem.mjs conta      # só as sabotagens de uma área
+node testes/rodar-tudo.mjs           # os nove blocos em paralelo — 70 s
+node testes/rodar-tudo.mjs silencio  # só um bloco
+node testes/sabotagem.mjs            # 34 defeitos plantados, exige que os testes peguem
+node testes/sabotagem.mjs silencio   # só as sabotagens de uma área
 node ferramentas/gerar-imagens.mjs   # refaz as imagens da página inicial a partir do app
 node ferramentas/ver-home.mjs        # confere a página inicial
 node ferramentas/ver-app.mjs         # confere a ferramenta, com uma reunião de exemplo processada
+node ferramentas/ver-painel.mjs      # confere o painel de negócio, com dados de exemplo
 node ferramentas/baixar-modelo.mjs onnx-community/whisper-base   # espelha o modelo em public/modelos/
 ```
 
@@ -100,7 +117,7 @@ A versão aparece no rodapé da ferramenta e em `/versao.txt`. Para saber o que 
 ## O que foi verificado
 
 `node testes/rodar-tudo.mjs` roda tudo isto e sai com erro se algo falhar; `node testes/sabotagem.mjs`
-planta 21 defeitos no código, um de cada vez, e exige que a verificação correspondente pegue cada um —
+planta 34 defeitos no código, um de cada vez, e exige que a verificação correspondente pegue cada um —
 inclusive um cenário de controle, que precisa **passar**.
 
 Com captura sintética no Chromium: a gravação sai com **dois canais** de energias distintas (0,14 e 0,21
@@ -135,6 +152,25 @@ janelas de trinta segundos leem trechos diferentes do arquivo, "detectar o idiom
 ao modelo, o nome digitado e o nome escolhido por clique aparecem na ata, no texto e na legenda, e duas
 marcas feitas durante a gravação (uma pela tecla M, outra pelo botão) chegam à ata, ao texto e ao PDF.
 
+### O que a suíte de silêncio protege
+
+Nasceu de uma ata de verdade: 11 minutos de reunião com o microfone fechado produziram **88 repetições** de
+"O que é isso?" atribuídas a quem gravou. O modelo simulado dos testes agora **alucina igual** — silêncio
+entra, laço sai —, senão a peneira poderia ser removida sem nenhum teste ficar vermelho.
+
+`testes/t-silencio.mjs` mede as regras isoladamente, com números escritos à mão (silêncio não passa, um
+estalo de 60 ms não passa, 800 ms de fala passa, canal de ganho baixo não é confundido com canal mudo) e
+depois grava de verdade com o microfone em ganho zero: nenhuma fala atribuída ao microfone, a tela diz que
+o canal ficou em silêncio, o outro canal continua transcrito, e o contador do modelo simulado prova que o
+áudio mudo **nem chegou nele**. O botão de fechar o microfone é conferido pela trilha, não pelo rótulo.
+
+### O que a suíte de funções protege
+
+`testes/t-funcoes.mjs` não abre navegador: importa `api/painel.js` e `api/resumo.js` e as chama com o
+`fetch` substituído por um duplo que registra tudo. É o único jeito de afirmar o que a página não tem como
+demonstrar — que o servidor recusa quem deve recusar, e que **a cota é consumida antes de a Anthropic ser
+chamada**. Trocar essa ordem não muda nada na tela e faz cada recusa custar dinheiro.
+
 ### O que a suíte de conta protege
 
 Não é a qualidade do resumo — é a promessa e a porteira. `testes/t-conta.mjs` registra **toda** requisição
@@ -152,6 +188,9 @@ e que a única coisa gravada no navegador seja a sessão — nada da reunião.
 - **Reunião longa:** a memória deixou de ser o limite, mas o **tempo de transcrição** com o modelo real
   ainda não foi medido, e o disco passa a contar — cerca de 225 MB por hora só de áudio cru, mais o vídeo.
 - **Qualidade em português** com várias vozes e sotaques é incógnita.
+- **Canal com ruído alto e sem fala** — música de espera, ventilador perto do microfone — passa pela
+  peneira de energia, porque ela mede nível, não fala. O filtro de laço é a rede que sobra, e ela só pega
+  repetição. Detectar "isto é som, mas não é voz" pede outro modelo, e ainda não foi feito.
 - **A camada paga foi verificada só contra servidores de mentira.** As rotas de conta, de resumo e de
   envio de e-mail respondem nos testes como as de verdade responderiam, e é isso que garante o
   comportamento do navegador. Falta rodar uma vez com Supabase, Anthropic e Resend reais: a migration

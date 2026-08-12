@@ -48,6 +48,43 @@ export default async function (ctx, url, erros) {
   const telas = await p.$$eval('.telas figure', e => e.length);
   b.entre('telas encontradas no vídeo recuperado', telas, 2, 4);
 
+  /* ---------- salvar a gravação em fluxo ----------
+
+     O caminho antigo montava a gravação inteira num Blob e a entregava por
+     URL.createObjectURL — duas cópias de tudo antes de a barra de download
+     aparecer, e era isso que demorava. Agora os pedaços vão um a um para o
+     arquivo escolhido.
+
+     O seletor de arquivo do navegador não pode ser clicado por um teste, então
+     ele é substituído por um que aceita e guarda o que foi escrito. O que este
+     teste mede é o que importa: que a escrita aconteça em MAIS DE UM pedaço
+     (ou seja, em fluxo) e que a soma bata com a gravação inteira. */
+  await p.evaluate(() => {
+    globalThis.__salvo = { pedacos: [], bytes: 0, nome: null, fechado: false };
+    window.showSaveFilePicker = async opcoes => {
+      globalThis.__salvo.nome = opcoes && opcoes.suggestedName;
+      return {
+        createWritable: async () => ({
+          write: async d => { globalThis.__salvo.pedacos.push(d.size || d.byteLength || 0);
+                              globalThis.__salvo.bytes += d.size || d.byteLength || 0; },
+          close: async () => { globalThis.__salvo.fechado = true; }
+        })
+      };
+    };
+  });
+
+  const tamanhoEsperado = await p.evaluate(() => window.__salavox.gravacao().size);
+  await p.click('#baixarGrav');
+  await p.waitForFunction(() => globalThis.__salvo && globalThis.__salvo.fechado, null, { timeout: 30000 });
+  const salvo = await p.evaluate(() => globalThis.__salvo);
+
+  b.conferir('o arquivo salvo tem exatamente os bytes da gravação', salvo.bytes, tamanhoEsperado);
+  b.verdade('e foi escrito em pedaços, não de uma vez só', salvo.pedacos.length > 1);
+  b.verdade('nenhum pedaço saiu vazio', salvo.pedacos.every(n => n > 0));
+  b.verdade('o nome sugerido leva a marca e a extensão certa',
+            /^salavox-gravacao-.*\.(webm|mp4)$/.test(salvo.nome || ''));
+  b.verdade('e a tela confirma que salvou', /salva/.test(await p.textContent('#ataMsg')));
+
   await p.close();
 
   p = await paginaLimpa(ctx, erros);

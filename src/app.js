@@ -72,12 +72,18 @@
     return nomes.sort();
   }
 
-  async function juntarPrefixo(prefixo) {
+  /* Os pedaços em ordem, como arquivos. Quem quiser um Blob só chama juntar();
+     quem quiser gravar em disco sem carregar nada percorre esta lista. */
+  async function arquivosDe(prefixo) {
     const dir = await pasta();
     const arqs = [];
     for (const nome of await nomesDe(prefixo))
       arqs.push(await (await dir.getFileHandle(nome)).getFile());
-    return new Blob(arqs);
+    return arqs;
+  }
+
+  async function juntarPrefixo(prefixo) {
+    return new Blob(await arquivosDe(prefixo));
   }
 
   async function limparPrefixo(prefixo) {
@@ -121,6 +127,12 @@
         await fila;
         const doDisco = TEM_OPFS ? await juntarPrefixo(prefixo) : new Blob([]);
         return new Blob(doDisco.size ? [doDisco].concat(partes) : partes);
+      },
+      /* Os pedaços na ordem, sem juntar nada: é o que permite salvar uma
+         gravação de duas horas escrevendo direto no arquivo de destino. */
+      async pedacos() {
+        await fila;
+        return (TEM_OPFS ? await arquivosDe(prefixo) : []).concat(partes);
       },
       get bytes() { return bytes; },
       get emDisco() { return disco; },
@@ -242,17 +254,23 @@ registerProcessor('toca', Toca);`;
   }
 
   /* medidor de nível, só para a pessoa ver que está captando */
+  /* O medidor também guarda o maior nível que já viu. Serve para avisar no fim
+     da gravação que uma das fontes nunca se mexeu — melhor descobrir ali do que
+     depois de dez minutos de transcrição, que foi como o defeito apareceu. */
   function medidor(ctx, node, alvo) {
     const an = ctx.createAnalyser();
     an.fftSize = 512;
     node.connect(an);
     const buf = new Uint8Array(an.frequencyBinCount);
-    return () => {
+    const f = () => {
       an.getByteTimeDomainData(buf);
       let pico = 0;
       for (const v of buf) pico = Math.max(pico, Math.abs(v - 128));
+      if (pico > f.maior) f.maior = pico;
       alvo.style.width = Math.min(100, pico / 60 * 100) + '%';
     };
+    f.maior = 0;
+    return f;
   }
 
   /* ============================================================
@@ -345,6 +363,7 @@ registerProcessor('toca', Toca);`;
        pedido de microfone fica para depois; em algumas máquinas ele nunca
        aparece, e a gravação sai muda sem ninguém entender por quê. */
     let telaFluxo = null, micFluxo = null;
+    micFluxoAtual = null;
     if ($('mic').checked || soMicrofone()) {
       $('recMsg').textContent = 'Autorize o microfone…';
       try {
@@ -405,15 +424,18 @@ registerProcessor('toca', Toca);`;
     const juntador = ctxAudio.createChannelMerger(2);
     const medidores = [];
 
+    let medeMic = null, medeEles = null;
     if (micFluxo) {
       const n = ctxAudio.createMediaStreamSource(micFluxo);
       n.connect(juntador, 0, 0);
-      medidores.push(medidor(ctxAudio, n, $('vuYou')));
+      medeMic = medidor(ctxAudio, n, $('vuYou'));
+      medidores.push(medeMic);
     }
     if (temSistema) {
       const n = ctxAudio.createMediaStreamSource(new MediaStream(telaFluxo.getAudioTracks()));
       n.connect(juntador, 0, 1);
-      medidores.push(medidor(ctxAudio, n, $('vuThem')));
+      medeEles = medidor(ctxAudio, n, $('vuThem'));
+      medidores.push(medeEles);
     }
 
     const destino = ctxAudio.createMediaStreamDestination();
@@ -452,7 +474,7 @@ registerProcessor('toca', Toca);`;
       ocupado = false;
       $('rec').classList.remove('hide'); $('rec').disabled = false;
       $('stop').classList.add('hide'); $('vu').classList.add('hide');
-      $('marcar').classList.add('hide');
+      $('marcar').classList.add('hide'); $('calar').classList.add('hide');
       $('recMsg').textContent = 'Fechando os pedaços gravados…';
       meta.segundos = segundos;
       await salvarMeta();
@@ -470,6 +492,20 @@ registerProcessor('toca', Toca);`;
         `${temSistema ? 'com' : 'sem'} áudio da reunião, ${micFluxo ? 'com' : 'sem'} microfone.` +
         (depGrav.emDisco ? '' : '<br><span class="err">O disco recusou a escrita, então a gravação ficou na ' +
           'memória: gere a transcrição e baixe os arquivos antes de fechar esta aba.</span>');
+      /* Fonte que nunca se mexeu. Dizer isto agora vale dez minutos do dia de
+         alguém: numa reunião real o microfone ficou fechado a gravação inteira
+         e só se descobriu depois da transcrição — que veio cheia de texto
+         inventado, porque é o que o modelo faz com silêncio. */
+      const paradas = [];
+      if (medeMic && medeMic.maior < 3) paradas.push('o seu microfone');
+      if (medeEles && medeEles.maior < 3) paradas.push('o áudio da reunião');
+      if (paradas.length) {
+        $('recMsg').innerHTML += `<br><span class="err">Atenção: ${paradas.join(' e ')} ` +
+          `${paradas.length === 1 ? 'não registrou' : 'não registraram'} som nenhum durante a gravação.</span> ` +
+          (paradas.length === 1
+            ? 'A ata vai sair só com o outro lado — este canal não será transcrito, para o modelo não inventar texto.'
+            : 'Não há o que transcrever.');
+      }
       $('trans').disabled = false;
       if (gravaVideo) $('telasCard').classList.remove('hide'); else $('telasCard').classList.add('hide');
     };
@@ -492,6 +528,29 @@ registerProcessor('toca', Toca);`;
     $('rec').classList.add('hide');
     $('stop').classList.remove('hide');
     $('marcar').classList.remove('hide');
+    /* Fechar o microfone de verdade, aqui dentro.
+
+       O pedido veio de uma reunião real: "o microfone estava fechado e ele
+       continuou captando". Estava — no Teams. Silenciar-se na reunião cala
+       você para os outros e não toca no microfone que o navegador entregou a
+       esta página. Isso é bom por padrão (a fala entra na ata mesmo quando se
+       esquece de reabrir), mas tem de haver um jeito de parar mesmo. Este é o
+       jeito: a trilha desligada não produz amostra nenhuma. */
+    micFluxoAtual = micFluxo;
+    if (micFluxo) {
+      $('calar').classList.remove('hide');
+      $('calar').textContent = 'Fechar meu microfone';
+      $('calar').onclick = () => {
+        const t = micFluxo.getAudioTracks()[0];
+        if (!t) return;
+        t.enabled = !t.enabled;
+        $('calar').textContent = t.enabled ? 'Fechar meu microfone' : 'Reabrir meu microfone';
+        $('calar').classList.toggle('rec', !t.enabled);
+        $('marcasMsg').innerHTML = t.enabled
+          ? '<span class="ok">microfone reaberto</span> — sua voz volta a entrar na ata'
+          : '<span class="err">microfone fechado</span> — nada seu está sendo gravado a partir de agora';
+      };
+    }
     $('tempo').classList.remove('hide'); $('vu').classList.remove('hide');
     $('tempo').textContent = '00:00';
 
@@ -579,6 +638,10 @@ registerProcessor('toca', Toca);`;
     try {
       aviso(`Lendo <b>${arquivo.name}</b> (${(arquivo.size/1048576).toFixed(1)} MB)…`);
       await limparTudo();
+      /* O disco acabou de ser zerado. Deixar o depósito da gravação anterior de
+         pé faria "salvar a gravação" escrever um arquivo vazio, apontando para
+         pedaços que não existem mais. */
+      depGrav = null; depPcm = null;
       esconderRecuperacao();
       momentos = []; telas = []; falas = [];
       $('telasCard').classList.add('hide'); $('ataCard').classList.add('hide');
@@ -639,6 +702,7 @@ registerProcessor('toca', Toca);`;
 
   /* ================= transcrição por canal ================= */
   let janelas = { voce: false, outros: false };
+  let micFluxoAtual = null;   // só para o botão de calar e para os testes
   let falas = [];
 
   const TJS = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';
@@ -869,14 +933,117 @@ registerProcessor('toca', Toca);`;
 
   function separar(bruto, q, desl) {
     const dados = new Float32Array(q);
-    let pico = 0;
-    for (let k = 0; k < q; k++) {
-      const v = bruto[k * 2 + desl] / 32768;
-      dados[k] = v;
-      const abs = v < 0 ? -v : v;
-      if (abs > pico) pico = abs;
+    for (let k = 0; k < q; k++) dados[k] = bruto[k * 2 + desl] / 32768;
+    return dados;
+  }
+
+  /* ============================================================
+     Quanta voz existe de verdade neste áudio.
+
+     Defeito que originou tudo isto, numa reunião real de 11 minutos: o
+     microfone estava fechado, e a ata saiu com **88 repetições** de "O que é
+     isso?" no canal de quem gravou, mais "e aí" onze vezes. Nada daquilo foi
+     dito. O Whisper, diante de silêncio, não devolve silêncio — devolve texto
+     inventado, e entra em laço. O modelo não tem como saber que não havia
+     ninguém falando. Quem tem de saber é este código.
+
+     A peneira antiga olhava o PICO da janela e deixava passar tudo acima de
+     0,012 (−38 dBFS). Um clique de teclado, um estalo na mesa ou o próprio
+     ruído do microfone chegam lá sozinhos — então trinta segundos de
+     quase-silêncio iam para o modelo e voltavam preenchidos.
+
+     O que conta agora é **quanto tempo** tem energia de voz, medido em
+     quadros de 20 ms. Um clique tem dois quadros; uma frase tem dezenas. E o
+     limiar acompanha o próprio material: 12% do nível dos trechos mais altos
+     daquele canal, com piso absoluto — assim um microfone de ganho baixo
+     continua sendo transcrito, e um canal mudo não passa de jeito nenhum.
+     ============================================================ */
+
+  const QUADRO = 320;          // 20 ms a 16 kHz
+  const PISO_VOZ = 0.006;      // abaixo disto não é voz em gravação nenhuma
+  const QUADROS_MIN = 10;      // 200 ms de voz para a janela valer a viagem
+
+  /* rms de cada quadro de 20 ms de um canal, acumulado no vetor recebido */
+  function rmsPorQuadro(bruto, q, desl, saida) {
+    for (let base = 0; base + QUADRO <= q; base += QUADRO) {
+      let soma = 0;
+      for (let k = base; k < base + QUADRO; k++) {
+        const v = bruto[k * 2 + desl] / 32768;
+        soma += v * v;
+      }
+      saida.push(Math.sqrt(soma / QUADRO));
     }
-    return { dados, pico };
+    return saida;
+  }
+
+  /* O nível dos trechos altos do canal: 99,9º percentil dos quadros. Não uso o
+     pico porque um único estalo o define; não uso a média porque o silêncio
+     entre as falas a derruba. O percentil alto pergunta a coisa certa — "o
+     mais alto que este canal chega, sustentado por quase um segundo, é nível
+     de voz?" — e é isso que separa microfone fechado de microfone baixo. */
+  function nivelAlto(quadros) {
+    if (!quadros.length) return 0;
+    const ord = Float32Array.from(quadros).sort();
+    return ord[Math.min(ord.length - 1, Math.floor(ord.length * 0.999))];
+  }
+
+  /* A regra da janela, num lugar só e com nome: **tem voz suficiente para
+     valer uma chamada ao modelo?** Contar quadros acima do limiar, e não olhar
+     o pico, é o que separa um clique de teclado (dois quadros) de uma frase
+     (dezenas). Enquanto isto era uma comparação solta no meio do laço, não
+     havia como medi-la sem gravar meia hora de reunião. */
+  function janelaTemVoz(quadrosDaJanela, limiar) {
+    let n = 0;
+    for (const r of quadrosDaJanela) if (r > limiar) n++;
+    return n >= QUADROS_MIN;
+  }
+
+  /* O limiar acompanha o material: 6% do nível alto do canal — 24 dB abaixo da
+     fala forte —, nunca menos que o piso. O piso sozinho já resolve microfone
+     de ganho baixo; a parte relativa existe para excluir zumbido de ventilador
+     ou chiado constante num canal alto.
+
+     Foi 12% por algumas horas, e o teste de arquivo importado passou raspando:
+     o trecho baixo do arquivo tem exatamente 18 dB a menos que o alto, e o
+     limiar caía em cima dele. Numa reunião real esses 18 dB são a diferença
+     entre quem está junto ao microfone e quem está do outro lado da sala — ou
+     seja, o limiar apertado comeria a fala de alguém. Verificação que passa por
+     um fio é aviso, não aprovação. */
+  const limiarDoCanal = alto => Math.max(PISO_VOZ, alto * 0.06);
+
+  /* Ler uma janela do áudio cru. Existe como função — e não como duas linhas
+     iguais em dois laços — porque a duplicata já custou caro: a sabotagem que
+     manda a transcrição ler sempre a primeira fatia passou a alterar só a
+     primeira cópia, e o teste que devia pegá-la ficou verde. Trecho repetido é
+     trecho que só metade das travas protege. */
+  const lerJanela = async (ini, fim) => new Int16Array(
+    await blobPcm.slice(ini * BYTES_POR_AMOSTRA, fim * BYTES_POR_AMOSTRA).arrayBuffer());
+
+  /* E o veredito do canal inteiro: se o mais alto que ele chega, sustentado por
+     quase um segundo, não é nível de voz, então não há voz nenhuma ali. */
+  const canalMudo = alto => alto < 0.01;
+
+  /* Segunda linha de defesa. Mesmo com a peneira, o modelo às vezes entra em
+     laço num trecho de música, de ruído ou de fala muito abafada e devolve a
+     mesma frase muitas vezes seguidas. Três repetições seguidas no mesmo canal
+     não são conversa: são o modelo preso. A corrida inteira sai, e o número
+     sai dito na tela — descartar em silêncio seria trocar um defeito visível
+     por um invisível. */
+  function tirarLacos(lista) {
+    const chave = t => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const fora = new Set();
+    for (const canal of ['voce', 'outros']) {
+      const meu = lista.filter(f => f.quem === canal);
+      let i = 0;
+      while (i < meu.length) {
+        const k = chave(meu[i].texto);
+        let j = i + 1;
+        while (j < meu.length && chave(meu[j].texto) === k) j++;
+        if (j - i >= 3 && k.length <= 140) for (let n = i; n < j; n++) fora.add(meu[n]);
+        i = j;
+      }
+    }
+    return { limpa: lista.filter(f => !fora.has(f)), tirados: fora.size };
   }
 
   $('trans').onclick = async () => {
@@ -906,57 +1073,108 @@ registerProcessor('toca', Toca);`;
       if (janelas.outros) quais.push(['outros', 1]);
       if (!quais.length) quais.push(['voce', 0], ['outros', 1]);
 
-      const totalBlocos = nJanelas * quais.length;
+      /* ---- pré-varredura: medir antes de chamar o modelo ----
+         A decisão mais importante desta função é a de NÃO transcrever, e ela
+         não pode depender do modelo — é justamente o modelo que inventa. Uma
+         passada pelo áudio cru, sem rede e sem GPU, responde onde há voz. */
+      aviso('Etapa 1 de 2 — medindo o áudio…');
+      const quadros = { voce: [], outros: [] };      // rms por quadro, o gravação inteira
+      const porJanela = [];                          // e os mesmos quadros, janela a janela
+      for (let i = 0; i < nJanelas; i++) {
+        const ini = i * JANELA, fim = Math.min(ini + JANELA, totalAmostras);
+        if (fim - ini < SR) break;
+        const bruto = await lerJanela(ini, fim);
+        const desta = { voce: [], outros: [] };
+        for (const [quem, desl] of quais) {
+          rmsPorQuadro(bruto, fim - ini, desl, desta[quem]);
+          for (const r of desta[quem]) quadros[quem].push(r);
+        }
+        porJanela.push(desta);
+        $('bar').style.width = (2 + (i + 1) / nJanelas * 16).toFixed(1) + '%';
+      }
+
+      /* Canal mudo: o mais alto que ele chega, sustentado, não é nível de voz.
+         Foi o caso do microfone fechado. Não se manda isso ao modelo — e se
+         diz por quê, em vez de entregar uma ata pela metade sem explicação. */
+      const alto = { voce: nivelAlto(quadros.voce), outros: nivelAlto(quadros.outros) };
+      const limiar = {}, mudos = [];
+      for (const [quem] of quais) {
+        limiar[quem] = limiarDoCanal(alto[quem]);
+        if (canalMudo(alto[quem])) mudos.push(quem);
+      }
+      const ativos = quais.filter(([quem]) => mudos.indexOf(quem) < 0);
+      if (!ativos.length) {
+        mostrarModeloGuardado();
+        aviso('<span class="err">Nenhum dos canais tem voz.</span> O áudio gravado está em silêncio — ' +
+              'o microfone pode ter ficado fechado e a reunião pode não ter compartilhado o som. ' +
+              'Não vou transcrever silêncio: o modelo inventaria texto.');
+        return;
+      }
+
+      const totalBlocos = nJanelas * ativos.length;
       const inicio = performance.now();
-      let feitos = 0;
+      let feitos = 0, puladas = 0;
       const idioma = $('idioma').value;
       falas = [];
 
-      for (let i = 0; i < nJanelas; i++) {
+      for (let i = 0; i < porJanela.length; i++) {
         const ini = i * JANELA, fim = Math.min(ini + JANELA, totalAmostras);
         // A última janela costuma ser um resto de fração de segundo. Mandar isso
         // ao modelo produz texto inventado, com instante além do fim da reunião:
         // um teste com 60,05 s gerou fala datada em 01:09. Resto curto não entra.
         if (fim - ini < SR) break;
-        const bruto = new Int16Array(
-          await blobPcm.slice(ini * BYTES_POR_AMOSTRA, fim * BYTES_POR_AMOSTRA).arrayBuffer());
         const q = fim - ini;
 
-        for (const [quem, desl] of quais) {
-          const { dados, pico } = separar(bruto, q, desl);
-          // pula blocos silenciosos: economiza muito tempo em reunião real
-          if (pico >= 0.012) {
-            const opts = { return_timestamps: true, task: $('saida').value };
-            if (idioma) opts.language = idioma;
-            const r = await pipe(dados, opts);
-            const trechos = (r && r.chunks && r.chunks.length) ? r.chunks
-              : [{ timestamp: [0, q / SR], text: (r && r.text) || '' }];
-            trechos.forEach(c => {
-              const txt = (c.text || '').trim();
-              // o instante devolvido pelo modelo é preso ao tamanho da janela:
-              // sem isso, um trecho mal datado joga a fala para depois do fim
-              const dentro = Math.min(Math.max((c.timestamp && c.timestamp[0]) || 0, 0), q / SR);
-              if (txt) falas.push({ quem, a: ini / SR + dentro, texto: txt });
-            });
-          }
+        /* Quais canais desta janela têm voz. Só se lê o áudio do disco se
+           algum tiver — em reunião com um lado calado isso corta metade do
+           trabalho, e é o mesmo cálculo que impede a invenção. */
+        const comVoz = ativos.filter(([quem]) => janelaTemVoz(porJanela[i][quem], limiar[quem]));
+        puladas += ativos.length - comVoz.length;
+        feitos += ativos.length - comVoz.length;
+
+        let bruto = null;
+        if (comVoz.length) bruto = await lerJanela(ini, fim);
+
+        for (const [quem, desl] of comVoz) {
+          const dados = separar(bruto, q, desl);
+          const opts = { return_timestamps: true, task: $('saida').value };
+          if (idioma) opts.language = idioma;
+          const r = await pipe(dados, opts);
+          const trechos = (r && r.chunks && r.chunks.length) ? r.chunks
+            : [{ timestamp: [0, q / SR], text: (r && r.text) || '' }];
+          trechos.forEach(c => {
+            const txt = (c.text || '').trim();
+            // o instante devolvido pelo modelo é preso ao tamanho da janela:
+            // sem isso, um trecho mal datado joga a fala para depois do fim
+            const dentro = Math.min(Math.max((c.timestamp && c.timestamp[0]) || 0, 0), q / SR);
+            if (txt) falas.push({ quem, a: ini / SR + dentro, texto: txt });
+          });
           feitos++;
-          const pct = feitos / totalBlocos * 100;
-          $('bar').style.width = (20 + pct * 0.8).toFixed(1) + '%';
-          const resta = (performance.now() - inicio) / feitos * (totalBlocos - feitos) / 1000;
-          const falta = feitos >= 2 && resta > 5
-            ? ` — faltam ~${resta < 90 ? Math.ceil(resta) + 's' : Math.ceil(resta / 60) + ' min'}` : '';
-          aviso(`Etapa 2 de 2 — transcrevendo ${fmt(ini / SR)} de ${fmt(totalAmostras / SR)}: ` +
-                `${pct.toFixed(0)}%${falta}`);
         }
+
+        const pct = feitos / totalBlocos * 100;
+        $('bar').style.width = (20 + pct * 0.8).toFixed(1) + '%';
+        const resta = (performance.now() - inicio) / Math.max(1, feitos) * (totalBlocos - feitos) / 1000;
+        const falta = feitos >= 2 && resta > 5
+          ? ` — faltam ~${resta < 90 ? Math.ceil(resta) + 's' : Math.ceil(resta / 60) + ' min'}` : '';
+        aviso(`Etapa 2 de 2 — transcrevendo ${fmt(ini / SR)} de ${fmt(totalAmostras / SR)}: ` +
+              `${pct.toFixed(0)}%${falta}`);
       }
 
       mostrarModeloGuardado();
       falas.sort((a, b) => a.a - b.a);
+      const laco = tirarLacos(falas);
+      falas = laco.limpa;
       const trocas = corrigirComVocabulario();
       mostrarAta();
+      const nome = q => q === 'voce' ? 'do seu microfone' : 'dos participantes';
       aviso(`<span class="ok">Ata pronta</span> — ${falas.length} trechos` +
             (trocas ? `, ${trocas} ${trocas === 1 ? 'termo corrigido' : 'termos corrigidos'} pelo vocabulário` : '') +
-            '.');
+            '.' +
+            (mudos.length ? `<br><span class="err">O canal ${mudos.map(nome).join(' e o ')} ficou em ` +
+              'silêncio e não foi transcrito</span> — sem isso o modelo inventaria texto.' : '') +
+            (laco.tirados ? `<br>${laco.tirados} ${laco.tirados === 1 ? 'trecho repetido foi descartado' :
+              'trechos repetidos foram descartados'}: o modelo entrou em laço sobre ruído.` : ''));
     } catch (e) {
       aviso(`<span class="err">Não consegui transcrever: ${(e && e.message) || e}</span>`);
     } finally {
@@ -1234,14 +1452,84 @@ registerProcessor('toca', Toca);`;
 
   $('todasTelas').onclick = () => { telas.forEach(t => t.manter = true); desenharTelas(); };
 
-  $('baixarGrav').onclick = () => {
-    if (!blobGravacao) return;
+  /* ============================================================
+     Salvar a gravação.
+
+     Por que isto deixou de ser três linhas: o caminho antigo montava a
+     gravação inteira num Blob e a entregava por `URL.createObjectURL`. Cada
+     etapa disso é uma cópia — do disco privado do navegador para o Blob, do
+     Blob para o arquivo baixado. Numa reunião de uma hora são centenas de
+     megabytes copiados duas vezes antes de a barra de download sequer
+     aparecer, e é exatamente essa espera que se sente.
+
+     Agora, quando o navegador tem a API de salvar arquivo, quem escolhe o
+     destino é você e os pedaços vão **um a um, direto do disco para o
+     arquivo**. Nada é montado inteiro em lugar nenhum, a memória fica plana e
+     a barra anda desde o primeiro pedaço.
+
+     Onde a API não existe — Firefox, Safari, celular — continua valendo o
+     caminho antigo, que funciona e é lento. Dizer isso na tela é melhor do que
+     fingir que os dois são iguais.
+     ============================================================ */
+
+  const podeSalvarEmFluxo = () => typeof window.showSaveFilePicker === 'function';
+
+  /* De onde saem os pedaços, nas três origens possíveis: gravação desta sessão,
+     gravação recuperada depois de a aba morrer, e arquivo importado. A terceira
+     não tem pedaços — é um arquivo só, e já está no disco de quem usa. */
+  async function pedacosDaGravacao() {
+    if (depGrav) return depGrav.pedacos();
+    if (TEM_OPFS) { const a = await arquivosDe('gravacao'); if (a.length) return a; }
+    return [blobGravacao];
+  }
+
+  $('baixarGrav').onclick = async () => {
+    if (!blobGravacao || ocupado) return;
     const ext = (blobGravacao.type.indexOf('mp4') >= 0) ? 'mp4' : 'webm';
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blobGravacao);
-    a.download = nomeArquivo().replace('ata-', 'gravacao-') + '.' + ext;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+    const nome = nomeArquivo().replace('ata-', 'gravacao-') + '.' + ext;
+    const aviso = m => { $('ataMsg').innerHTML = m; };
+
+    if (!podeSalvarEmFluxo()) {
+      aviso('Preparando o arquivo… neste navegador a gravação é montada antes de baixar, ' +
+            'o que demora em reunião longa.');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blobGravacao);
+      a.download = nome;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+      setTimeout(() => aviso(''), 4000);
+      return;
+    }
+
+    let destino;
+    try {
+      destino = await window.showSaveFilePicker({
+        suggestedName: nome,
+        types: [{ description: 'Gravação da reunião', accept: { ['video/' + ext]: ['.' + ext] } }]
+      });
+    } catch (e) { return; }        // cancelou o seletor: não é erro, é uma escolha
+
+    ocupado = true;
+    try {
+      const pedacos = await pedacosDaGravacao();
+      const total = pedacos.reduce((t, p) => t + (p.size || 0), 0) || blobGravacao.size;
+      const escrita = await destino.createWritable();
+      let feito = 0;
+      for (const pedaco of pedacos) {
+        await escrita.write(pedaco);          // o pedaço vai do disco para o arquivo sem passar pela aba
+        feito += pedaco.size || 0;
+        aviso(`Salvando a gravação… ${(feito / total * 100).toFixed(0)}% ` +
+              `(${(feito / 1048576).toFixed(0)} de ${(total / 1048576).toFixed(0)} MB)`);
+      }
+      await escrita.close();
+      aviso(`<span class="ok">Gravação salva</span> — ${(total / 1048576).toFixed(1)} MB, ` +
+            'escritos direto no arquivo, sem cópia intermediária.');
+    } catch (e) {
+      aviso(`<span class="err">Não consegui salvar: ${(e && e.message) || e}</span>`);
+    } finally {
+      ocupado = false;
+      setTimeout(() => { if (/salva|Não consegui/.test($('ataMsg').textContent)) aviso(''); }, 8000);
+    }
   };
 
   /* ================= saídas ================= */
@@ -1502,20 +1790,56 @@ registerProcessor('toca', Toca);`;
      linhas que se corrigem mutuamente não são segurança, são um ponto cego. */
   let ataNaTela = false;
 
+  /* Quantos resumos de cortesia sobraram nesta conta. −1 significa assinante:
+     a pergunta não se aplica. Vem do banco porque o navegador não tem como
+     saber, e mentir aqui seria pior do que não dizer nada. */
+  let cortesia = null;
+
+  async function lerCortesia() {
+    cortesia = null;
+    if (!cfg || !sessao) return;
+    try {
+      const r = await fetch(cfg.supabaseUrl + '/rest/v1/rpc/cortesia_restante', {
+        method: 'POST',
+        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + sessao.access_token,
+                   'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      if (r.ok) cortesia = await r.json();
+    } catch (e) {}
+  }
+
   function desenharIa() {
     $('iaCard').classList.toggle('hide', !(cfg && ataNaTela));
     if (!cfg) return;
     const pago = temPlano();
-    $('iaAcoes').classList.toggle('hide', !pago);
+    /* Quem entrou na conta tem os botões, assinando ou não.
+
+       Antes, plano grátis via um cartão sem botão nenhum e o preço escrito —
+       e o primeiro a esbarrar nisso foi o dono do produto, tentando testar a
+       própria IA. O problema é maior que o incômodo: ninguém assina um resumo
+       por IA sem ver o resumo. A porta agora tem três voltas de cortesia; a
+       recusa vem do servidor, na quarta, com o convite para assinar junto. */
+    $('iaAcoes').classList.toggle('hide', !sessao);
+    /* O modelo preciso não entra na degustação: custa cerca de dez vezes mais
+       por chamada, e o rápido já mostra o que a ferramenta faz. */
+    const preciso = $('iaModeloSalavox').querySelector('option[value="preciso"]');
+    if (preciso) preciso.disabled = !pago;
+    if (!pago) $('iaModeloSalavox').value = 'rapido';
+
     if (pago) {
       $('iaEstado').innerHTML = 'A <b>IA do Salavox</b> lê o texto da ata e devolve o resumo, ' +
         'as decisões e as pendências. O texto sai daqui só quando você clica.';
     } else if (!sessao) {
-      $('iaEstado').innerHTML = 'O resumo por IA é do <b>plano profissional</b>, R$ 19,90 por mês. ' +
-        'Entre na sua conta no cartão acima — gravar, transcrever e exportar continua de graça.';
+      $('iaEstado').innerHTML = 'Entre na sua conta no cartão acima e ganhe <b>3 resumos para ' +
+        'experimentar</b>. Gravar, transcrever e exportar continua de graça, com ou sem conta.';
+    } else if (cortesia === 0) {
+      $('iaEstado').innerHTML = 'Seus <b>resumos de cortesia acabaram</b>. O plano profissional ' +
+        'tem 30 por mês, mais o modelo preciso e o envio da ata por e-mail, por R$ 19,90.';
     } else {
-      $('iaEstado').innerHTML = 'Sua conta está no <b>plano grátis</b>. O resumo por IA é do ' +
-        '<b>plano profissional</b>, R$ 19,90 por mês.';
+      const q = typeof cortesia === 'number' && cortesia > 0 ? cortesia : 3;
+      $('iaEstado').innerHTML = `Você tem <b>${q} ${q === 1 ? 'resumo' : 'resumos'} de cortesia</b> ` +
+        'para experimentar a IA do Salavox. Depois, o plano profissional tem 30 por mês por R$ 19,90.';
     }
   }
 
@@ -1689,6 +2013,7 @@ registerProcessor('toca', Toca);`;
       const d = await r.json();
       perfil = Array.isArray(d) ? d[0] : null;
     } catch (e) { perfil = null; }
+    await lerCortesia();
     desenharConta();
   }
 
@@ -1787,9 +2112,17 @@ registerProcessor('toca', Toca);`;
       body: JSON.stringify({ prompt, modelo })
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.erro || ('o servidor respondeu ' + r.status));
+    if (!r.ok) {
+      // recusa por cota: a tela tem de refletir isso na hora, não só na mensagem
+      if (r.status === 402 && !temPlano()) { cortesia = 0; desenharIa(); }
+      throw new Error(d.erro || ('o servidor respondeu ' + r.status));
+    }
     if (typeof d.restante === 'number') {
-      $('iaMotorMsg').innerHTML = `restam <b>${d.restante}</b> resumos neste mês`;
+      if (!temPlano()) cortesia = d.restante;
+      $('iaMotorMsg').innerHTML = temPlano()
+        ? `restam <b>${d.restante}</b> resumos neste mês`
+        : `restam <b>${d.restante}</b> ${d.restante === 1 ? 'resumo' : 'resumos'} de cortesia`;
+      desenharIa();
     }
     return (d.texto || '').trim();
   }
@@ -1881,6 +2214,11 @@ registerProcessor('toca', Toca);`;
     origemModelo: () => origemModelo, espelhoLocal,
     consentimento: () => consentimento, aplicarVocabulario, corrigirComVocabulario,
     resumos: () => resumos, montarPrompt, perfil: () => perfil, temPlano, cfg: () => cfg,
+    tirarLacos, nivelAlto, janelaTemVoz, limiarDoCanal, canalMudo, rmsPorQuadro,
+    podeSalvarEmFluxo,
+    QUADRO, PISO_VOZ, QUADROS_MIN,
+    micLigado: () => !!(micFluxoAtual && micFluxoAtual.getAudioTracks()[0] &&
+                        micFluxoAtual.getAudioTracks()[0].enabled),
     gravacao: () => blobGravacao, pcm: () => blobPcm,
     tamanhos: () => ({ grav: depGrav ? depGrav.bytes : 0, pcm: depPcm ? depPcm.bytes : 0,
                        disco: !!(depGrav && depGrav.emDisco) }),

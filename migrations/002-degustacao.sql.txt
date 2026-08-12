@@ -1,0 +1,79 @@
+-- Salavox — degustação da IA no plano grátis
+-- Ordem de execução: depois de 001-contas.sql.txt. Pode rodar num banco que já
+-- está em uso: não cria nem apaga tabela, só troca uma função.
+--
+-- POR QUE ESTE ARQUIVO EXISTE
+--
+-- A camada paga foi construída com a porta fechada: quem não assina não vê a
+-- IA. O primeiro a esbarrar nisso foi o dono do produto, tentando testar a
+-- própria funcionalidade — e o problema é mais sério do que o incômodo dele.
+-- Ninguém assina um resumo por IA sem ver o resumo. Nas ferramentas com que o
+-- Salavox compete, experimentar é grátis; aqui era impossível.
+--
+-- Então: TRÊS resumos rápidos por conta, uma vez na vida da conta. Não por mês
+-- — por mês vira plano grátis disfarçado, e quem faz poucas reuniões nunca
+-- assinaria. Uma vez só é degustação: dá para ver a qualidade e não dá para
+-- viver dela.
+--
+-- O modelo preciso fica de fora da degustação, de propósito: ele custa umas
+-- dez vezes mais por chamada, e o barato é o suficiente para mostrar o valor.
+--
+-- COMO A CONTA DE "UMA VEZ NA VIDA" É FEITA: somando a coluna `resumos` de
+-- todos os meses daquele perfil. Não precisa de coluna nova, e tem a
+-- propriedade certa — quem assinou, usou trinta e cancelou não ganha
+-- degustação de novo ao voltar.
+
+create or replace function consumir_ia(p_perfil uuid, p_premium boolean)
+returns int language plpgsql security definer set search_path = public as $$
+declare
+  v_plano plano; v_ate timestamptz; v_mes date := date_trunc('month', now())::date;
+  v_pago boolean; v_limite int; v_usado int;
+begin
+  select plano, assinante_ate into v_plano, v_ate from perfis where id = p_perfil;
+  if not found then return -1; end if;
+
+  v_pago := (v_plano <> 'gratis' and v_ate is not null and v_ate >= now());
+
+  -- a linha do mês tem de existir antes de qualquer contagem
+  insert into uso_ia (perfil_id, mes) values (p_perfil, v_mes)
+    on conflict (perfil_id, mes) do nothing;
+
+  if v_pago then
+    v_limite := case when p_premium then 5 else 30 end;
+    select case when p_premium then premium else resumos end into v_usado
+      from uso_ia where perfil_id = p_perfil and mes = v_mes for update;
+  else
+    -- degustação: só o modelo rápido, e a conta é da vida inteira
+    if p_premium then return -1; end if;
+    v_limite := 3;
+    perform 1 from uso_ia where perfil_id = p_perfil and mes = v_mes for update;
+    select coalesce(sum(resumos), 0) into v_usado from uso_ia where perfil_id = p_perfil;
+  end if;
+
+  if v_usado >= v_limite then return -1; end if;
+
+  if p_premium then
+    update uso_ia set premium = premium + 1 where perfil_id = p_perfil and mes = v_mes;
+  else
+    update uso_ia set resumos = resumos + 1 where perfil_id = p_perfil and mes = v_mes;
+  end if;
+
+  return v_limite - v_usado - 1;
+end $$;
+
+-- Quantos resumos de cortesia ainda restam nesta conta. O navegador chama esta
+-- função para mostrar o número ANTES do primeiro clique — sem ela, a tela teria
+-- de dizer "você talvez tenha resumos de cortesia", que não é jeito de vender
+-- nada. Ela só lê, só a própria conta, e não gasta cota.
+create or replace function cortesia_restante()
+returns int language plpgsql security definer set search_path = public as $$
+declare v_plano plano; v_ate timestamptz; v_usado int;
+begin
+  select plano, assinante_ate into v_plano, v_ate from perfis where id = auth.uid();
+  if not found then return 0; end if;
+  if v_plano <> 'gratis' and v_ate is not null and v_ate >= now() then return -1; end if;  -- assinante
+  select coalesce(sum(resumos), 0) into v_usado from uso_ia where perfil_id = auth.uid();
+  return greatest(0, 3 - v_usado);
+end $$;
+
+grant execute on function cortesia_restante() to authenticated;

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel — Salavox</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site.css">
+<style>
+/* Painel de negócio. Só tema claro, como o resto do produto.
+
+   As duas cores de dado NÃO são o verde da marca. O verde #2F6F66 tem croma
+   0,067 em OKLCH — abaixo do piso de 0,10 —, e uma barra nesse tom lê como
+   cinza desabilitado em vez de dado. Os dois tons abaixo passam nos seis
+   testes de paleta (banda de luminosidade, croma, separação para daltonismo,
+   piso de visão normal e contraste com a superfície). Marca é para moldura;
+   dado precisa de cor que trabalhe. */
+:root{ --dado-1:#00897A; --dado-2:#B4682A; }
+
+body{background:var(--superficie)}
+.topo{background:var(--branco);border-bottom:1px solid var(--linha)}
+.painel{max-width:1140px;margin:0 auto;padding:28px 24px 80px}
+h1{font-size:30px;font-weight:800;letter-spacing:-.6px;margin-bottom:4px}
+.sub{color:var(--tinta-media);font-size:14.5px;margin-bottom:24px}
+
+.grade{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:14px}
+.tile{background:var(--branco);border:1px solid var(--linha);border-radius:14px;padding:16px 18px;
+      box-shadow:var(--sombra)}
+.tile .rot{font-size:11.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+           color:var(--tinta-suave);margin-bottom:6px}
+.tile .num{font-size:29px;font-weight:800;letter-spacing:-1px;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .pe{font-size:12.5px;color:var(--tinta-media);margin-top:4px}
+.tile.destaque{border-color:var(--dado-1);box-shadow:0 0 0 1px var(--dado-1),var(--sombra)}
+
+.cartao{background:var(--branco);border:1px solid var(--linha);border-radius:14px;padding:18px 20px;
+        box-shadow:var(--sombra);margin-bottom:14px}
+.cartao h2{font-size:16.5px;font-weight:800;letter-spacing:-.3px;margin-bottom:2px}
+.cartao .dica{font-size:12.5px;color:var(--tinta-media);margin-bottom:14px}
+
+.duplo{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+@media(max-width:820px){.duplo{grid-template-columns:1fr}}
+
+/* barras: marca fina, ponta arredondada de 4px ancorada na base, 2px de
+   respiro entre vizinhas, rótulo direto só onde ajuda */
+.gr{width:100%;height:150px;display:block}
+.gr rect.b{transition:opacity .15s}
+.gr:hover rect.b{opacity:.45}
+.gr rect.b:hover{opacity:1}
+.gr .eixo{font-size:10.5px;fill:var(--tinta-suave);font-variant-numeric:tabular-nums}
+.gr .valor{font-size:11px;font-weight:700;fill:var(--tinta-media);font-variant-numeric:tabular-nums}
+.gr line.base{stroke:var(--linha);stroke-width:1}
+.vazio{color:var(--tinta-suave);font-size:13px;padding:34px 0;text-align:center}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-suave);
+   font-weight:700;padding:6px 8px;border-bottom:1px solid var(--linha)}
+td{padding:7px 8px;border-bottom:1px solid var(--superficie);font-variant-numeric:tabular-nums}
+td.e{font-variant-numeric:normal}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px}
+.pill.pago{background:#E2F1EE;color:#1C4F48}
+.pill.free{background:var(--superficie);color:var(--tinta-media)}
+
+.linha{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input,select{font-family:var(--f);font-size:14px;padding:9px 12px;border:1.5px solid var(--linha);
+             border-radius:10px;background:#fff;color:var(--tinta)}
+input:focus,select:focus{outline:none;border-color:var(--dado-1)}
+button{font-family:var(--f);font-size:14px;font-weight:700;padding:9px 16px;border-radius:10px;
+       border:none;background:var(--dado-1);color:#fff;cursor:pointer}
+button.ghost{background:#fff;color:var(--tinta);border:1.5px solid var(--linha)}
+button:disabled{opacity:.5;cursor:default}
+.msg{font-size:13px;margin-top:10px;min-height:19px}
+.ok{color:#1C6B5E;font-weight:700}
+.err{color:#A3352B;font-weight:700}
+.nota{font-size:12px;color:var(--tinta-suave);margin-top:12px;line-height:1.5}
+.hide{display:none}
+.tabelinha{font-size:12.5px;color:var(--tinta-media);margin-top:8px}
+.tabelinha summary{cursor:pointer;color:var(--dado-1);font-weight:700}
+</style>
+</head>
+<body>
+
+<nav class="nav topo">
+  <div class="wrap nav-inner">
+    <a class="marca" href="/"><img src="/logo.svg" alt=""><span>Sala<b>vox</b></span></a>
+    <div class="nav-links"><a href="/app">Ferramenta</a><a href="/">Site</a></div>
+  </div>
+</nav>
+
+<div class="painel">
+  <h1>Painel</h1>
+  <p class="sub" id="sub">Números do negócio e atendimento de conta.</p>
+
+  <!-- entrada -->
+  <div class="cartao" id="entrar">
+    <h2>Entrar</h2>
+    <p class="dica">O painel abre só para as contas listadas em <code>ADMIN_EMAILS</code> na Vercel.
+    A entrada é o mesmo link por e-mail da ferramenta.</p>
+    <div class="linha">
+      <input type="email" id="email" placeholder="seu@email.com" autocomplete="email" style="min-width:240px">
+      <button id="pedirLink">Receber o link</button>
+    </div>
+    <div class="msg" id="entrarMsg"></div>
+  </div>
+
+  <div id="conteudo" class="hide">
+    <div class="grade" id="tiles"></div>
+
+    <div class="duplo">
+      <div class="cartao">
+        <h2>Resumos por mês</h2>
+        <p class="dica">Quantas vezes a IA foi usada. Passe o mouse para ver o mês.</p>
+        <div id="grResumos"></div>
+      </div>
+      <div class="cartao">
+        <h2>Custo de IA por mês</h2>
+        <p class="dica">Dólares gastos com a Anthropic, contados por token — medido, não estimado.</p>
+        <div id="grCusto"></div>
+      </div>
+    </div>
+
+    <div class="cartao">
+      <h2>Atendimento de conta</h2>
+      <p class="dica">Achar alguém pelo e-mail, liberar ou estender o plano, zerar a cota do mês.</p>
+      <div class="linha">
+        <input type="email" id="alvo" placeholder="cliente@escritorio.com.br" style="min-width:260px">
+        <button id="buscar">Ver a conta</button>
+        <select id="plano">
+          <option value="profissional">profissional</option>
+          <option value="escritorio">escritório</option>
+          <option value="gratis">grátis</option>
+        </select>
+        <input type="number" id="dias" value="30" min="0" max="3650" style="width:92px">
+        <button class="ghost" id="liberar">Liberar / estender</button>
+        <button class="ghost" id="zerar">Zerar cota do mês</button>
+      </div>
+      <div class="msg" id="opMsg"></div>
+      <div id="conta"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Últimas contas</h2>
+      <p class="dica">As vinte mais recentes.</p>
+      <div id="ultimas"></div>
+    </div>
+
+    <p class="nota" id="rodape"></p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = i => document.getElementById(i);
+  const CHAVE_SESSAO = 'salavox.sessao';
+  const CHAVE_DOLAR = 'salavox.dolar';
+  let cfg = null, sessao = null;
+
+  const num = n => Number(n || 0).toLocaleString('pt-BR');
+  const brl = n => 'R$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const usd = n => 'US$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const escapar = t => String(t == null ? '' : t).replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const dia = d => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
+  const mesCurto = m => {
+    const d = new Date(m + (String(m).length === 7 ? '-01' : ''));
+    return d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+  };
+  const dolar = () => Number(localStorage.getItem(CHAVE_DOLAR) || 5.16);
+
+  /* ---------- entrada ---------- */
+  async function comecar() {
+    try { cfg = await (await fetch('/config.json', { cache: 'no-cache' })).json(); } catch (e) {}
+    if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey) {
+      $('entrarMsg').innerHTML = '<span class="err">O config.json não está preenchido</span> — ' +
+        'sem ele não há contas, e sem contas não há painel.';
+      return;
+    }
+    cfg.supabaseUrl = String(cfg.supabaseUrl).replace(/\/+$/, '');
+    if (location.hash.indexOf('access_token=') >= 0) {
+      const h = new URLSearchParams(location.hash.slice(1));
+      sessao = { access_token: h.get('access_token'), refresh_token: h.get('refresh_token') };
+      localStorage.setItem(CHAVE_SESSAO, JSON.stringify(sessao));
+      history.replaceState(null, '', location.pathname);
+    } else {
+      try { sessao = JSON.parse(localStorage.getItem(CHAVE_SESSAO) || 'null'); } catch (e) {}
+    }
+    window.addEventListener('hashchange', () => location.reload());
+    if (sessao && sessao.access_token) carregar();
+  }
+
+  $('pedirLink').onclick = async () => {
+    const email = ($('email').value || '').trim();
+    if (!/.+@.+\..+/.test(email)) { $('entrarMsg').innerHTML = '<span class="err">e-mail inválido</span>'; return; }
+    $('entrarMsg').textContent = 'Enviando…';
+    try {
+      const r = await fetch(cfg.supabaseUrl + '/auth/v1/otp', {
+        method: 'POST',
+        headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, create_user: false })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      $('entrarMsg').innerHTML = '<span class="ok">Link enviado</span> — abra o e-mail e clique. ' +
+        'Se cair na ferramenta em vez do painel, volte para <code>/painel</code> nesta aba.';
+    } catch (e) { $('entrarMsg').innerHTML = '<span class="err">não consegui enviar o link</span>'; }
+  };
+
+  async function pedir(corpo) {
+    const r = await fetch('/api/painel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
+      body: JSON.stringify(corpo)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.erro || ('o servidor respondeu ' + r.status));
+    return d;
+  }
+
+  /* ---------- números ---------- */
+  async function carregar(quieto) {
+    if (!quieto) $('entrarMsg').textContent = 'Conferindo a conta…';
+    let d;
+    try { d = await pedir({ acao: 'numeros' }); }
+    catch (e) {
+      $('entrarMsg').innerHTML = `<span class="err">${escapar(e.message)}</span>`;
+      return;
+    }
+    $('entrar').classList.add('hide');
+    $('conteudo').classList.remove('hide');
+    desenhar(d);
+  }
+
+  function desenhar(d) {
+    const n = d.numeros, m = d.dinheiro;
+    const custoBrl = m.custo_ia_mes_usd * dolar();
+    const margem = m.receita_mensal ? (m.receita_mensal - custoBrl) / m.receita_mensal * 100 : null;
+    const conversao = n.provaram ? n.provaram_e_assinaram / n.provaram * 100 : null;
+
+    const tiles = [
+      { rot: 'contas', num: num(n.contas), pe: `+${num(n.contas_no_mes)} neste mês` },
+      { rot: 'assinantes', num: num(n.assinantes), destaque: true,
+        pe: n.vencendo_em_7 ? `${num(n.vencendo_em_7)} vencem em 7 dias` : 'nenhum vence esta semana' },
+      { rot: 'receita mensal', num: brl(m.receita_mensal), pe: `${brl(m.mensalidade)} por assinante` },
+      { rot: 'custo de IA no mês', num: brl(custoBrl), pe: `${usd(m.custo_ia_mes_usd)} · dólar a ${brl(dolar())}` },
+      { rot: 'margem', num: margem == null ? '—' : margem.toFixed(1).replace('.', ',') + '%',
+        pe: margem == null ? 'sem assinante ainda' : 'receita menos o custo de IA' },
+      { rot: 'provaram a IA', num: num(n.provaram),
+        pe: conversao == null ? 'ninguém usou a cortesia ainda' : `${conversao.toFixed(0)}% viraram assinantes` },
+      { rot: 'resumos no mês', num: num(n.resumos_mes), pe: `${num(n.premium_mes)} no modelo preciso` },
+      { rot: 'e-mails no mês', num: num(n.emails_mes), pe: 'atas encaminhadas pela plataforma' }
+    ];
+    $('tiles').innerHTML = tiles.map(t =>
+      `<div class="tile${t.destaque ? ' destaque' : ''}"><div class="rot">${t.rot}</div>` +
+      `<div class="num">${t.num}</div><div class="pe">${t.pe}</div></div>`).join('');
+
+    const meses = d.meses || [];
+    barras('grResumos', meses, x => Number(x.resumos || 0), 'var(--dado-1)', v => num(v), 'resumos');
+    barras('grCusto', meses, x => Number(x.custo_usd || 0), 'var(--dado-2)', v => usd(v), 'custo');
+
+    $('ultimas').innerHTML = (n.ultimas || []).length ? tabela(n.ultimas) :
+      '<p class="vazio">Nenhuma conta ainda.</p>';
+
+    $('rodape').innerHTML =
+      'O custo é contado pelos tokens que a Anthropic informou em cada chamada — é medição, não estimativa. ' +
+      'A conversão para reais usa a cotação abaixo, que é a única suposição desta tela: ' +
+      `<input type="number" id="cotacao" step="0.01" min="1" value="${dolar()}" style="width:88px;padding:4px 8px;font-size:12px"> ` +
+      '<button class="ghost" id="salvarCotacao" style="padding:4px 10px;font-size:12px">usar</button><br>' +
+      'A contagem de tokens não separa qual modelo gastou o quê; enquanto o preciso for uma fração das ' +
+      'chamadas, a diferença é de centavos.';
+    $('salvarCotacao').onclick = () => {
+      localStorage.setItem(CHAVE_DOLAR, $('cotacao').value || '5.16');
+      carregar();
+    };
+  }
+
+  function tabela(linhas) {
+    return '<table><thead><tr><th>e-mail</th><th>plano</th><th>até</th><th>criada</th></tr></thead><tbody>' +
+      linhas.map(u => {
+        const pago = u.plano !== 'gratis' && u.assinante_ate && new Date(u.assinante_ate) > new Date();
+        return `<tr><td class="e">${escapar(u.email)}</td>` +
+          `<td><span class="pill ${pago ? 'pago' : 'free'}">${escapar(u.plano)}</span></td>` +
+          `<td>${dia(u.assinante_ate)}</td><td>${dia(u.criado_em)}</td></tr>`;
+      }).join('') + '</tbody></table>';
+  }
+
+  /* ---------- barras ----------
+     Uma série por gráfico, de propósito. Resumos e dólares têm escalas
+     diferentes, e um gráfico com dois eixos verticais é o jeito mais comum de
+     mentir com um gráfico honesto: a mesma altura passa a significar coisas
+     diferentes, e quem olha compara mesmo assim. Dois gráficos lado a lado
+     dizem a mesma coisa sem esse convite ao erro.
+
+     Sem legenda: com uma série só, o título já a nomeia. Rótulo direto só no
+     maior e no último — número em cima de toda barra vira ruído. */
+  function barras(onde, meses, valorDe, cor, formata, oque) {
+    const alvo = document.getElementById(onde);
+    if (!meses.length) { alvo.innerHTML = `<p class="vazio">Ainda não há ${oque} para mostrar.</p>`; return; }
+    const L = 520, A = 150, base = A - 22, topo = 16;
+    const vals = meses.map(valorDe);
+    const max = Math.max(...vals, 1);
+    const larg = Math.min(56, (L - 8) / meses.length - 10);
+    const passo = (L - 8) / meses.length;
+    const iMax = vals.indexOf(Math.max(...vals));
+
+    const partes = meses.map((m, i) => {
+      const v = vals[i];
+      const h = Math.max(v > 0 ? 3 : 0, (v / max) * (base - topo));
+      const x = 4 + i * passo + (passo - larg) / 2;
+      const y = base - h;
+      const rotulo = (i === iMax || i === meses.length - 1) && v > 0
+        ? `<text class="valor" x="${x + larg / 2}" y="${y - 5}" text-anchor="middle">${formata(v)}</text>` : '';
+      return `<g><rect class="b" x="${x}" y="${y}" width="${larg}" height="${h}" rx="4" fill="${cor}">` +
+             `<title>${mesCurto(m.mes)}: ${formata(v)}${m.pessoas ? ' · ' + m.pessoas + ' pessoas' : ''}</title></rect>` +
+             rotulo +
+             `<text class="eixo" x="${x + larg / 2}" y="${A - 6}" text-anchor="middle">${mesCurto(m.mes)}</text></g>`;
+    });
+
+    alvo.innerHTML = `<svg class="gr" viewBox="0 0 ${L} ${A}" role="img" aria-label="${oque} por mês">` +
+      `<line class="base" x1="0" y1="${base}" x2="${L}" y2="${base}"/>${partes.join('')}</svg>` +
+      `<details class="tabelinha"><summary>ver como tabela</summary>` +
+      `<table><thead><tr><th>mês</th><th>${oque}</th></tr></thead><tbody>` +
+      meses.map((m, i) => `<tr><td>${escapar(m.mes)}</td><td>${formata(vals[i])}</td></tr>`).join('') +
+      `</tbody></table></details>`;
+  }
+
+  /* ---------- atendimento ---------- */
+  const op = (m, erro) => { $('opMsg').innerHTML = erro ? `<span class="err">${escapar(m)}</span>` : m; };
+
+  /* `quieto` existe por causa de um defeito que o teste pegou: liberar um plano
+     dizia "Feito" e mandava recarregar a ficha, e a recarga limpava a mensagem
+     antes de alguém conseguir lê-la. A confirmação da ação mais importante da
+     tela durava um piscar. Quem recarrega a ficha por conta própria não fala
+     na área de mensagem. */
+  async function verConta(quieto) {
+    const alvo = ($('alvo').value || '').trim();
+    if (!alvo) { if (!quieto) op('informe o e-mail', true); return; }
+    if (!quieto) op('Procurando…');
+    try {
+      const { conta } = await pedir({ acao: 'conta', alvo });
+      if (!conta.achou) {
+        $('conta').innerHTML = '';
+        if (!quieto) op('não achei essa conta', true);
+        return;
+      }
+      if (!quieto) op('');
+      const pago = conta.plano !== 'gratis' && conta.assinante_ate && new Date(conta.assinante_ate) > new Date();
+      $('conta').innerHTML =
+        `<div style="margin-top:14px"><b>${escapar(conta.email)}</b> — ` +
+        `<span class="pill ${pago ? 'pago' : 'free'}">${escapar(conta.plano)}</span> ` +
+        `${pago ? 'até ' + dia(conta.assinante_ate) : 'sem assinatura ativa'} · ` +
+        `conta criada em ${dia(conta.criado_em)} · ` +
+        `<b>${num(conta.cortesia_usada)}</b> de 3 cortesias usadas</div>` +
+        ((conta.uso || []).length
+          ? '<table style="margin-top:10px"><thead><tr><th>mês</th><th>resumos</th><th>preciso</th>' +
+            '<th>e-mails</th><th>tokens</th></tr></thead><tbody>' +
+            conta.uso.map(u => `<tr><td>${escapar(u.mes)}</td><td>${num(u.resumos)}</td>` +
+              `<td>${num(u.premium)}</td><td>${num(u.emails)}</td>` +
+              `<td>${num(Number(u.tokens_ent) + Number(u.tokens_sai))}</td></tr>`).join('') +
+            '</tbody></table>'
+          : '<p class="vazio">Esta conta nunca usou a IA.</p>');
+    } catch (e) { if (!quieto) op(e.message, true); }
+  }
+
+  $('buscar').onclick = () => verConta(false);
+
+  $('liberar').onclick = async () => {
+    const alvo = ($('alvo').value || '').trim();
+    if (!alvo) return op('informe o e-mail', true);
+    const dias = Number($('dias').value || 0);
+    if (!confirm(`Liberar ${$('plano').value} por ${dias} dias para ${alvo}?`)) return;
+    op('Aplicando…');
+    try {
+      const { feito } = await pedir({ acao: 'liberar', alvo, plano: $('plano').value, dias });
+      if (!feito.achou) return op('não achei essa conta', true);
+      await verConta(true);
+      await carregar(true);
+      op(`<span class="ok">Feito</span> — ${escapar(alvo)} está em ${escapar(feito.plano)} até ` +
+         dia(feito.assinante_ate) + '.');
+    } catch (e) { op(e.message, true); }
+  };
+
+  $('zerar').onclick = async () => {
+    const alvo = ($('alvo').value || '').trim();
+    if (!alvo) return op('informe o e-mail', true);
+    if (!confirm(`Zerar a cota do mês de ${alvo}?`)) return;
+    op('Zerando…');
+    try {
+      const { feito } = await pedir({ acao: 'zerar', alvo });
+      await verConta(true);
+      op(feito.achou ? '<span class="ok">Cota do mês zerada.</span>' : 'não achei essa conta', !feito.achou);
+    } catch (e) { op(e.message, true); }
+  };
+
+  window.__painel = { desenhar, barras };   // usado pelos testes
+  comecar();
+})();
+</script>
+</body>
+</html>

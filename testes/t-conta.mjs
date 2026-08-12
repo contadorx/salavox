@@ -52,7 +52,7 @@ export default async function (ctx, url, erros) {
   const p = await paginaLimpa(ctx, erros);
   const enviados = [];
   const pedidos = [];
-  let plano = 'gratis', ate = null;
+  let plano = 'gratis', ate = null, cortesia = 3, restante = 2;
 
   p.on('request', r => {
     const u = r.url();
@@ -72,15 +72,20 @@ export default async function (ctx, url, erros) {
     contentType: 'application/json',
     body: JSON.stringify([{ email: 'contador@exemplo.com.br', plano, assinante_ate: ate }])
   }));
+  await p.route(SUPA + '/rest/v1/rpc/cortesia_restante', r => r.fulfill({
+    contentType: 'application/json', body: String(cortesia)
+  }));
   await p.route('**/api/resumo', r => {
     const req = r.request();
     enviados.push({ tipo: 'resumo', corpo: req.postDataJSON(), auth: req.headers()['authorization'] });
-    if (plano === 'gratis') {
+    if (plano === 'gratis' && cortesia <= 0) {
       return r.fulfill({ status: 402, contentType: 'application/json',
-        body: JSON.stringify({ erro: 'a cota de resumos deste mês acabou — ou a assinatura não está ativa' }) });
+        body: JSON.stringify({ assinar: true,
+          erro: 'seus resumos de cortesia acabaram — o plano profissional tem 30 por mês, R$ 19,90' }) });
     }
     return r.fulfill({ contentType: 'application/json',
-      body: JSON.stringify({ texto: 'RESUMO DO SALAVOX: três decisões e duas pendências.', restante: 29 }) });
+      body: JSON.stringify({ texto: 'RESUMO DO SALAVOX: três decisões e duas pendências.',
+                             restante: plano === 'gratis' ? restante : 29 }) });
   });
   await p.route('**/api/enviar-ata', r => {
     enviados.push({ tipo: 'email', corpo: r.request().postDataJSON() });
@@ -122,19 +127,46 @@ export default async function (ctx, url, erros) {
   await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
   await transcrever(p);
 
-  /* No grátis nem se clica: os botões não estão lá. A porta é fechada antes,
-     não depois — recusar só no servidor gastaria uma viagem para dizer não. */
-  b.verdade('no grátis os botões da IA nem ficam disponíveis', await p.isHidden('#iaAcoes'));
+  /* Degustação: quem entrou na conta clica, assinando ou não.
+
+     A regra anterior escondia os botões de quem não assinava, e o primeiro a
+     esbarrar nela foi o dono do produto tentando testar a própria IA. Ninguém
+     assina um resumo por IA sem ver o resumo. */
+  b.verdade('quem entrou na conta tem os botões da IA, mesmo no grátis',
+            !(await p.isHidden('#iaAcoes')));
+  b.verdade('e a tela conta quantos resumos de cortesia sobraram',
+            /3 resumos de cortesia/.test(await p.textContent('#iaEstado')));
+  b.conferir('o modelo caro fica fora da degustação',
+             await p.evaluate(() =>
+               document.querySelector('#iaModeloSalavox option[value="preciso"]').disabled), true);
+
   /* Este conferir tem de vir DEPOIS da ata na tela. Enquanto o cartão da ata
      está escondido, o botão de e-mail está escondido junto — e a verificação
      passava mesmo com a trava do plano arrancada. Foi a sabotagem que mostrou:
      um teste verde por acidente é pior do que teste nenhum. */
   b.verdade('com a ata na tela, o envio por e-mail continua fora do grátis',
             await p.isHidden('#enviarEmail'));
-  b.verdade('o cartão de resumo aparece assim mesmo, explicando o plano', !(await p.isHidden('#iaCard')));
-  b.verdade('e a tela diz que é do plano profissional, com o preço',
-            /profissional/.test(await p.textContent('#iaEstado')) &&
-            /19,90/.test(await p.textContent('#iaEstado')));
+
+  /* usa uma cortesia */
+  cortesia = 2; restante = 1;
+  await p.click('#iaResumo');
+  await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent),
+                          null, { timeout: 30000 });
+  b.verdade('o resumo de cortesia sai de verdade',
+            /RESUMO DO SALAVOX/.test(await p.evaluate(() =>
+              (window.__salavox.resumos().find(r => r.chave === 'resumo') || {}).texto || '')));
+  b.verdade('e o que sobrou aparece contado como cortesia',
+            /1 resumo de cortesia/.test(await p.textContent('#iaMotorMsg')));
+
+  /* acabou a cortesia: a recusa tem de convidar a assinar, não só dizer não */
+  cortesia = 0;
+  await p.click('#iaPendencias');
+  await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent),
+                          null, { timeout: 30000 });
+  const recusa = await p.textContent('#iaMsg');
+  b.verdade('a recusa diz que a cortesia acabou e quanto custa continuar',
+            /cortesia/.test(recusa) && /19,90/.test(recusa));
+  b.verdade('e o cartão passa a oferecer o plano', /acabaram/.test(await p.textContent('#iaEstado')));
 
   /* vira assinante e tenta de novo */
   plano = 'profissional';
@@ -155,6 +187,7 @@ export default async function (ctx, url, erros) {
   // o botão de e-mail mora no cartão da ata, que só existe depois de transcrever
   b.verdade('assinante ganha o botão de enviar por e-mail', !(await p.isHidden('#enviarEmail')));
 
+  await p.evaluate(() => { document.getElementById('iaMsg').textContent = ''; });
   await p.click('#iaPendencias');
   await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent), null, { timeout: 30000 });
 
@@ -165,7 +198,11 @@ export default async function (ctx, url, erros) {
   b.verdade('a chamada leva o token de quem pediu', /^Bearer token-de-teste$/.test(pedido.auth || ''));
   b.verdade('o que sai é o texto da ata, com a instrução da tarefa',
             /decisões/i.test(pedido.corpo.prompt) && /PARTICIPANTES|VOCÊ/.test(pedido.corpo.prompt));
-  b.verdade('a cota que sobrou aparece na tela', /restam/.test(await p.textContent('#iaMotorMsg')));
+  b.verdade('para o assinante a cota do mês aparece na tela',
+            /restam .*29.* resumos neste mês/.test(await p.textContent('#iaMotorMsg')));
+  b.conferir('e o modelo preciso é liberado',
+             await p.evaluate(() =>
+               document.querySelector('#iaModeloSalavox option[value="preciso"]').disabled), false);
 
   /* ---------- 3b. o resumo chega ao PDF e ao texto ---------- */
   const texto = await p.evaluate(() => window.__salavox.comoTexto());
@@ -203,6 +240,9 @@ export default async function (ctx, url, erros) {
   await p.waitForTimeout(200);
   b.conferir('sair apaga a sessão',
              await p.evaluate(() => localStorage.getItem('salavox.sessao')), null);
+  b.verdade('sem entrar na conta não há botão de IA nenhum', await p.isHidden('#iaAcoes'));
+  b.verdade('e o cartão convida a entrar para experimentar',
+            /3 resumos para experimentar/.test(await p.textContent('#iaEstado')));
 
   await p.close();
   return b;

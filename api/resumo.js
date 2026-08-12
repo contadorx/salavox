@@ -16,9 +16,13 @@
  *   SUPABASE_SERVICE_ROLE_KEY  chave de serviço (NUNCA no navegador)
  */
 
+/* Os dois modelos oferecidos. O "preciso" era o Sonnet 4.5 e passou ao Sonnet 5
+   em 12/08/2026: mais capaz e mais barato que o anterior. Conferido no catálogo
+   da Anthropic, não deduzido — nome de modelo envelhece rápido, e apontar para
+   um que saiu do ar derruba a funcionalidade inteira sem aviso. */
 const MODELOS = {
   rapido:  'claude-haiku-4-5',
-  preciso: 'claude-sonnet-4-5'
+  preciso: 'claude-sonnet-5'
 };
 
 const LIMITE_TEXTO = 400000;   // ~100 mil tokens: reunião muito longa é cortada, não recusada
@@ -29,7 +33,13 @@ export default async function handler(req, res) {
   const chave = process.env.ANTHROPIC_API_KEY;
   const sbUrl = process.env.SUPABASE_URL;
   const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!chave || !sbUrl || !sbKey) return res.status(500).json({ erro: 'servidor sem configuração' });
+  /* Dizer QUAL variável falta, pelo nome. "Servidor sem configuração" é a
+     mensagem que faz alguém abrir o painel da Vercel e olhar para cinco campos
+     sem saber qual. O nome da variável é público — só o valor é segredo. */
+  const faltando = [['ANTHROPIC_API_KEY', chave], ['SUPABASE_URL', sbUrl],
+                    ['SUPABASE_SERVICE_ROLE_KEY', sbKey]].filter(([, v]) => !v).map(([n]) => n);
+  if (faltando.length) return res.status(500).json({
+    erro: 'falta configurar no servidor: ' + faltando.join(', '), faltando });
 
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ erro: 'entre na sua conta para usar a IA do Salavox' });
@@ -54,10 +64,14 @@ export default async function handler(req, res) {
   });
   const restante = await cota.json();
   if (!cota.ok || restante < 0) {
+    /* A recusa precisa dizer o que fazer a seguir. Quem esgotou a degustação
+       está a um passo de assinar; quem recebe "cota esgotada" e ponto final
+       fecha a aba. */
     return res.status(402).json({
       erro: premium
-        ? 'a cota de resumos no modelo preciso acabou este mês'
-        : 'a cota de resumos deste mês acabou — ou a assinatura não está ativa'
+        ? 'o modelo preciso é do plano profissional (ou a cota dele acabou este mês)'
+        : 'seus resumos de cortesia acabaram — o plano profissional tem 30 por mês, R$ 19,90',
+      assinar: true
     });
   }
 
@@ -84,5 +98,20 @@ export default async function handler(req, res) {
 
   const d = await r.json();
   const texto = (d.content || []).map(c => c.text || '').join('').trim();
+
+  /* Guarda quantos tokens custou — números, nunca conteúdo. Sem isto o painel
+     só saberia estimar o custo por cenário, e cifra estimada apresentada como
+     fato é como se erra um preço. Falhar aqui não pode derrubar o resumo que já
+     está pronto e já foi pago: o erro é registrado e a resposta segue. */
+  const uso = d.usage || {};
+  try {
+    await fetch(sbUrl + '/rest/v1/rpc/somar_tokens', {
+      method: 'POST',
+      headers: { apikey: sbKey, Authorization: 'Bearer ' + sbKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_perfil: usuario.id,
+                             p_ent: uso.input_tokens || 0, p_sai: uso.output_tokens || 0 })
+    });
+  } catch (e) { console.error('somar_tokens', e.message); }
+
   return res.status(200).json({ texto, restante });
 }

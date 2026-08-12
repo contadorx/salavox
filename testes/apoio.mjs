@@ -33,6 +33,21 @@ export function servir(porta = 8131, raiz = PUBLICO) {
   })));
 }
 
+/* Microfone mudo: exatamente o caso que produziu a ata com 88 alucinações.
+   O navegador de teste entrega um bipe no microfone falso, que é o oposto do
+   que precisamos reproduzir aqui — então a trilha é substituída por uma de
+   ganho zero. Fica digitalmente silenciosa, como um microfone fechado. */
+export function micMudo() {
+  return `navigator.mediaDevices.getUserMedia = async () => {
+    const ac = new AudioContext();
+    const o = ac.createOscillator(); const g = ac.createGain();
+    g.gain.value = 0;                       // silêncio, não ausência de trilha
+    const d = ac.createMediaStreamDestination();
+    o.connect(g); g.connect(d); o.start();
+    return d.stream;
+  };`;
+}
+
 /* Tela sintética: troca de "slide" num intervalo conhecido, para que os
    instantes detectados possam ser comparados com valores golden. */
 export function telaFalsa(segundosPorSlide) {
@@ -72,7 +87,14 @@ export function telaFalsa(segundosPorSlide) {
 /* Modelo de transcrição falso. O modelo real vem de uma CDN e não pode ser
    carregado aqui — o que este teste cobre é a integração (fatiamento, canais,
    linha do tempo), não a qualidade do reconhecimento. Isso está declarado no
-   README como não verificado, e continua não verificado. */
+   README como não verificado, e continua não verificado.
+
+   Uma coisa ele imita de propósito, porque é o defeito que chegou de uma
+   reunião de verdade: **diante de silêncio, o Whisper não devolve silêncio.**
+   Devolve texto inventado, em laço — a ata real saiu com "O que é isso?" 88
+   vezes no canal do microfone fechado. Se o modelo simulado fosse educado e
+   devolvesse vazio no silêncio, a peneira poderia ser removida do produto sem
+   nenhum teste ficar vermelho. Aqui ele alucina igual. */
 export const MODELO_FALSO = {
   contentType: 'application/javascript',
   body: `export const env={allowLocalModels:1,allowRemoteModels:1,backends:{onnx:{wasm:{}}}};
@@ -81,6 +103,13 @@ export const MODELO_FALSO = {
       globalThis.__opcoes = opts;      // o teste confere o que o idioma mandou para o modelo
       let soma=0; for (let i=0;i<d.length;i++) soma += d[i]<0 ? -d[i] : d[i];
       const amp = (soma/(d.length||1)).toFixed(4);
+      globalThis.__amps = (globalThis.__amps||[]); globalThis.__amps.push(+amp);
+      /* silêncio entra, alucinação em laço sai — como no modelo de verdade */
+      if (+amp < 0.004) {
+        globalThis.__alucinou = (globalThis.__alucinou||0) + 1;
+        return {chunks: Array.from({length: 14}, (_, k) =>
+          ({timestamp:[k*2, k*2+2], text:'O que é isso?'}))};
+      }
       /* instante, dentro desta janela, em que o áudio fica baixo e continua baixo.
          A tela sintética abaixa o volume no mesmo segundo em que troca de slide,
          então este número tem de bater com o instante da tela detectada no vídeo —
