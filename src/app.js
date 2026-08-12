@@ -708,11 +708,12 @@ registerProcessor('toca', Toca);`;
         const resta = (performance.now() - t0) / (i + 1) * (total - i - 1) / 1000;
         const falta = i >= 3 && resta > 4
           ? ` — faltam ~${resta < 90 ? Math.ceil(resta) + 's' : Math.ceil(resta/60) + ' min'}` : '';
-        $('telasMsg').textContent = `Procurando telas… ${fmt(t)} de ${fmt(dur)} — ${guardadas} encontrada(s)${falta}`;
+        $('telasMsg').textContent = `Procurando telas… ${fmt(t)} de ${fmt(dur)} — ` +
+          `${guardadas} ${guardadas === 1 ? 'encontrada' : 'encontradas'}${falta}`;
       }
 
       telas.sort((a, b) => a.t - b.t);
-      $('telasMsg').innerHTML = `<span class="ok">${telas.length} tela(s) encontrada(s).</span>` +
+      $('telasMsg').innerHTML = `<span class="ok">${telas.length === 1 ? '1 tela encontrada' : telas.length + ' telas encontradas'}.</span>` +
         (pararVarredura ? ' Interrompido por você.' : '');
       $('telasDica').classList.remove('hide');
       $('todasTelas').classList.remove('hide');

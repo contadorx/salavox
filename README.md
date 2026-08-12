@@ -45,10 +45,16 @@ PROTOCOLO.md         como se trabalha neste projeto
 ```
 
 ```bash
-python3 build.py                  # gera public/app.html e public/versao.txt
-node testes/rodar-tudo.mjs        # telas, gravação em pedaços, recuperação
-node testes/sabotagem.mjs         # quebra o app de propósito e exige que os testes peguem
+python3 build.py                     # gera public/app.html e public/versao.txt
+node testes/rodar-tudo.mjs           # telas, gravação em pedaços, recuperação
+node testes/sabotagem.mjs            # quebra o app de propósito e exige que os testes peguem
+node ferramentas/gerar-imagens.mjs   # refaz as imagens da página inicial a partir do app
+node ferramentas/ver-home.mjs        # confere a página inicial, tema claro e escuro
 ```
+
+As imagens da página inicial são **capturas do aplicativo de verdade**, geradas por
+`ferramentas/gerar-imagens.mjs` a partir de uma reunião de exemplo. Se a interface mudar, basta rodar de
+novo — não há maquete para manter sincronizada com nada.
 
 A versão aparece no rodapé da ferramenta e em `/versao.txt`. Para saber o que está publicado:
 `curl https://salavox.com/versao.txt` — se não bater com o zip, o que está no ar é outro produto.

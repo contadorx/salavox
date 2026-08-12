@@ -103,6 +103,23 @@ Foi também a sabotagem que encontrou um defeito de verdade no produto: a últim
 ser um resto de 0,05 s, e o modelo devolvia texto datado em 01:09 numa reunião de um minuto. Resto curto
 agora não entra, e o instante vem preso ao tamanho da janela.
 
+### Teste que pisca é teste quebrado
+
+O controle acima reprovou duas vezes antes de ficar de pé, e por um motivo que vale registrar: **eu estava
+medindo a coisa certa pelo instrumento errado.** O alinhamento entre áudio e vídeo era conferido comparando
+a duração do áudio com o cronômetro do navegador — e entre mandar parar e o evento de parada chegar passam
+dezenas ou centenas de milissegundos, que variam com a carga da máquina. A margem apertada acusava defeito
+onde não havia; a margem larga deixaria passar defeito de verdade.
+
+A saída foi medir **pelo conteúdo**: a tela sintética troca de slide e abaixa o volume no mesmo instante. A
+troca de slide é datada pelo vídeo, a queda de volume é datada pelo áudio cru, e o teste compara os dois
+números. Se as linhas do tempo estiverem alinhadas, eles são iguais — não importa quanto o gravador demorou
+para começar. **Quando um teste pisca, o defeito quase sempre está no instrumento, não no limite de
+tolerância.** Afrouxar a margem é o remédio errado e o mais tentador.
+
+Três corridas seguidas verdes valem mais que uma. Um teste que passa numa e falha na outra é um teste que
+não se pode usar para dizer "passou".
+
 ---
 
 ## 4. Publicação — o elo mais fraco da corrente

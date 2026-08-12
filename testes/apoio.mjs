@@ -66,8 +66,19 @@ export const MODELO_FALSO = {
     export async function pipeline(){ return async (d) => { n++;
       let soma=0; for (let i=0;i<d.length;i++) soma += d[i]<0 ? -d[i] : d[i];
       const amp = (soma/(d.length||1)).toFixed(4);
+      /* instante, dentro desta janela, em que o áudio fica baixo e continua baixo.
+         A tela sintética abaixa o volume no mesmo segundo em que troca de slide,
+         então este número tem de bater com o instante da tela detectada no vídeo —
+         é assim que o teste compara as duas linhas do tempo sem depender de
+         cronômetro nenhum. */
+      let q = -1;
+      for (let i = 5*16000; i + 1600 < d.length; i += 160) {
+        let alto = false;
+        for (let k = i; k < i + 1600; k += 8) if ((d[k] < 0 ? -d[k] : d[k]) > 0.12) { alto = true; break; }
+        if (!alto) { q = i / 16000; break; }
+      }
       return {chunks:[
-        {timestamp:[1,5], text:'Trecho '+n+' [amp='+amp+']'},
+        {timestamp:[1,5], text:'Trecho '+n+' [amp='+amp+'] [quieto='+q.toFixed(2)+']'},
         {timestamp:[9,13],text:'Segunda parte do trecho '+n+'.'}
       ]}; }; }`
 };

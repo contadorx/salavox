@@ -26,6 +26,7 @@ const nav = await chromium.launch({
 });
 
 let falhou = false;
+const resumo = [];
 for (const [nome, teste] of TESTES) {
   const erros = [];
   const ctx = await nav.newContext({ permissions: ['microphone'], viewport: { width: 1100, height: 900 } });
@@ -34,6 +35,7 @@ for (const [nome, teste] of TESTES) {
     b = await teste(ctx, servidor.url, erros);
   } catch (e) {
     console.log(`\n■ ${nome}\n  ✗ o teste quebrou: ${e.message.split('\n')[0]}`);
+    resumo.push([nome, ['o teste quebrou: ' + e.message.split('\n')[0]]]);
     falhou = true;
     await ctx.close();
     continue;
@@ -45,11 +47,18 @@ for (const [nome, teste] of TESTES) {
     console.log(`  ${i.ok ? '✓' : '✗'} ${i.oque}` +
       (i.ok ? `  →  ${JSON.stringify(i.real)}` : `\n      esperado: ${JSON.stringify(i.esperado)}\n      obtido:   ${JSON.stringify(i.real)}`));
   if (erros.length) { console.log('  ✗ erros no console da página:'); erros.forEach(e => console.log('      ' + e)); }
+  resumo.push([nome, b.itens.filter(i => !i.ok).map(i => i.oque).concat(erros)]);
   if (!b.passou || erros.length) falhou = true;
 }
 
 await nav.close();
 await servidor.fechar();
 
+/* Resumo no fim, para que um `| tail` mostre o que falhou sem obrigar a rolar
+   a saída inteira. Já perdi uma corrida vermelha por não ver a linha que
+   importava. */
+console.log('\n' + '─'.repeat(56));
+for (const [nome, falhas] of resumo)
+  console.log(falhas.length ? `✗ ${nome}: ${falhas.join(' | ')}` : `✓ ${nome}`);
 console.log(falhou ? '\nRESULTADO: falhou' : '\nRESULTADO: passou');
 process.exit(falhou ? 1 : 0);

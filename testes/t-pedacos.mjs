@@ -59,9 +59,11 @@ export default async function (ctx, url, erros) {
 
   const duracao = info.pcmBytes / 4 / 16000;                  // 2 canais Int16 a 16 kHz
   b.entre('taxa do áudio cru em KB/s', info.pcmBytes / duracao / 1024, 62.4, 62.6);
-  // comparado com o instante real de início e fim da gravação, não com o
-  // relógio da tela, que só tem resolução de um segundo
-  b.entre('áudio alinhado com o vídeo, em segundos de diferença', duracao - info.real, -0.3, 0.3);
+  /* Conferência grossa: o arquivo de áudio tem a duração da gravação. A margem é
+     larga de propósito — entre mandar parar e o evento de parada chegar passam
+     dezenas ou centenas de milissegundos, e apertar isto só produziria teste
+     instável. O alinhamento fino é medido mais abaixo, pelo conteúdo. */
+  b.entre('o áudio tem a duração da gravação, em segundos de diferença', duracao - info.real, -1.5, 1.5);
   b.entre('pedaços de vídeo no disco (1 a cada 10 s)', info.video, 4, 8);
   b.entre('pedaços de áudio no disco (1 a cada 4 s)', info.audio, 12, 20);
   b.verdade('os metadados da sessão foram gravados', info.meta);
@@ -84,6 +86,27 @@ export default async function (ctx, url, erros) {
   const a1 = amp(1), a2 = amp(31);
   b.verdade('a segunda janela leu o segundo trecho do áudio, não o primeiro',
             a1 !== null && a2 !== null && a1 >= a2 * 2);
+
+  /* ---- alinhamento fino, medido pelo conteúdo e não por cronômetro ----
+     A tela sintética troca de slide e abaixa o volume no mesmo instante. A troca
+     de slide é datada pelo vídeo; a queda de volume, pelo áudio cru. Se as duas
+     linhas do tempo estiverem alinhadas, os dois números são o mesmo — e isso
+     vale mesmo que o gravador tenha demorado a começar. */
+  await p.click('#varrer');
+  await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), { timeout: 240000 });
+  const legendas = await p.$$eval('.telas figcaption', e => e.map(x => x.textContent.trim()));
+  const segundosDe = t => { const [m, s] = t.split(':').map(Number); return m * 60 + s; };
+  const telaDoMeio = legendas[1] ? segundosDe(legendas[1]) : null;
+
+  const primeira = falas.find(f => f.quem === 'outros' && f.a === 1 && /quieto=/.test(f.texto));
+  const quieto = primeira ? Number(primeira.texto.match(/quieto=(-?[0-9.]+)/)[1]) : null;
+
+  /* Faixa larga de propósito: o instante absoluto depende de quanto o gravador
+     demorou para começar depois de a tela sintética entrar no ar. O que precisa
+     ser exato é a diferença entre as duas linhas do tempo, conferida logo abaixo. */
+  b.entre('a segunda tela cai perto do meio da gravação (segundos)', telaDoMeio, 15, 22);
+  b.verdade('a queda de volume e a troca de tela caem no mesmo instante',
+            quieto !== null && telaDoMeio !== null && Math.abs(quieto - telaDoMeio) <= 0.6);
 
   await p.close();
   return b;

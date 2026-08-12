@@ -33,6 +33,26 @@
     e monta a ata dentro do seu navegador — e ainda separa o que você falou do que os participantes falaram.</p>
     <p><a class="btn" href="/app">Abrir o Salavox — é grátis</a></p>
     <p class="small muted" style="margin-top:16px">Sem cadastro e sem instalação. Funciona no Chrome e no Edge.</p>
+
+    <figure class="visual">
+      <div class="moldura">
+        <div class="barra"><i></i><i></i><i></i><span>salavox.com/app</span></div>
+        <div class="recorte alto">
+          <img src="/img/ata-topo.webp" width="1600" height="1232" loading="lazy"
+               alt="Ata gerada pelo Salavox: falas marcadas como VOCÊ e PARTICIPANTES, com as telas compartilhadas intercaladas no instante em que apareceram.">
+        </div>
+      </div>
+      <figcaption>A ata de uma reunião de exemplo, como o Salavox entrega — com as telas
+      compartilhadas no minuto em que apareceram.</figcaption>
+    </figure>
+
+    <div class="selos">
+      <span>sem robô na chamada</span>
+      <span>sem cadastro</span>
+      <span>sem limite de duração</span>
+      <span>PDF, .txt e .vtt</span>
+      <span>funciona sem internet depois do primeiro uso</span>
+    </div>
   </div>
 </section>
 
@@ -52,22 +72,32 @@
     <h2>Três passos, nenhuma conta</h2>
     <ol class="steps">
       <li>
-        <h3>Grave</h3>
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/></svg>Grave</h3>
         <p>Avise os participantes, compartilhe a janela da reunião e clique em gravar. O áudio da chamada e
         o seu microfone são captados por caminhos separados.</p>
       </li>
       <li>
-        <h3>Transcreva</h3>
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h2M8 6v12M13 3v18M18 8v8M21 11v2"/></svg>Transcreva</h3>
         <p>O reconhecimento de voz roda no seu próprio computador, usando a placa de vídeo. Nada é enviado
         para lugar nenhum.</p>
       </li>
       <li>
-        <h3>Receba a ata</h3>
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Receba a ata</h3>
         <p>Sai em PDF, texto ou legenda, com o instante de cada fala, a marcação de quem falou e as telas
         que foram compartilhadas, na ordem em que apareceram. E um prompt pronto, se quiser pedir o resumo
         a uma IA.</p>
       </li>
     </ol>
+
+    <figure class="visual">
+      <div class="moldura">
+        <div class="barra"><i></i><i></i><i></i><span>gravando</span></div>
+        <img src="/img/gravando.webp" width="1600" height="599" loading="lazy"
+             alt="A ferramenta gravando: cronômetro, medidores separados para o seu microfone e para o áudio da reunião, e o aviso de quanto já foi gravado em disco.">
+      </div>
+      <figcaption>Durante a reunião: dois medidores separados, um para você e outro para a chamada — é
+      dessa separação que sai a marcação de quem falou.</figcaption>
+    </figure>
   </div>
 </section>
 
@@ -78,9 +108,83 @@
     pagos. Aqui a solução é outra: <strong>as duas fontes de áudio já chegam separadas</strong>. Seu microfone
     é você; o áudio da chamada são os outros. O Salavox grava cada um em um canal e transcreve os dois
     isoladamente.</p>
-    <p class="small muted">Sendo exato: isso distingue você dos demais, mas não separa os participantes entre
-    si — todos aparecem como um grupo. É o suficiente para saber o que <em>você</em> se comprometeu a fazer,
-    e não pretendemos vender como mais do que é.</p>
+    <div class="diagrama">
+      <svg viewBox="0 0 860 300" role="img" aria-label="Diagrama: o microfone entra no canal esquerdo e o áudio da chamada no canal direito; a gravação e a transcrição acontecem no seu computador e nada é enviado para fora.">
+        <g font-family="ui-sans-serif,system-ui,sans-serif" fill="currentColor">
+          <rect x="8" y="34" width="212" height="72" rx="11" fill="none" stroke="currentColor" stroke-opacity=".28"/>
+          <text x="30" y="66" font-size="16" font-weight="600">Seu microfone</text>
+          <text x="30" y="88" font-size="13.5" opacity=".65">o que você fala</text>
+
+          <rect x="8" y="188" width="212" height="72" rx="11" fill="none" stroke="currentColor" stroke-opacity=".28"/>
+          <text x="30" y="220" font-size="16" font-weight="600">Áudio da chamada</text>
+          <text x="30" y="242" font-size="13.5" opacity=".65">o que os outros falam</text>
+
+          <path d="M220 70 H300 Q316 70 316 86 V128 H352" fill="none" stroke="var(--accent)" stroke-width="2"/>
+          <path d="M220 224 H300 Q316 224 316 208 V166 H352" fill="none" stroke="var(--warm,#8a5a2b)" stroke-width="2"/>
+          <path d="M344 122 l10 6 -10 6 z" fill="var(--accent)"/>
+          <path d="M344 160 l10 6 -10 6 z" fill="var(--warm,#8a5a2b)"/>
+
+          <rect x="360" y="20" width="490" height="260" rx="14" fill="none" stroke="currentColor" stroke-opacity=".28"/>
+          <text x="384" y="52" font-size="12" letter-spacing="1.6" opacity=".6">SEU COMPUTADOR</text>
+
+          <rect x="384" y="104" width="200" height="34" rx="8" fill="var(--accent)" fill-opacity=".14"/>
+          <text x="398" y="126" font-size="14" font-weight="600" fill="var(--accent)">canal esquerdo</text>
+          <text x="600" y="126" font-size="14">vira <tspan font-weight="700" fill="var(--accent)">VOCÊ</tspan> na ata</text>
+
+          <rect x="384" y="150" width="200" height="34" rx="8" fill="var(--warm,#8a5a2b)" fill-opacity=".14"/>
+          <text x="398" y="172" font-size="14" font-weight="600" fill="var(--warm,#8a5a2b)">canal direito</text>
+          <text x="600" y="172" font-size="14">vira <tspan font-weight="700" fill="var(--warm,#8a5a2b)">PARTICIPANTES</tspan></text>
+
+          <text x="384" y="222" font-size="13.5" opacity=".7">A gravação e a transcrição acontecem aqui dentro.</text>
+          <text x="384" y="246" font-size="13.5" opacity=".7">Nenhum áudio é enviado para servidor nenhum.</text>
+        </g>
+      </svg>
+    </div>
+
+    <p class="small muted" style="margin-top:22px">Sendo exato: isso distingue você dos demais, mas não
+    separa os participantes entre si — todos aparecem como um grupo. É o suficiente para saber o que
+    <em>você</em> se comprometeu a fazer, e não pretendemos vender como mais do que é.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">O que você leva embora</p>
+    <h2>As telas viram parte da ata</h2>
+    <p class="lead">Boa parte do que importa numa reunião de escritório não é dita, é mostrada — a planilha,
+    o extrato, o contrato na tela. O Salavox procura os instantes em que a tela mudou, guarda uma imagem de
+    cada um e você escolhe quais entram.</p>
+
+    <figure class="visual">
+      <div class="moldura">
+        <img src="/img/telas.webp" width="1600" height="614" loading="lazy"
+             alt="O passo de telas compartilhadas: as três telas encontradas na gravação, com o instante de cada uma, e o aviso de que clicar remove da ata.">
+      </div>
+    </figure>
+
+    <div class="duo">
+      <figure class="visual" style="margin-top:0">
+        <div class="moldura">
+          <div class="barra"><i></i><i></i><i></i><span>ata.pdf</span></div>
+          <div class="recorte medio">
+            <img src="/img/pdf.webp" width="910" height="1287" loading="lazy"
+                 alt="A primeira página do PDF gerado, com cabeçalho, aviso de transcrição automática e as telas embutidas no meio das falas.">
+          </div>
+        </div>
+        <figcaption>O PDF sai com as telas embutidas, prontas para anexar ao e-mail do cliente.</figcaption>
+      </figure>
+      <div>
+        <h3 style="font-size:17px;margin-top:6px">E também</h3>
+        <ul class="plan" style="list-style:none;padding:0;margin:14px 0 0;display:grid;gap:9px;font-size:15px;color:var(--muted)">
+          <li>Arquivo <code>.txt</code> com o instante de cada fala</li>
+          <li>Legenda <code>.vtt</code>, para reabrir junto com a gravação</li>
+          <li>A gravação em vídeo, para guardar como quiser</li>
+          <li>Um prompt pronto para pedir o resumo a uma IA</li>
+        </ul>
+        <p class="small muted" style="margin-top:18px">Tudo isso é arquivo no seu computador desde o primeiro
+        segundo. Não depende de plano ativo, de prazo de retenção nem de a ferramenta continuar existindo.</p>
+      </div>
+    </div>
   </div>
 </section>
 

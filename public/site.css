@@ -93,3 +93,44 @@ footer{padding:40px 0 60px;color:var(--muted);font-size:14px}
 footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 footer a{color:var(--muted);text-decoration:none;margin-right:18px}
 footer a:hover{color:var(--ink)}
+
+/* ---------- elementos visuais da página inicial ---------- */
+
+/* moldura de navegador: a captura é do aplicativo de verdade, e a moldura
+   deixa isso explícito em vez de parecer um desenho de interface */
+.moldura{border:1px solid var(--line);border-radius:13px;overflow:hidden;background:var(--panel);
+         box-shadow:0 1px 2px rgba(0,0,0,.04),0 12px 34px -18px rgba(0,0,0,.35)}
+.moldura .barra{display:flex;align-items:center;gap:7px;padding:10px 14px;background:var(--bg);
+                border-bottom:1px solid var(--line)}
+.moldura .barra i{width:9px;height:9px;border-radius:50%;background:var(--line);display:block}
+.moldura .barra span{margin-left:8px;font-size:12px;color:var(--muted);
+                     font-family:ui-monospace,Menlo,monospace}
+.moldura img{width:100%;display:block}
+
+/* recorte com esmaecimento: mostra o começo do documento sem despejar a página inteira */
+.recorte{position:relative;overflow:hidden}
+.recorte img{display:block;width:100%}
+.recorte.alto{max-height:430px}
+.recorte.medio{max-height:330px}
+.recorte::after{content:'';position:absolute;inset:auto 0 0 0;height:110px;
+                /* o esmaecimento acompanha o fundo da captura, não o da página: as
+                   imagens são do aplicativo em tema claro, e um degradê escuro por
+                   cima delas no modo noturno vira uma mancha */
+                background:linear-gradient(to bottom,rgba(250,249,247,0),#faf9f7)}
+
+figure.visual{margin:30px 0 0}
+figure.visual figcaption{margin-top:11px;font-size:13.5px;color:var(--muted);text-align:center}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:30px;align-items:start}
+@media (max-width:720px){ .duo{grid-template-columns:1fr} }
+
+.diagrama{margin-top:28px;background:var(--panel);border:1px solid var(--line);
+          border-radius:13px;padding:24px 20px}
+.diagrama svg{width:100%;height:auto;display:block}
+
+.steps li h3{display:flex;align-items:center;gap:9px}
+.steps li h3 svg{width:17px;height:17px;color:var(--accent);flex:none}
+
+.selos{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.selos span{font-size:12.5px;color:var(--muted);border:1px solid var(--line);
+            border-radius:99px;padding:5px 13px;background:var(--panel)}
