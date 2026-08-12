@@ -53,10 +53,10 @@ export default async function (ctx, url, erros) {
   await p.selectOption('#saida', 'translate');
 
   await p.click('#rec');
-  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), { timeout: 20000 });
+  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), null, { timeout: 20000 });
   await p.waitForTimeout(12000);
   await p.click('#stop');
-  await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), { timeout: 60000 });
+  await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
 
   const dep = await p.evaluate(() => window.__salavox.consentimento());
   b.verdade('o registro guarda confirmação, cópia do aviso e início da gravação',

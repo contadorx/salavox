@@ -1,0 +1,98 @@
+-- Salavox — contas, planos e cota de IA
+-- Ordem de execução: este é o primeiro. Não há nada antes dele.
+--
+-- O QUE ESTE BANCO GUARDA: identidade, plano e contador de uso.
+-- O QUE ELE NUNCA GUARDA: áudio, vídeo, transcrição, ata, nome de cliente de
+-- ninguém. Se algum dia aparecer uma coluna com conteúdo de reunião aqui, a
+-- promessa da página inicial deixou de ser verdade e alguém precisa ser
+-- avisado antes de a migration rodar.
+
+create type plano as enum ('gratis', 'profissional', 'escritorio');
+
+create table perfis (
+  id            uuid primary key references auth.users on delete cascade,
+  email         text not null,
+  plano         plano not null default 'gratis',
+  -- assinatura
+  assinante_ate timestamptz,                    -- nulo = sem assinatura ativa
+  cobranca_id   text,                           -- identificador no meio de pagamento
+  criado_em     timestamptz not null default now()
+);
+
+-- Um registro por mês por pessoa. Contador, não histórico: aqui não entra o que
+-- foi resumido, só quantas vezes.
+create table uso_ia (
+  perfil_id  uuid not null references perfis on delete cascade,
+  mes        date not null,                     -- sempre o dia 1
+  resumos    int  not null default 0,
+  premium    int  not null default 0,           -- resumos no modelo caro
+  emails     int  not null default 0,
+  primary key (perfil_id, mes)
+);
+
+-- ---------------------------------------------------------------- segurança
+alter table perfis  enable row level security;
+alter table uso_ia  enable row level security;
+
+create policy "cada um vê o seu perfil"
+  on perfis for select using (auth.uid() = id);
+
+create policy "cada um vê o seu uso"
+  on uso_ia for select using (auth.uid() = perfil_id);
+
+-- Ninguém escreve no próprio plano nem no próprio contador pelo navegador:
+-- quem escreve é a função no servidor, com a chave de serviço. Sem isto, o
+-- cliente daria a si mesmo o plano profissional com uma linha no console.
+
+-- ------------------------------------------------------------- automatismos
+create function ao_criar_usuario() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into perfis (id, email) values (new.id, new.email);
+  return new;
+end $$;
+
+create trigger criar_perfil
+  after insert on auth.users
+  for each row execute function ao_criar_usuario();
+
+-- Consome uma unidade da cota e devolve quanto sobrou. Devolve -1 quando a
+-- cota acabou — a função no servidor lê isso e recusa antes de chamar a IA,
+-- que é onde o dinheiro é gasto.
+create function consumir_ia(p_perfil uuid, p_premium boolean)
+returns int language plpgsql security definer set search_path = public as $$
+declare
+  v_plano plano; v_ate timestamptz; v_mes date := date_trunc('month', now())::date;
+  v_limite int; v_usado int;
+begin
+  select plano, assinante_ate into v_plano, v_ate from perfis where id = p_perfil;
+  if v_plano = 'gratis' or v_ate is null or v_ate < now() then return -1; end if;
+
+  v_limite := case when p_premium then 5 else 30 end;
+
+  insert into uso_ia (perfil_id, mes) values (p_perfil, v_mes)
+    on conflict (perfil_id, mes) do nothing;
+
+  select case when p_premium then premium else resumos end into v_usado
+    from uso_ia where perfil_id = p_perfil and mes = v_mes for update;
+
+  if v_usado >= v_limite then return -1; end if;
+
+  if p_premium then
+    update uso_ia set premium = premium + 1 where perfil_id = p_perfil and mes = v_mes;
+  else
+    update uso_ia set resumos = resumos + 1 where perfil_id = p_perfil and mes = v_mes;
+  end if;
+
+  return v_limite - v_usado - 1;
+end $$;
+
+-- Contador de e-mails enviados. Mesma regra: conta quantos, nunca para quem
+-- nem o quê.
+create function contar_email(p_perfil uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_mes date := date_trunc('month', now())::date;
+begin
+  insert into uso_ia (perfil_id, mes, emails) values (p_perfil, v_mes, 1)
+    on conflict (perfil_id, mes) do update set emails = uso_ia.emails + 1;
+end $$;

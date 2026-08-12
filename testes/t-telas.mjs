@@ -14,10 +14,10 @@ export default async function (ctx, url, erros) {
 
   await p.check('#okConsent');
   await p.click('#rec');
-  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), { timeout: 20000 });
+  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), null, { timeout: 20000 });
   await p.waitForTimeout(13000);                 // 13 s = 4 slides
   await p.click('#stop');
-  await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), { timeout: 60000 });
+  await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
 
   b.verdade('o cartão de telas aparece quando se grava a tela', !(await p.isHidden('#telasCard')));
 
@@ -25,7 +25,7 @@ export default async function (ctx, url, erros) {
   b.verdade('a ata sai com trechos', /Ata pronta/.test(await p.textContent('#trMsg')));
 
   await p.click('#varrer');
-  await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), { timeout: 180000 });
+  await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), null, { timeout: 180000 });
 
   /* A varredura amostra o vídeo de 0,6 em 0,6 segundo, e o instante que ela
      registra é o do primeiro quadro amostrado depois da troca — pode cair um

@@ -70,10 +70,10 @@ export default async function (ctx, url, erros) {
 
   await p.check('#okConsent');
   await p.click('#rec');
-  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), { timeout: 20000 });
+  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), null, { timeout: 20000 });
   await p.waitForTimeout(12000);
   await p.click('#stop');
-  await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), { timeout: 60000 });
+  await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
   await transcrever(p);
 
   b.verdade('o cartão de resumo aparece junto com a ata', !(await p.isHidden('#iaCard')));
@@ -81,7 +81,7 @@ export default async function (ctx, url, erros) {
   /* ---------- 1. modo padrão: só o prompt, nada sai ---------- */
   const antes = pedidos.length;
   await p.click('#iaResumo');
-  await p.waitForFunction(() => document.querySelectorAll('#iaSaida .resumo').length > 0, { timeout: 15000 });
+  await p.waitForFunction(() => document.querySelectorAll('#iaSaida .resumo').length > 0, null, { timeout: 15000 });
 
   const prompt = await p.evaluate(() => window.__salavox.resumos()[0].texto);
   b.verdade('o prompt traz a instrução da tarefa', /resumo executivo/i.test(prompt));
@@ -94,14 +94,14 @@ export default async function (ctx, url, erros) {
   /* ---------- 2. Ollama: sai da aba, não sai da máquina ---------- */
   await p.selectOption('#iaMotor', 'ollama');
   await p.click('#iaProcurar');
-  await p.waitForFunction(() => /encontrado|Não achei/.test(document.getElementById('iaMotorMsg').textContent), { timeout: 15000 });
+  await p.waitForFunction(() => /encontrado|Não achei/.test(document.getElementById('iaMotorMsg').textContent), null, { timeout: 15000 });
   b.verdade('acha o Ollama e lista os modelos', /encontrado/.test(await p.textContent('#iaMotorMsg')));
   b.conferir('os modelos do Ollama viram opções',
              await p.$$eval('#iaModelo option', e => e.map(x => x.textContent)), ['llama3.2:3b', 'qwen2.5:7b']);
 
   const marca = pedidos.length;   // o modelo de transcrição já foi buscado antes; conta daqui
   await p.click('#iaPendencias');
-  await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent), { timeout: 30000 });
+  await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent), null, { timeout: 30000 });
   const doOllama = await p.evaluate(() => (window.__salavox.resumos().find(r => r.chave === 'pendencias') || {}).texto);
   b.verdade('a resposta do Ollama entra na ata', /RESUMO LOCAL/.test(doOllama || ''));
   b.verdade('o prompt chegou inteiro ao modelo', /Tamanho do prompt: [1-9]\d{2,}/.test(doOllama || ''));
@@ -127,7 +127,7 @@ export default async function (ctx, url, erros) {
 
   await p.check('#iaOk');
   await p.click('#iaEmail');
-  await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent), { timeout: 30000 });
+  await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent), null, { timeout: 30000 });
   const doServico = await p.evaluate(() => (window.__salavox.resumos().find(r => r.chave === 'email') || {}).texto);
   b.verdade('a resposta do serviço entra na ata', /RESUMO REMOTO/.test(doServico || ''));
 

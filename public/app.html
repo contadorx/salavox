@@ -96,6 +96,14 @@
   .tempo{font:800 34px/1 var(--mono);letter-spacing:-1px;margin:14px 0 0;color:var(--tinta)}
 
   /* ---------- consentimento ---------- */
+  .modos{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:16px}
+  .modo{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--linha);border-radius:12px;
+        padding:13px 15px;cursor:pointer;background:#fff;transition:.15s}
+  .modo:has(input:checked){border-color:var(--verde);background:var(--verde-50)}
+  .modo input{margin-top:3px;accent-color:var(--verde)}
+  .modo b{display:block;font-size:14.5px;font-weight:700;color:var(--tinta)}
+  .modo i{display:block;font-style:normal;font-size:12.5px;color:var(--muted);margin-top:2px}
+  @media(max-width:640px){ .modos{grid-template-columns:1fr} }
   .consent{border:1px solid var(--verde-claro);background:var(--verde-50);border-radius:12px;
            padding:16px;margin-bottom:16px}
   .consent .chk{color:var(--tinta);align-items:flex-start;font-size:14.5px}
@@ -205,6 +213,19 @@
     aqui, no seu navegador.</p>
   </div>
 
+  <div class="card hide" id="contaCard">
+    <h2><span class="step">✦</span>Sua conta</h2>
+    <div class="status" id="contaEstado"></div>
+    <div class="row" style="margin-top:12px">
+      <input type="text" id="contaEmail" placeholder="seu@email.com" autocomplete="email" style="min-width:230px">
+      <button id="contaEntrar" class="hide">Entrar sem senha</button>
+      <button id="contaSair" class="ghost sm hide">Sair</button>
+      <span class="status" id="contaMsg"></span>
+    </div>
+    <p class="note">A conta guarda o seu e-mail, o plano e quantos resumos você usou no mês.
+    <b>Nunca</b> guarda áudio, vídeo, transcrição ou ata — nada disso chega ao nosso servidor.</p>
+  </div>
+
   <div class="card hide" id="recupCard" style="border-color:var(--warn)">
     <h2 style="color:var(--warn)">Gravação interrompida</h2>
     <div class="status" id="recupMsg"></div>
@@ -224,12 +245,18 @@
         <span class="status" id="avisoMsg"></span>
       </div>
     </div>
+    <div class="modos">
+      <label class="modo"><input type="radio" name="modo" id="modoTela" checked>
+        <span><b>Reunião on-line</b><i>compartilha a tela e capta o áudio da chamada</i></span></label>
+      <label class="modo"><input type="radio" name="modo" id="modoMic">
+        <span><b>Reunião presencial</b><i>só o microfone — é o modo que funciona no celular</i></span></label>
+    </div>
     <div class="row">
       <button id="rec" disabled>Começar a gravar</button>
       <button class="rec hide" id="stop">Encerrar</button>
       <button class="ghost hide" id="marcar" title="atalho: tecla M">Marcar este momento</button>
-      <label class="chk"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
-      <label class="chk"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
+      <label class="chk" id="labelMic"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
+      <label class="chk" id="labelTela"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
     </div>
     <p class="tempo hide" id="tempo">00:00</p>
     <div class="status" id="marcasMsg"></div>
@@ -284,6 +311,7 @@
     </details>
     <div class="bar hide" id="barWrap"><i id="bar"></i></div>
     <div class="status" id="trMsg"></div>
+    <div class="status" id="modeloMsg" style="margin-top:6px"></div>
     <p class="note hide" id="fique">Mantenha esta aba aberta e visível. A transcrição roda no seu navegador
     e fica muito mais lenta se a aba for para segundo plano.</p>
   </div>
@@ -310,6 +338,7 @@
       <button id="baixarTxt" class="ghost sm">Baixar .txt</button>
       <button id="baixarVtt" class="ghost sm">Baixar .vtt</button>
       <button id="copiarPrompt" class="ghost sm">Copiar prompt para a IA</button>
+      <button id="enviarEmail" class="ghost sm hide">Enviar por e-mail</button>
       <span class="status" id="ataMsg"></span>
     </div>
 
@@ -335,6 +364,10 @@
         <option value="prompt" selected>Prompt para colar na IA que eu já uso</option>
         <option value="ollama">Ollama, rodando neste computador</option>
         <option value="chave">Serviço de IA com a minha chave</option>
+      </select>
+      <select id="iaModeloSalavox" class="hide">
+        <option value="rapido" selected>Rápido (30 por mês)</option>
+        <option value="preciso">Preciso (5 por mês)</option>
       </select>
       <button class="ghost sm hide" id="iaProcurar">Procurar o Ollama</button>
       <select id="iaModelo" class="hide"></select>
@@ -380,7 +413,7 @@
 </div>
 
 <footer class="rodape">
-  Salavox versão <code>2026-08-12.32a8383</code> — tudo roda neste computador.
+  Salavox versão <code>2026-08-12.385da57</code> — tudo roda neste computador.
   <a href="/privacidade">privacidade</a><a href="/termos">termos</a><a href="/">site</a>
 </footer>
 <script>/** @license
@@ -799,7 +832,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
   let gravador = null, blobGravacao = null, blobPcm = null;
   let marcoInicio = 0, marcoFim = 0;          // instantes reais de início e fim, para conferência
-  let momentos = [], nomes = [], importado = false;
+  let momentos = [], nomes = [], importado = false, presencial = false;
 
   /* Registro de consentimento. Para contador e advogado isto vale mais que
      qualquer resumo por IA: não é o consentimento em si — que é dado na
@@ -819,9 +852,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     return e.returnValue;
   });
 
-  function formatoSuportado() {
-    for (const m of ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'])
-      if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+  function formatoSuportado(comVideo) {
+    // sem imagem o contêiner é de áudio; o Safari não faz webm, só mp4
+    const lista = comVideo
+      ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
+      : ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+    for (const m of lista)
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) return m;
     return '';
   }
 
@@ -1044,6 +1081,26 @@ registerProcessor('toca', Toca);`;
     'A gravação e a transcrição ficam no meu computador e não são enviadas a nenhum serviço externo. ' +
     'Quem preferir que não seja gravado, por favor diga agora.';
 
+  /* No celular não existe compartilhamento de tela em navegador nenhum: o modo
+     presencial já vem escolhido, e o outro fica explicado em vez de quebrado. */
+  (function ajustarModos() {
+    const temTela = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+    if (!temTela) {
+      $('modoMic').checked = true;
+      $('modoTela').disabled = true;
+      $('modoTela').closest('.modo').style.opacity = '.5';
+      $('modoTela').closest('.modo').querySelector('i').textContent =
+        'este navegador não compartilha tela — use o computador';
+    }
+    const trocou = () => {
+      const so = $('modoMic').checked;
+      $('labelMic').classList.toggle('hide', so);
+      $('labelTela').classList.toggle('hide', so);
+    };
+    $('modoTela').onchange = $('modoMic').onchange = trocou;
+    trocou();
+  })();
+
   $('okConsent').onchange = () => {
     $('rec').disabled = !$('okConsent').checked;
     if ($('okConsent').checked) {
@@ -1081,40 +1138,64 @@ registerProcessor('toca', Toca);`;
     setTimeout(() => { $('avisoMsg').textContent = ''; }, 4000);
   };
 
+  /* Modo de gravação. O de sempre é tela + áudio da chamada + microfone; o
+     outro é só microfone, para reunião presencial — e é o único que funciona no
+     celular, porque navegador de celular não compartilha tela. */
+  const soMicrofone = () => $('modoMic').checked;
+
   $('rec').onclick = async () => {
     if (!$('okConsent').checked) return;
-    if (!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia && window.MediaRecorder)) {
-      $('recMsg').innerHTML = '<span class="err">Este navegador não grava a tela. Use Chrome ou Edge no computador.</span>';
+    if (!(navigator.mediaDevices && window.MediaRecorder)) {
+      $('recMsg').innerHTML = '<span class="err">Este navegador não grava áudio. Tente o Chrome, o Edge, ' +
+        'o Firefox ou o Safari atualizados.</span>';
+      return;
+    }
+    if (!soMicrofone() && !navigator.mediaDevices.getDisplayMedia) {
+      $('recMsg').innerHTML = '<span class="err">Este navegador não compartilha tela — no celular nenhum ' +
+        'compartilha. Marque <b>só o microfone</b> acima para gravar uma reunião presencial.</span>';
       return;
     }
     $('rec').disabled = true;
-    $('recMsg').textContent = 'Escolha a janela da reunião e marque a opção de compartilhar o áudio…';
 
-    let telaFluxo, micFluxo = null;
-    try {
-      telaFluxo = await navigator.mediaDevices.getDisplayMedia({
-        video: $('tela').checked ? { frameRate: 8 } : { frameRate: 2 },
-        audio: true
-      });
-    } catch (e) {
-      $('recMsg').innerHTML = '<span class="err">Compartilhamento cancelado ou negado pelo navegador.</span>';
-      $('rec').disabled = false;
-      return;
-    }
-
-    if ($('mic').checked) {
+    /* O microfone é pedido ANTES da tela, de propósito.
+       Ao contrário, o navegador troca de tela para o seletor de janela e o
+       pedido de microfone fica para depois; em algumas máquinas ele nunca
+       aparece, e a gravação sai muda sem ninguém entender por quê. */
+    let telaFluxo = null, micFluxo = null;
+    if ($('mic').checked || soMicrofone()) {
+      $('recMsg').textContent = 'Autorize o microfone…';
       try {
         micFluxo = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: true, noiseSuppression: true }
         });
       } catch (e) {
+        if (soMicrofone()) {
+          $('recMsg').innerHTML = '<span class="err">Sem microfone não há o que gravar neste modo.</span>';
+          $('rec').disabled = false;
+          return;
+        }
         $('recMsg').innerHTML = '<span class="err">Sem acesso ao microfone: a ata sairá sem as suas falas.</span>';
       }
     }
 
-    const temSistema = telaFluxo.getAudioTracks().length > 0;
+    if (!soMicrofone()) {
+      $('recMsg').textContent = 'Agora escolha a janela da reunião e marque a opção de compartilhar o áudio…';
+      try {
+        telaFluxo = await navigator.mediaDevices.getDisplayMedia({
+          video: $('tela').checked ? { frameRate: 8 } : { frameRate: 2 },
+          audio: true
+        });
+      } catch (e) {
+        if (micFluxo) micFluxo.getTracks().forEach(t => t.stop());   // não deixa o microfone aberto à toa
+        $('recMsg').innerHTML = '<span class="err">Compartilhamento cancelado ou negado pelo navegador.</span>';
+        $('rec').disabled = false;
+        return;
+      }
+    }
+
+    const temSistema = !!(telaFluxo && telaFluxo.getAudioTracks().length);
     if (!temSistema && !micFluxo) {
-      telaFluxo.getTracks().forEach(t => t.stop());
+      if (telaFluxo) telaFluxo.getTracks().forEach(t => t.stop());
       $('recMsg').innerHTML = '<span class="err">Nenhuma fonte de áudio. Ao compartilhar, marque "compartilhar áudio".</span>';
       $('rec').disabled = false;
       return;
@@ -1133,6 +1214,7 @@ registerProcessor('toca', Toca);`;
     depPcm  = deposito('pcm');
     blobGravacao = blobPcm = null;
     momentos = []; importado = false;
+    presencial = soMicrofone();
     $('marcasMsg').textContent = '';
 
     // canal 0 = você, canal 1 = participantes
@@ -1155,16 +1237,17 @@ registerProcessor('toca', Toca);`;
     juntador.connect(destino);
 
     const trilhas = [destino.stream.getAudioTracks()[0]];
-    if ($('tela').checked) trilhas.unshift(telaFluxo.getVideoTracks()[0]);
+    const gravaVideo = !soMicrofone() && $('tela').checked && telaFluxo.getVideoTracks().length;
+    if (gravaVideo) trilhas.unshift(telaFluxo.getVideoTracks()[0]);
     const fluxoFinal = new MediaStream(trilhas);
     fluxos = [telaFluxo, micFluxo].filter(Boolean);
 
-    const tipo = formatoSuportado();
+    const tipo = formatoSuportado(gravaVideo);
     gravador = new MediaRecorder(fluxoFinal, tipo ? { mimeType: tipo, audioBitsPerSecond: 96000 } : undefined);
     gravador.ondataavailable = ev => { if (ev.data && ev.data.size) depGrav.escrever(ev.data); };
 
     const meta = { inicio: Date.now(), mime: tipo || 'video/webm', mic: !!micFluxo,
-                   sistema: temSistema, tela: $('tela').checked, segundos: 0, consentimento };
+                   sistema: temSistema, tela: gravaVideo, segundos: 0, consentimento };
     const salvarMeta = async () => {
       if (!TEM_OPFS) return;
       try {
@@ -1205,12 +1288,14 @@ registerProcessor('toca', Toca);`;
         (depGrav.emDisco ? '' : '<br><span class="err">O disco recusou a escrita, então a gravação ficou na ' +
           'memória: gere a transcrição e baixe os arquivos antes de fechar esta aba.</span>');
       $('trans').disabled = false;
-      if ($('tela').checked) $('telasCard').classList.remove('hide');
+      if (gravaVideo) $('telasCard').classList.remove('hide'); else $('telasCard').classList.add('hide');
     };
 
-    telaFluxo.getVideoTracks()[0].addEventListener('ended', () => {
-      if (gravador && gravador.state !== 'inactive') gravador.stop();
-    });
+    if (telaFluxo && telaFluxo.getVideoTracks().length) {
+      telaFluxo.getVideoTracks()[0].addEventListener('ended', () => {
+        if (gravador && gravador.state !== 'inactive') gravador.stop();
+      });
+    }
 
     let anima;
     const desenhar = () => { medidores.forEach(m => m()); anima = requestAnimationFrame(desenhar); };
@@ -1390,10 +1475,80 @@ registerProcessor('toca', Toca);`;
     return null;
   }
 
+  /* O modelo só deveria ser baixado uma vez: a transformers.js guarda os pesos
+     no Cache Storage do navegador. Quando alguém diz que ele baixa toda vez, a
+     causa costuma ser o cache desligado ou limpo — então aqui ele é ligado
+     explicitamente, e a tela passa a dizer se o modelo já está guardado. */
+  async function modeloGuardado() {
+    try {
+      if (!window.caches) return null;
+      const nomes = await caches.keys();
+      let bytes = 0, arquivos = 0;
+      for (const n of nomes) {
+        if (!/transformers|onnx|huggingface/i.test(n)) continue;
+        const c = await caches.open(n);
+        for (const req of await c.keys()) {
+          arquivos++;
+          const r = await c.match(req);
+          const b = r && r.headers.get('content-length');
+          if (b) bytes += Number(b);
+        }
+      }
+      return arquivos ? { arquivos, bytes } : null;
+    } catch (e) { return null; }
+  }
+
+  async function mostrarModeloGuardado() {
+    const g = await modeloGuardado();
+    $('modeloMsg').innerHTML = g
+      ? `<span class="ok">Modelo já guardado neste navegador</span> — ` +
+        `${g.arquivos} ${g.arquivos === 1 ? 'arquivo' : 'arquivos'}` +
+        (g.bytes ? `, ${(g.bytes/1048576).toFixed(0)} MB` : '') +
+        `. Não será baixado de novo. <button class="ghost sm" id="apagarModelo">apagar</button>`
+      : 'O modelo é baixado na primeira transcrição e fica guardado no navegador para as próximas.';
+    const b = $('apagarModelo');
+    if (b) b.onclick = async () => {
+      for (const n of await caches.keys()) if (/transformers|onnx|huggingface/i.test(n)) await caches.delete(n);
+      mostrarModeloGuardado();
+    };
+  }
+  mostrarModeloGuardado();
+
+  /* De onde vem o modelo.
+
+     A primeira escolha é o nosso próprio domínio: rede de escritório costuma
+     bloquear CDN de terceiro, e o primeiro uso é justamente onde a pessoa
+     desiste. O arquivo /modelos/pronto.json é escrito por
+     ferramentas/baixar-modelo.mjs e lista o que foi espelhado; se ele não
+     existir, ou não tiver o modelo escolhido, cai na CDN pública como antes.
+
+     Em nenhum dos dois casos o áudio sai daqui: o que trafega é o modelo, no
+     sentido contrário. */
+  let origemModelo = 'CDN pública';
+
+  async function espelhoLocal(modelo) {
+    try {
+      const r = await fetch('/modelos/pronto.json', { cache: 'no-cache' });
+      if (!r.ok) return null;
+      const d = await r.json();
+      if (!d || !Array.isArray(d.modelos) || d.modelos.indexOf(modelo) < 0) return null;
+      return location.origin + '/modelos/';
+    } catch (e) { return null; }
+  }
+
   async function carregarModelo(modelo, aviso) {
     const mod = await import(TJS);
+    const espelho = await espelhoLocal(modelo);
+    if (espelho) {
+      mod.env.remoteHost = espelho;
+      mod.env.remotePathTemplate = '{model}';
+      origemModelo = 'servidor do Salavox';
+    } else {
+      origemModelo = 'CDN pública';
+    }
     mod.env.allowLocalModels = false;
     mod.env.allowRemoteModels = true;
+    mod.env.useBrowserCache = true;      // sem isto, alguns navegadores baixam de novo toda vez
     const base = await acharWasm();
     try {
       const w = mod.env.backends && mod.env.backends.onnx && mod.env.backends.onnx.wasm;
@@ -1405,8 +1560,10 @@ registerProcessor('toca', Toca);`;
         visto[p.file] = p.progress || 0;
         const v = Object.values(visto);
         const pct = v.reduce((a, b) => a + b, 0) / v.length;
-        $('bar').style.width = pct + '%';
-        aviso(`Etapa 1 de 2 — baixando o modelo: ${pct.toFixed(0)}% (só na primeira vez)`);
+        // a primeira etapa ocupa os primeiros 20% da barra; os 80% restantes são
+        // da transcrição, que é a parte demorada
+        $('bar').style.width = (pct * 0.2).toFixed(1) + '%';
+        aviso(`Etapa 1 de 2 — baixando o modelo do ${origemModelo}: ${pct.toFixed(0)}% (só na primeira vez)`);
       }
     };
     try {
@@ -1548,8 +1705,8 @@ registerProcessor('toca', Toca);`;
     const aviso = m => { $('trMsg').innerHTML = m; };
     // apaga o resultado anterior na hora: deixar "Ata pronta" na tela enquanto
     // uma transcrição nova roda faz parecer que já acabou
-    aviso('Preparando…');
-    $('bar').style.width = '0%';
+    aviso('Etapa 1 de 2 — preparando o modelo…');
+    $('bar').style.width = '2%';
     try {
       if (!blobPcm || !blobPcm.size) {
         aviso('Preparando o áudio…');
@@ -1601,7 +1758,7 @@ registerProcessor('toca', Toca);`;
           }
           feitos++;
           const pct = feitos / totalBlocos * 100;
-          $('bar').style.width = pct + '%';
+          $('bar').style.width = (20 + pct * 0.8).toFixed(1) + '%';
           const resta = (performance.now() - inicio) / feitos * (totalBlocos - feitos) / 1000;
           const falta = feitos >= 2 && resta > 5
             ? ` — faltam ~${resta < 90 ? Math.ceil(resta) + 's' : Math.ceil(resta / 60) + ' min'}` : '';
@@ -1610,6 +1767,7 @@ registerProcessor('toca', Toca);`;
         }
       }
 
+      mostrarModeloGuardado();
       falas.sort((a, b) => a.a - b.a);
       const trocas = corrigirComVocabulario();
       mostrarAta();
@@ -1637,7 +1795,7 @@ registerProcessor('toca', Toca);`;
      ============================================================ */
 
   const rotuloPadrao = f => f.quem === 'voce'
-    ? ($('nomeVoce').value.trim() || 'VOCÊ')
+    ? ($('nomeVoce').value.trim() || (presencial ? 'SALA' : 'VOCÊ'))
     : ($('nomeGrupo').value.trim() || (importado ? 'TRANSCRIÇÃO' : 'PARTICIPANTES'));
   const rotulo = f => f.nome || rotuloPadrao(f);
 
@@ -1812,7 +1970,15 @@ registerProcessor('toca', Toca);`;
       });
       await corrigirDuracao();
       const dur = vid.duration;
-      if (!vid.videoWidth) throw new Error('a gravação não tem imagem — a opção de guardar as telas estava desmarcada?');
+      if (!vid.videoWidth) {
+        // não é erro: é uma gravação só de áudio. O cartão some e a ata segue.
+        $('telasCard').classList.add('hide');
+        $('telasMsg').textContent = '';
+        $('varrer').disabled = false;
+        $('pararVarre').classList.add('hide');
+        ocupado = false;
+        return;
+      }
 
       const passo = Math.max(0.6, dur / 900);
       const total = Math.ceil(dur / passo);
@@ -1895,7 +2061,9 @@ registerProcessor('toca', Toca);`;
   };
 
   /* ================= saídas ================= */
-  const nomeArquivo = () => 'ata-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  /* A marca viaja com o arquivo. A ata é encaminhada para gente que nunca ouviu
+     falar do produto, e o nome do arquivo é a primeira coisa que ela lê. */
+  const nomeArquivo = () => 'salavox-ata-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
 
   function baixar(texto, ext) {
     const a = document.createElement('a');
@@ -1915,6 +2083,9 @@ registerProcessor('toca', Toca);`;
   const blocosResumo = () => resumos.filter(r => r.noPdf)
     .map(r => r.titulo.toUpperCase() + '\n' + r.texto + '\n').join('\n');
 
+  const RODAPE_MARCA = '\n---\nAta gerada pelo Salavox (salavox.com) — a gravação e a transcrição ' +
+    'aconteceram no computador de quem gravou, sem passar por servidor nenhum.\n';
+
   const comoTexto = () => cabecalhoConsentimento() +
     (blocosResumo() ? blocosResumo() + '\n---\n\n' : '') + linhaDoTempo().map(i =>
     i.tipo === 'fala'    ? `[${fmt(i.f.a)}] ${rotulo(i.f)}: ${i.f.texto}` :
@@ -1926,7 +2097,7 @@ registerProcessor('toca', Toca);`;
       const h = Math.floor(s/3600), m = Math.floor(s%3600/60), sc = s%60;
       return `${pad2(h)}:${pad2(m)}:${sc.toFixed(3).padStart(6,'0')}`;
     };
-    return 'WEBVTT\n\n' + falas.map((f, i) => {
+    return 'WEBVTT\nNOTE gerado pelo Salavox — salavox.com\n\n' + falas.map((f, i) => {
       const fim = i + 1 < falas.length ? Math.min(falas[i+1].a, f.a + 12) : f.a + 5;
       return `${t(f.a)} --> ${t(Math.max(fim, f.a + 0.5))}\n` +
              `<v ${rotulo(f)}>${f.texto}`;
@@ -2063,7 +2234,7 @@ registerProcessor('toca', Toca);`;
     doc.save(nomeArquivo() + '.pdf');
   };
 
-  $('baixarTxt').onclick = () => baixar(comoTexto(), 'txt');
+  $('baixarTxt').onclick = () => baixar(comoTexto() + '\n' + RODAPE_MARCA, 'txt');
   $('baixarVtt').onclick = () => baixar(comoVtt(), 'vtt');
 
   $('copiarPrompt').onclick = async () => {
@@ -2170,6 +2341,7 @@ ${comoTexto()}`;
     const m = $('iaMotor').value;
     $('iaChave').classList.toggle('hide', m !== 'chave');
     $('iaProcurar').classList.toggle('hide', m !== 'ollama');
+    $('iaModeloSalavox').classList.toggle('hide', m !== 'salavox');
     $('iaModelo').classList.add('hide');
     $('iaMotorMsg').textContent = m === 'ollama'
       ? 'O Ollama precisa estar aberto e aceitar esta página. Clique em procurar.'
@@ -2252,7 +2424,9 @@ ${comoTexto()}`;
     $('iaBarWrap').classList.remove('hide');
     $('iaBar').style.width = '35%';
     try {
-      const texto = motor === 'ollama' ? await pedirOllama(prompt, aviso) : await pedirServico(prompt, aviso);
+      const texto = motor === 'salavox' ? await pedirSalavox(prompt, aviso)
+                  : motor === 'ollama'  ? await pedirOllama(prompt, aviso)
+                                        : await pedirServico(prompt, aviso);
       $('iaBar').style.width = '100%';
       guardarResumo(chave, titulo, texto);
       aviso(`<span class="ok">${titulo} pronto.</span> Ele entra no PDF e no texto da ata.`);
@@ -2306,6 +2480,168 @@ ${comoTexto()}`;
     if (q) rodarTarefa('pergunta', q);
   };
   $('iaPergunta').onkeydown = ev => { if (ev.key === 'Enter') $('iaPerguntar').click(); };
+
+
+  /* ============================================================
+     Conta, plano e a IA do Salavox.
+
+     Esta é a única parte do produto que fala com servidor nosso, e
+     ela só existe se /config.json existir. Sem esse arquivo — que é
+     o caso de quem baixa o código e serve sozinho — a ferramenta
+     continua inteira, local e sem cadastro nenhum.
+
+     O que sai daqui quando alguém usa a IA do Salavox: o texto da
+     ata. Não o áudio, não o vídeo. E sai por ordem de quem clicou,
+     com a tela dizendo isso antes.
+
+     A sessão fica no localStorage, como em qualquer site com login.
+     O texto da reunião, não: ele nunca é gravado em lugar nenhum.
+     ============================================================ */
+
+  let cfg = null, sessao = null, perfil = null;
+  const CHAVE_SESSAO = 'salavox.sessao';
+
+  const temPlano = () => !!(perfil && perfil.plano !== 'gratis' &&
+                            perfil.assinante_ate && new Date(perfil.assinante_ate) > new Date());
+
+  async function iniciarConta() {
+    try {
+      const r = await fetch('/config.json', { cache: 'no-cache' });
+      if (!r.ok) return;
+      cfg = await r.json();
+      if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey) { cfg = null; return; }
+    } catch (e) { return; }
+
+    $('contaCard').classList.remove('hide');
+    $('iaMotor').insertAdjacentHTML('afterbegin',
+      '<option value="salavox">IA do Salavox — resumo pronto, sem instalar nada</option>');
+
+    if (!pegarTokens()) {
+      try { sessao = JSON.parse(localStorage.getItem(CHAVE_SESSAO) || 'null'); } catch (e) {}
+    }
+
+    /* O link do e-mail pode cair numa aba que já está aberta no aplicativo. Aí o
+       navegador só troca o pedaço depois do #, sem recarregar nada, e o código
+       que lê os tokens nunca roda de novo: a pessoa clica no link, volta para a
+       aba e continua deslogada, sem entender por quê. */
+    window.addEventListener('hashchange', () => { if (pegarTokens()) carregarPerfil(); });
+
+    await carregarPerfil();
+  }
+
+  /* volta do link do e-mail: os tokens chegam no pedaço depois do # */
+  function pegarTokens() {
+    if (location.hash.indexOf('access_token=') < 0) return false;
+    const h = new URLSearchParams(location.hash.slice(1));
+    guardarSessao({ access_token: h.get('access_token'), refresh_token: h.get('refresh_token') });
+    history.replaceState(null, '', location.pathname);
+    return true;
+  }
+
+  function guardarSessao(s) {
+    sessao = s && s.access_token ? s : null;
+    try {
+      if (sessao) localStorage.setItem(CHAVE_SESSAO, JSON.stringify(sessao));
+      else localStorage.removeItem(CHAVE_SESSAO);
+    } catch (e) {}
+  }
+
+  async function carregarPerfil() {
+    if (!cfg || !sessao) { desenharConta(); return; }
+    try {
+      const r = await fetch(cfg.supabaseUrl + '/rest/v1/perfis?select=email,plano,assinante_ate', {
+        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + sessao.access_token }
+      });
+      if (r.status === 401) { guardarSessao(null); perfil = null; desenharConta(); return; }
+      const d = await r.json();
+      perfil = Array.isArray(d) ? d[0] : null;
+    } catch (e) { perfil = null; }
+    desenharConta();
+  }
+
+  function desenharConta() {
+    if (!cfg) return;
+    if (!sessao || !perfil) {
+      $('contaEstado').innerHTML = 'Entre para usar a <b>IA do Salavox</b> e o envio da ata por e-mail. ' +
+        'Gravar, transcrever e gerar a ata continua funcionando sem conta.';
+      $('contaEntrar').classList.remove('hide');
+      $('contaSair').classList.add('hide');
+      $('enviarEmail').classList.add('hide');
+      return;
+    }
+    const pago = temPlano();
+    $('contaEstado').innerHTML = `<b>${escapar(perfil.email)}</b> — plano ` +
+      (pago ? `<span class="ok">${escapar(perfil.plano)}</span>, ativo até ` +
+              new Date(perfil.assinante_ate).toLocaleDateString('pt-BR')
+            : 'grátis. A IA do Salavox e o envio por e-mail são do plano profissional.');
+    $('contaEntrar').classList.add('hide');
+    $('contaSair').classList.remove('hide');
+    $('enviarEmail').classList.toggle('hide', !pago);
+  }
+
+  $('contaEntrar').onclick = async () => {
+    const email = ($('contaEmail').value || '').trim();
+    if (!/.+@.+\..+/.test(email)) { $('contaMsg').innerHTML = '<span class="err">e-mail inválido</span>'; return; }
+    $('contaMsg').textContent = 'Enviando o link…';
+    try {
+      const r = await fetch(cfg.supabaseUrl + '/auth/v1/otp', {
+        method: 'POST',
+        headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, create_user: true })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      $('contaMsg').innerHTML = '<span class="ok">Link enviado</span> — abra o e-mail e clique. ' +
+        'Não há senha para lembrar.';
+    } catch (e) {
+      $('contaMsg').innerHTML = '<span class="err">não consegui enviar o link agora</span>';
+    }
+  };
+
+  $('contaSair').onclick = () => { guardarSessao(null); perfil = null; desenharConta(); $('contaMsg').textContent = ''; };
+
+  async function pedirSalavox(prompt, aviso) {
+    if (!sessao) throw new Error('entre na sua conta para usar a IA do Salavox.');
+    const modelo = $('iaModeloSalavox') ? $('iaModeloSalavox').value : 'rapido';
+    aviso('Resumindo com a IA do Salavox…');
+    const r = await fetch('/api/resumo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
+      body: JSON.stringify({ prompt, modelo })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.erro || ('o servidor respondeu ' + r.status));
+    if (typeof d.restante === 'number') {
+      $('iaMotorMsg').innerHTML = `restam <b>${d.restante}</b> resumos neste mês`;
+    }
+    return (d.texto || '').trim();
+  }
+
+  /* ---- enviar a ata por e-mail, com a marca junto ---- */
+  $('enviarEmail').onclick = async () => {
+    const para = prompt('Enviar a ata para quais e-mails? (separe por vírgula)');
+    if (!para) return;
+    $('ataMsg').textContent = 'Enviando…';
+    try {
+      const r = await fetch('/api/enviar-ata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
+        body: JSON.stringify({
+          para,
+          assunto: 'Ata da reunião — ' + new Date().toLocaleDateString('pt-BR'),
+          corpo: comoTexto(),
+          assinatura: perfil && perfil.email
+        })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.erro || ('erro ' + r.status));
+      $('ataMsg').innerHTML = `<span class="ok">enviada para ${d.enviados} ` +
+        `${d.enviados === 1 ? 'endereço' : 'endereços'}</span>`;
+    } catch (e) {
+      $('ataMsg').innerHTML = `<span class="err">${(e && e.message) || e}</span>`;
+    }
+  };
+
+  iniciarConta();
 
   /* ============================================================
      Recuperação. Como cada pedaço é fechado no disco assim que
@@ -2364,8 +2700,9 @@ ${comoTexto()}`;
 
   window.__salavox = { falas: () => falas, comoTexto, comoVtt,
     momentos: () => momentos, nomes: () => nomes, importado: () => importado,
+    origemModelo: () => origemModelo, espelhoLocal,
     consentimento: () => consentimento, aplicarVocabulario, corrigirComVocabulario,
-    resumos: () => resumos, montarPrompt,
+    resumos: () => resumos, montarPrompt, perfil: () => perfil, temPlano, cfg: () => cfg,
     gravacao: () => blobGravacao, pcm: () => blobPcm,
     tamanhos: () => ({ grav: depGrav ? depGrav.bytes : 0, pcm: depPcm ? depPcm.bytes : 0,
                        disco: !!(depGrav && depGrav.emDisco) }),

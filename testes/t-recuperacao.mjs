@@ -19,7 +19,7 @@ export default async function (ctx, url, erros) {
   await p.goto(url + '/app');
   await p.check('#okConsent');
   await p.click('#rec');
-  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), { timeout: 20000 });
+  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), null, { timeout: 20000 });
   await p.waitForFunction(seg => {
     const t = document.getElementById('tempo').textContent.split(':').map(Number);
     return t[0] * 60 + t[1] >= seg;
@@ -34,7 +34,7 @@ export default async function (ctx, url, erros) {
   if (!apareceu) { await p.close(); return b; }
 
   await p.click('#recupUsar');
-  await p.waitForFunction(() => !document.getElementById('trans').disabled, { timeout: 30000 });
+  await p.waitForFunction(() => !document.getElementById('trans').disabled, null, { timeout: 30000 });
 
   const seg = await p.evaluate(() => window.__salavox.pcm().size / 4 / 16000);
   b.entre('segundos de áudio recuperados dos 25 gravados', seg, 20, 25.5);
@@ -44,7 +44,7 @@ export default async function (ctx, url, erros) {
   b.verdade('dá para transcrever o material recuperado', /Ata pronta/.test(await p.textContent('#trMsg')));
 
   await p.click('#varrer');
-  await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), { timeout: 180000 });
+  await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), null, { timeout: 180000 });
   const telas = await p.$$eval('.telas figure', e => e.length);
   b.entre('telas encontradas no vídeo recuperado', telas, 2, 4);
 
@@ -54,7 +54,7 @@ export default async function (ctx, url, erros) {
   await p.goto(url + '/app');
   await p.waitForSelector('#recupCard:not(.hide)', { timeout: 15000 });
   await p.click('#recupApagar');
-  await p.waitForFunction(() => document.getElementById('recupCard').classList.contains('hide'), { timeout: 15000 });
+  await p.waitForFunction(() => document.getElementById('recupCard').classList.contains('hide'), null, { timeout: 15000 });
   const sobrou = await p.evaluate(async () => {
     const dir = await navigator.storage.getDirectory(); let n = 0;
     for await (const _ of dir.keys()) n++; return n;

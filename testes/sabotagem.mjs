@@ -159,6 +159,32 @@ const SABOTAGENS = [
     porta: 8158,
     trocas: [['    return max - min < 12;', '    return false;']],
     pega: 'a ata abriria com um retângulo preto apresentado como a primeira tela da reunião'
+  },
+  {
+    nome: 'a sessão é lida só no carregamento, não no link do e-mail',
+    teste: 'conta',
+    porta: 8159,
+    trocas: [["    window.addEventListener('hashchange', () => { if (pegarTokens()) carregarPerfil(); });",
+              '    /* sabotado */']],
+    pega: 'quem clicasse no link com a aba já aberta voltaria deslogado, sem entender por quê'
+  },
+  {
+    nome: 'a IA do Salavox aparece sem configuração de servidor',
+    teste: 'conta',
+    porta: 8160,
+    trocas: [["      if (!r.ok) return;\n      cfg = await r.json();", '      cfg = { supabaseUrl: "x", supabaseAnonKey: "y" };']],
+    pega: 'quem serve o código sozinho veria um botão de camada paga que não existe do lado dele'
+  },
+  {
+    nome: 'o texto da reunião é guardado no navegador junto da sessão',
+    teste: 'conta',
+    porta: 8162,
+    // plantada onde tudo já está inicializado: se fosse no início do arquivo, o
+    // aplicativo quebraria por outro motivo e a sabotagem seria "pega" pelo
+    // motivo errado
+    trocas: [["    if (!sessao) throw new Error('entre na sua conta para usar a IA do Salavox.');",
+              "    if (!sessao) throw new Error('entre na sua conta para usar a IA do Salavox.');\n    try { localStorage.setItem('rascunho', comoTexto()); } catch (e) {}"]],
+    pega: 'a transcrição ficaria no disco do navegador, fora do controle de quem gravou'
   }
 ];
 

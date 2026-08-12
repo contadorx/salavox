@@ -1,0 +1,70 @@
+# Como ligar a camada paga
+
+Quatro peças, nesta ordem. Enquanto nenhuma delas existir, o Salavox continua funcionando inteiro,
+local e sem cadastro — o cartão de conta simplesmente não aparece.
+
+---
+
+## 1. Supabase
+
+1. Crie o projeto. Anote a **URL** e a **anon key** (essas duas são públicas, podem ir no navegador) e a
+   **service role key** (esta **nunca** vai ao navegador).
+2. Rode `migrations/001-contas.sql.txt` no editor SQL, de uma vez.
+3. Em Authentication → URL Configuration, aponte o **Site URL** para `https://salavox.com/app` — é para lá
+   que o link do e-mail volta.
+
+O que o banco guarda: e-mail, plano e contador de uso do mês. O que ele nunca guarda: áudio, vídeo,
+transcrição, ata. Se aparecer uma coluna com conteúdo de reunião, a promessa da página inicial deixou de
+ser verdade.
+
+## 2. Variáveis de ambiente na Vercel
+
+| Variável | De onde vem |
+|---|---|
+| `ANTHROPIC_API_KEY` | console.anthropic.com, com faturamento ativo |
+| `SUPABASE_URL` | Supabase → Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API — **só no servidor** |
+| `RESEND_API_KEY` | resend.com, para o envio de e-mail |
+| `REMETENTE` | ex.: `ata@salavox.com`, com o domínio verificado no Resend |
+
+## 3. `public/config.json`
+
+```json
+{
+  "supabaseUrl": "https://SEU-PROJETO.supabase.co",
+  "supabaseAnonKey": "SUA-ANON-KEY"
+}
+```
+
+É a chave de liga-desliga da camada paga: com o arquivo, o cartão de conta e a IA do Salavox aparecem;
+sem ele, não existem. **Não versione este arquivo** se quiser que quem clonar o repositório receba a
+versão puramente local.
+
+## 4. Cobrança
+
+Ainda não está ligada. O que existe é o campo `assinante_ate` no perfil: quem tem data no futuro é
+assinante. O meio de pagamento (Stripe, Asaas, Mercado Pago) precisa, ao confirmar o pagamento, escrever
+essa data — por webhook, com a service role key. Enquanto isso não existe, dá para liberar alguém à mão:
+
+```sql
+update perfis set plano = 'profissional', assinante_ate = now() + interval '30 days'
+where email = 'cliente@exemplo.com.br';
+```
+
+---
+
+## O que foi verificado e o que não foi
+
+**Verificado** (`testes/t-conta.mjs`, com servidor simulado): sem `config.json` a conta não aparece e a IA
+do Salavox nem é oferecida; o link por e-mail entra na conta inclusive quando a aba já está aberta; plano
+grátis recebe recusa clara; assinante recebe o resumo e o botão de e-mail; a chamada leva o token de quem
+pediu e o corpo é o texto da ata; e o navegador guarda **apenas** a sessão — nenhum pedaço da reunião.
+
+**Não verificado**, porque depende de credencial real: a chamada à Anthropic, o envio pelo Resend, a
+migration rodando no Supabase de verdade e o fluxo do link de e-mail ponta a ponta. As funções em `api/`
+estão escritas e revisadas, mas nunca executaram contra os serviços reais. Rode uma vez com uma conta de
+teste antes de anunciar.
+
+**Antes do primeiro cliente pagante:** a política de privacidade e os termos precisam de uma seção nova
+dizendo o que sai do computador no plano pago, para onde vai, quanto tempo fica (não fica) e o que a
+Anthropic faz com isso. Hoje os dois documentos descrevem só o produto local.

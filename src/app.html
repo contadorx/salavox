@@ -96,6 +96,14 @@
   .tempo{font:800 34px/1 var(--mono);letter-spacing:-1px;margin:14px 0 0;color:var(--tinta)}
 
   /* ---------- consentimento ---------- */
+  .modos{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:16px}
+  .modo{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--linha);border-radius:12px;
+        padding:13px 15px;cursor:pointer;background:#fff;transition:.15s}
+  .modo:has(input:checked){border-color:var(--verde);background:var(--verde-50)}
+  .modo input{margin-top:3px;accent-color:var(--verde)}
+  .modo b{display:block;font-size:14.5px;font-weight:700;color:var(--tinta)}
+  .modo i{display:block;font-style:normal;font-size:12.5px;color:var(--muted);margin-top:2px}
+  @media(max-width:640px){ .modos{grid-template-columns:1fr} }
   .consent{border:1px solid var(--verde-claro);background:var(--verde-50);border-radius:12px;
            padding:16px;margin-bottom:16px}
   .consent .chk{color:var(--tinta);align-items:flex-start;font-size:14.5px}
@@ -205,6 +213,19 @@
     aqui, no seu navegador.</p>
   </div>
 
+  <div class="card hide" id="contaCard">
+    <h2><span class="step">✦</span>Sua conta</h2>
+    <div class="status" id="contaEstado"></div>
+    <div class="row" style="margin-top:12px">
+      <input type="text" id="contaEmail" placeholder="seu@email.com" autocomplete="email" style="min-width:230px">
+      <button id="contaEntrar" class="hide">Entrar sem senha</button>
+      <button id="contaSair" class="ghost sm hide">Sair</button>
+      <span class="status" id="contaMsg"></span>
+    </div>
+    <p class="note">A conta guarda o seu e-mail, o plano e quantos resumos você usou no mês.
+    <b>Nunca</b> guarda áudio, vídeo, transcrição ou ata — nada disso chega ao nosso servidor.</p>
+  </div>
+
   <div class="card hide" id="recupCard" style="border-color:var(--warn)">
     <h2 style="color:var(--warn)">Gravação interrompida</h2>
     <div class="status" id="recupMsg"></div>
@@ -224,12 +245,18 @@
         <span class="status" id="avisoMsg"></span>
       </div>
     </div>
+    <div class="modos">
+      <label class="modo"><input type="radio" name="modo" id="modoTela" checked>
+        <span><b>Reunião on-line</b><i>compartilha a tela e capta o áudio da chamada</i></span></label>
+      <label class="modo"><input type="radio" name="modo" id="modoMic">
+        <span><b>Reunião presencial</b><i>só o microfone — é o modo que funciona no celular</i></span></label>
+    </div>
     <div class="row">
       <button id="rec" disabled>Começar a gravar</button>
       <button class="rec hide" id="stop">Encerrar</button>
       <button class="ghost hide" id="marcar" title="atalho: tecla M">Marcar este momento</button>
-      <label class="chk"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
-      <label class="chk"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
+      <label class="chk" id="labelMic"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
+      <label class="chk" id="labelTela"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
     </div>
     <p class="tempo hide" id="tempo">00:00</p>
     <div class="status" id="marcasMsg"></div>
@@ -284,6 +311,7 @@
     </details>
     <div class="bar hide" id="barWrap"><i id="bar"></i></div>
     <div class="status" id="trMsg"></div>
+    <div class="status" id="modeloMsg" style="margin-top:6px"></div>
     <p class="note hide" id="fique">Mantenha esta aba aberta e visível. A transcrição roda no seu navegador
     e fica muito mais lenta se a aba for para segundo plano.</p>
   </div>
@@ -310,6 +338,7 @@
       <button id="baixarTxt" class="ghost sm">Baixar .txt</button>
       <button id="baixarVtt" class="ghost sm">Baixar .vtt</button>
       <button id="copiarPrompt" class="ghost sm">Copiar prompt para a IA</button>
+      <button id="enviarEmail" class="ghost sm hide">Enviar por e-mail</button>
       <span class="status" id="ataMsg"></span>
     </div>
 
@@ -335,6 +364,10 @@
         <option value="prompt" selected>Prompt para colar na IA que eu já uso</option>
         <option value="ollama">Ollama, rodando neste computador</option>
         <option value="chave">Serviço de IA com a minha chave</option>
+      </select>
+      <select id="iaModeloSalavox" class="hide">
+        <option value="rapido" selected>Rápido (30 por mês)</option>
+        <option value="preciso">Preciso (5 por mês)</option>
       </select>
       <button class="ghost sm hide" id="iaProcurar">Procurar o Ollama</button>
       <select id="iaModelo" class="hide"></select>

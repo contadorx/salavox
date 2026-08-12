@@ -34,7 +34,7 @@ export default async function (ctx, url, erros) {
   /* ---------- A. arquivo que já existe, arrastado para a página ---------- */
   await p.selectOption('#idioma', '');                      // detectar o idioma
   await p.evaluate(MONTAR_WAV);
-  await p.waitForFunction(() => /pronto|<span class="err">/.test(document.getElementById('arqMsg').innerHTML), { timeout: 60000 });
+  await p.waitForFunction(() => /pronto|<span class="err">/.test(document.getElementById('arqMsg').innerHTML), null, { timeout: 60000 });
   const importou = /pronto/.test(await p.textContent('#arqMsg'));
   b.verdade('o arquivo arrastado é aceito', importou);
   b.verdade('a transcrição fica liberada', !(await p.isEnabled('#trans')) === false);
@@ -97,14 +97,14 @@ export default async function (ctx, url, erros) {
   /* ---------- C. momentos marcados durante a gravação ---------- */
   await p.check('#okConsent');
   await p.click('#rec');
-  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), { timeout: 20000 });
+  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), null, { timeout: 20000 });
   await p.waitForTimeout(3000);
   await p.keyboard.press('m');                              // atalho, sem tirar o olho da chamada
   await p.waitForTimeout(5000);
   await p.click('#marcar');
   await p.waitForTimeout(3000);
   await p.click('#stop');
-  await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), { timeout: 60000 });
+  await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
 
   const marcas = await p.evaluate(() => window.__salavox.momentos().map(m => Math.round(m)));
   b.conferir('duas marcas, nos instantes em que foram feitas', marcas.map(m => m >= 2 && m <= 4 ? 'inicio' : (m >= 7 && m <= 10 ? 'meio' : m)), ['inicio', 'meio']);
@@ -128,6 +128,17 @@ export default async function (ctx, url, erros) {
   let tam = 0;
   for await (const parte of fluxo) tam += parte.length;
   b.entre('o PDF com marcas ainda sai (bytes)', tam, 2000, 3000000);
+
+  /* ---------- D. de onde vem o modelo, e a marca nos arquivos ---------- */
+  b.conferir('sem espelho publicado, o modelo continua vindo da CDN',
+             await p.evaluate(() => window.__salavox.espelhoLocal('onnx-community/whisper-base')), null);
+
+  const comMarca = await p.evaluate(() => window.__salavox.comoVtt());
+  b.verdade('a legenda leva a marca junto', /NOTE gerado pelo Salavox/.test(comMarca));
+  b.verdade('o nome do arquivo leva a marca', /^salavox-ata-/.test(await p.evaluate(() => {
+    const a = document.createElement('a');
+    return 'salavox-ata-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  })));
 
   await p.close();
   return b;

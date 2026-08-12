@@ -33,6 +33,13 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
   colar (padrão, não faz nenhuma requisição), Ollama rodando na própria máquina, ou serviço externo com a
   chave do usuário — este último atrás de uma confirmação explícita, porque nele o texto realmente sai.
   A chave vive numa variável da aba e nunca é gravada.
+- **Dois modos de gravação**: reunião on-line (tela + áudio da chamada + microfone) e reunião presencial
+  (só o microfone) — este último é o que funciona no celular, onde navegador nenhum compartilha tela.
+- **Pede o microfone antes de abrir o seletor de tela.** Ao contrário, o navegador troca para o seletor e o
+  pedido de microfone fica para depois; em algumas máquinas ele nunca aparece e a gravação sai muda.
+- **Serve o modelo do próprio domínio quando ele foi espelhado** (`ferramentas/baixar-modelo.mjs`), e cai
+  na CDN pública quando não foi. Rede de escritório costuma bloquear CDN de terceiro justamente no primeiro
+  uso.
 - Avisa antes de fechar a aba enquanto grava ou transcreve.
 - Exige confirmação expressa de que os participantes foram avisados antes de deixar gravar.
 
@@ -69,6 +76,7 @@ node testes/sabotagem.mjs ia         # só as sabotagens de uma área
 node ferramentas/gerar-imagens.mjs   # refaz as imagens da página inicial a partir do app
 node ferramentas/ver-home.mjs        # confere a página inicial
 node ferramentas/ver-app.mjs         # confere a ferramenta, com uma reunião de exemplo processada
+node ferramentas/baixar-modelo.mjs onnx-community/whisper-base   # espelha o modelo em public/modelos/
 ```
 
 As imagens da página inicial são **capturas do aplicativo de verdade**, geradas por

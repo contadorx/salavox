@@ -18,7 +18,7 @@ export default async function (ctx, url, erros) {
 
   await p.check('#okConsent');
   await p.click('#rec');
-  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), { timeout: 20000 });
+  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), null, { timeout: 20000 });
 
   const medir = () => p.evaluate(() => ({
     heap: performance.memory ? performance.memory.usedJSHeapSize : 0,
@@ -40,7 +40,7 @@ export default async function (ctx, url, erros) {
   b.verdade('os pedaços estão indo para o disco, não para a memória', marcos[0].tam.disco === true);
 
   await p.click('#stop');
-  await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), { timeout: 60000 });
+  await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
 
   const info = await p.evaluate(async () => {
     const dir = await navigator.storage.getDirectory();
@@ -92,7 +92,7 @@ export default async function (ctx, url, erros) {
      linhas do tempo estiverem alinhadas, os dois números são o mesmo — e isso
      vale mesmo que o gravador tenha demorado a começar. */
   await p.click('#varrer');
-  await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), { timeout: 240000 });
+  await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), null, { timeout: 240000 });
   const legendas = await p.$$eval('.telas figcaption', e => e.map(x => x.textContent.trim()));
   const segundosDe = t => { const [m, s] = t.split(':').map(Number); return m * 60 + s; };
   const telaDoMeio = legendas[1] ? segundosDe(legendas[1]) : null;
