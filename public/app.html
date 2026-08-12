@@ -220,6 +220,7 @@
       <input type="text" id="contaEmail" placeholder="seu@email.com" autocomplete="email" style="min-width:230px">
       <button id="contaEntrar" class="hide">Entrar sem senha</button>
       <button id="contaSair" class="ghost sm hide">Sair</button>
+      <button id="diagnostico" class="ghost sm hide">Diagnóstico</button>
       <span class="status" id="contaMsg"></span>
     </div>
     <p class="note">A conta guarda o seu e-mail, o plano e quantos resumos você usou no mês.
@@ -413,7 +414,7 @@
 </div>
 
 <footer class="rodape">
-  Salavox versão <code>2026-08-12.385da57</code> — tudo roda neste computador.
+  Salavox versão <code>2026-08-12.3d5dd9e</code> — tudo roda neste computador.
   <a href="/privacidade">privacidade</a><a href="/termos">termos</a><a href="/">site</a>
 </footer>
 <script>/** @license
@@ -2505,14 +2506,44 @@ ${comoTexto()}`;
                             perfil.assinante_ate && new Date(perfil.assinante_ate) > new Date());
 
   async function iniciarConta() {
+    let bruto = null;
     try {
       const r = await fetch('/config.json', { cache: 'no-cache' });
-      if (!r.ok) return;
-      cfg = await r.json();
-      if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey) { cfg = null; return; }
+      if (!r.ok) return;                       // sem arquivo: produto local, sem cadastro. É o padrão.
+      bruto = await r.json();
     } catch (e) { return; }
 
+    /* Arquivo existe mas está vazio: também é o produto local — é como ele vem
+       no repositório, esperando ser preenchido. Silêncio aqui é correto. */
+    const vazio = v => !v || !String(v).trim();
+    if (!bruto || (vazio(bruto.supabaseUrl) && vazio(bruto.supabaseAnonKey))) return;
+
+    /* Arquivo existe e está pela metade, ou com o texto de exemplo ainda dentro.
+       Aqui o silêncio seria cruel: alguém publicou a configuração achando que
+       tinha ligado a camada paga, e o aplicativo não daria sinal nenhum. */
+    const problema =
+      vazio(bruto.supabaseUrl)     ? 'falta o <code>supabaseUrl</code>' :
+      vazio(bruto.supabaseAnonKey) ? 'falta o <code>supabaseAnonKey</code>' :
+      /SEU-PROJETO|SUA-ANON|exemplo/i.test(bruto.supabaseUrl + bruto.supabaseAnonKey)
+        ? 'o <code>config.json</code> ainda está com o texto de exemplo' :
+      !/^https:\/\/.+\.supabase\.co/.test(String(bruto.supabaseUrl).trim())
+        ? 'o <code>supabaseUrl</code> não parece um endereço do Supabase' : null;
+
+    if (problema) {
+      $('contaCard').classList.remove('hide');
+      $('contaEstado').innerHTML = `<span class="err">Camada paga não configurada:</span> ${problema}. ` +
+        'Corrija <code>public/config.json</code> e publique de novo — ' +
+        'enquanto isso, tudo o mais continua funcionando normalmente.';
+      $('contaEntrar').classList.add('hide');
+      $('diagnostico').classList.remove('hide');
+      return;
+    }
+
+    cfg = { supabaseUrl: String(bruto.supabaseUrl).trim().replace(/\/+$/, ''),
+            supabaseAnonKey: String(bruto.supabaseAnonKey).trim() };
+
     $('contaCard').classList.remove('hide');
+    $('diagnostico').classList.remove('hide');
     $('iaMotor').insertAdjacentHTML('afterbegin',
       '<option value="salavox">IA do Salavox — resumo pronto, sem instalar nada</option>');
 
@@ -2595,6 +2626,50 @@ ${comoTexto()}`;
     } catch (e) {
       $('contaMsg').innerHTML = '<span class="err">não consegui enviar o link agora</span>';
     }
+  };
+
+  /* Diagnóstico da camada paga.
+
+     Existe porque a primeira instalação falhou em silêncio: o arquivo de
+     configuração não estava lá, o cartão de conta não apareceu e não havia como
+     saber por quê. Isto responde as quatro perguntas de uma vez. */
+  $('diagnostico').onclick = async () => {
+    const linhas = [];
+    const diz = (o, ok, extra) => linhas.push(`${ok ? '✓' : '✗'} ${o}${extra ? ' — ' + extra : ''}`);
+
+    try {
+      const r = await fetch('/config.json', { cache: 'no-cache' });
+      diz('config.json publicado', r.ok, r.ok ? '' : 'HTTP ' + r.status);
+      if (r.ok) {
+        const c = await r.json().catch(() => null);
+        diz('config.json é JSON válido', !!c);
+        diz('supabaseUrl preenchido', !!(c && c.supabaseUrl && c.supabaseUrl.trim()));
+        diz('supabaseAnonKey preenchido', !!(c && c.supabaseAnonKey && c.supabaseAnonKey.trim()));
+      }
+    } catch (e) { diz('config.json publicado', false, e.message); }
+
+    if (cfg) {
+      try {
+        const r = await fetch(cfg.supabaseUrl + '/auth/v1/settings', { headers: { apikey: cfg.supabaseAnonKey } });
+        diz('Supabase responde', r.ok, r.ok ? '' : 'HTTP ' + r.status + ' — confira a URL e a anon key');
+      } catch (e) { diz('Supabase responde', false, 'não consegui alcançar'); }
+    }
+
+    try {
+      const r = await fetch('/api/resumo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      // sem token, a resposta certa é 401: significa que a função existe e está checando
+      diz('função /api/resumo publicada', r.status === 401 || r.status === 400,
+          r.status === 404 ? 'HTTP 404 — a pasta api/ não subiu com o projeto' : 'HTTP ' + r.status);
+      if (r.status === 500) {
+        const d = await r.json().catch(() => ({}));
+        diz('variáveis de ambiente da função', false, d.erro || 'servidor sem configuração');
+      } else if (r.status === 401) {
+        diz('variáveis de ambiente da função', true, 'a função respondeu como deve');
+      }
+    } catch (e) { diz('função /api/resumo publicada', false, e.message); }
+
+    $('contaMsg').innerHTML = '<pre style="white-space:pre-wrap;font:12.5px var(--mono);margin:8px 0 0">' +
+      linhas.join('\n') + '</pre>';
   };
 
   $('contaSair').onclick = () => { guardarSessao(null); perfil = null; desenharConta(); $('contaMsg').textContent = ''; };

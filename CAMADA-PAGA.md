@@ -27,18 +27,34 @@ ser verdade.
 | `RESEND_API_KEY` | resend.com, para o envio de e-mail |
 | `REMETENTE` | ex.: `ata@salavox.com`, com o domínio verificado no Resend |
 
-## 3. `public/config.json`
+## 3. `public/config.json` — **o arquivo já existe, só preencher**
+
+Ele vem no repositório com os campos em branco:
 
 ```json
 {
-  "supabaseUrl": "https://SEU-PROJETO.supabase.co",
-  "supabaseAnonKey": "SUA-ANON-KEY"
+  "supabaseUrl": "",
+  "supabaseAnonKey": ""
 }
 ```
 
-É a chave de liga-desliga da camada paga: com o arquivo, o cartão de conta e a IA do Salavox aparecem;
-sem ele, não existem. **Não versione este arquivo** se quiser que quem clonar o repositório receba a
-versão puramente local.
+Preencha as duas linhas com o **Project URL** e a **anon public** do Supabase (Settings → API) e publique.
+Esses dois valores são públicos por natureza — vão para o navegador de qualquer visitante. A
+**service role key nunca entra aqui**; ela é variável de ambiente da função.
+
+Em branco = produto local, sem cadastro. É esse o padrão, e é assim que ele vai no repositório.
+
+**Se ficar pela metade, o aplicativo avisa.** Foi assim que a primeira instalação falhou: o arquivo não
+existia, o cartão de conta não aparecia e não havia como saber por quê. Agora, config existente mas
+incompleto acende um aviso vermelho no cartão de conta, com um botão de **Diagnóstico** que responde as
+quatro perguntas de uma vez: o config subiu? é JSON válido? o Supabase responde com essa URL e essa chave?
+a função `/api/resumo` está publicada e com as variáveis de ambiente?
+
+### Se o diagnóstico disser "HTTP 404 — a pasta api/ não subiu"
+
+O projeto na Vercel precisa ter `api/` e `public/` lado a lado na raiz, com `outputDirectory: "public"` no
+`vercel.json` — que já vai configurado assim no repositório. Se você publicou apontando a raiz para
+`public/`, as funções ficam de fora e o 404 é esse.
 
 ## 4. Cobrança
 

@@ -17,16 +17,39 @@ const SUPA = 'https://projeto-de-teste.supabase.co';
 export default async function (ctx, url, erros) {
   const b = bloco('conta, plano e IA do Salavox');
 
-  /* ---------- 1. sem configuração, nada de conta ---------- */
+  /* ---------- 1. config.json em branco: o produto local, que é o padrão ----------
+     O arquivo VAI no repositório, com os campos vazios. Vazio tem de ser igual a
+     não existir: nada de conta, nada de camada paga. */
   const semConta = await paginaLimpa(ctx, erros);
   await semConta.addInitScript(telaFalsa(4));
   await semConta.goto(url + '/app');
-  await semConta.waitForTimeout(400);
-  b.verdade('sem /config.json o cartão de conta não aparece', await semConta.isHidden('#contaCard'));
-  b.conferir('sem /config.json a IA do Salavox nem é oferecida',
+  await semConta.waitForTimeout(500);
+  b.verdade('o config.json que vai no repositório está em branco',
+            await semConta.evaluate(async () => {
+              const c = await (await fetch('/config.json')).json();
+              return c && !c.supabaseUrl && !c.supabaseAnonKey;
+            }));
+  b.verdade('com o config em branco o cartão de conta não aparece', await semConta.isHidden('#contaCard'));
+  b.conferir('com o config em branco a IA do Salavox nem é oferecida',
              await semConta.$$eval('#iaMotor option', e => e.map(o => o.value)),
              ['prompt', 'ollama', 'chave']);
   await semConta.close();
+
+  /* ---------- 1b. config pela metade: falar alto, não ficar mudo ----------
+     A primeira instalação de verdade falhou exatamente assim, em silêncio. */
+  const meio = await paginaLimpa(ctx, erros);
+  await meio.route('**/config.json', r => r.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ supabaseUrl: 'https://SEU-PROJETO.supabase.co', supabaseAnonKey: 'SUA-ANON-KEY' })
+  }));
+  await meio.addInitScript(telaFalsa(4));
+  await meio.goto(url + '/app');
+  await meio.waitForFunction(() => !document.getElementById('contaCard').classList.contains('hide'),
+                             null, { timeout: 10000 }).catch(() => {});
+  b.verdade('config com o texto de exemplo é denunciado na tela',
+            /não configurada|exemplo/i.test(await meio.textContent('#contaEstado')));
+  b.verdade('e o botão de diagnóstico fica à mão', !(await meio.isHidden('#diagnostico')));
+  await meio.close();
 
   /* ---------- 2. com configuração ---------- */
   const p = await paginaLimpa(ctx, erros);
