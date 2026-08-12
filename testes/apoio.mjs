@@ -63,7 +63,8 @@ export const MODELO_FALSO = {
   contentType: 'application/javascript',
   body: `export const env={allowLocalModels:1,allowRemoteModels:1,backends:{onnx:{wasm:{}}}};
     let n=0;
-    export async function pipeline(){ return async (d) => { n++;
+    export async function pipeline(){ return async (d, opts) => { n++;
+      globalThis.__opcoes = opts;      // o teste confere o que o idioma mandou para o modelo
       let soma=0; for (let i=0;i<d.length;i++) soma += d[i]<0 ? -d[i] : d[i];
       const amp = (soma/(d.length||1)).toFixed(4);
       /* instante, dentro desta janela, em que o áudio fica baixo e continua baixo.
@@ -110,4 +111,17 @@ export function bloco(nome) {
     verdade(oque, real) { itens.push({ oque, ok: !!real, real, esperado: true }); },
     get passou() { return itens.every(i => i.ok); }
   };
+}
+
+/* Clicar em transcrever e esperar o fim.
+
+   Existe porque a armadilha já pegou: esperar por "Ata pronta" logo depois de
+   uma transcrição anterior devolve na hora, com a ata velha ainda na tela, e o
+   teste passa a conferir o resultado errado. Aqui a mensagem é apagada antes. */
+export async function transcrever(p, timeout = 180000) {
+  await p.evaluate(() => { document.getElementById('trMsg').textContent = ''; });
+  await p.click('#trans');
+  await p.waitForFunction(
+    () => /Ata pronta|Não consegui/.test(document.getElementById('trMsg').textContent), null, { timeout });
+  return p.textContent('#trMsg');
 }

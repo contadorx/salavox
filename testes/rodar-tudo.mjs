@@ -8,6 +8,7 @@ import { servir, RAIZ } from './apoio.mjs';
 import telas from './t-telas.mjs';
 import pedacos from './t-pedacos.mjs';
 import recuperacao from './t-recuperacao.mjs';
+import extras from './t-extras.mjs';
 
 const SO = process.argv[2];                       // roda um teste só, pelo nome
 const PORTA = Number(process.env.PORTA || 8131);
@@ -15,7 +16,8 @@ const PORTA = Number(process.env.PORTA || 8131);
 const TESTES = [
   ['telas', telas],
   ['pedacos', pedacos],
-  ['recuperacao', recuperacao]
+  ['recuperacao', recuperacao],
+  ['extras', extras]
 ].filter(([n]) => !SO || n === SO);
 
 console.log(execFileSync('python3', ['build.py'], { cwd: RAIZ }).toString().trim());

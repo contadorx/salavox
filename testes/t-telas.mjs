@@ -4,7 +4,7 @@
    cinza, e vermelho puro e verde escuro têm luminância quase idêntica — a
    troca de slide passava batido. A tela sintética usa exatamente essas cores. */
 
-import { telaFalsa, paginaLimpa, bloco } from './apoio.mjs';
+import { telaFalsa, paginaLimpa, bloco, transcrever } from './apoio.mjs';
 
 export default async function (ctx, url, erros) {
   const b = bloco('telas compartilhadas');
@@ -21,8 +21,7 @@ export default async function (ctx, url, erros) {
 
   b.verdade('o cartão de telas aparece quando se grava a tela', !(await p.isHidden('#telasCard')));
 
-  await p.click('#trans');
-  await p.waitForFunction(() => /Ata pronta|Não consegui/.test(document.getElementById('trMsg').textContent), { timeout: 120000 });
+  await transcrever(p);
   b.verdade('a ata sai com trechos', /Ata pronta/.test(await p.textContent('#trMsg')));
 
   await p.click('#varrer');

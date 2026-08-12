@@ -15,6 +15,7 @@
 
   let gravador = null, blobGravacao = null, blobPcm = null;
   let marcoInicio = 0, marcoFim = 0;          // instantes reais de início e fim, para conferência
+  let momentos = [], nomes = [], importado = false;
   let depGrav = null, depPcm = null;
   let ctxAudio = null, ctxPcm = null, fluxos = [], relogio = null, segundos = 0;
   let ocupado = false;
@@ -315,6 +316,8 @@ registerProcessor('toca', Toca);`;
     depGrav = deposito('gravacao');
     depPcm  = deposito('pcm');
     blobGravacao = blobPcm = null;
+    momentos = []; importado = false;
+    $('marcasMsg').textContent = '';
 
     // canal 0 = você, canal 1 = participantes
     ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
@@ -367,6 +370,7 @@ registerProcessor('toca', Toca);`;
       ocupado = false;
       $('rec').classList.remove('hide'); $('rec').disabled = false;
       $('stop').classList.add('hide'); $('vu').classList.add('hide');
+      $('marcar').classList.add('hide');
       $('recMsg').textContent = 'Fechando os pedaços gravados…';
       meta.segundos = segundos;
       await salvarMeta();
@@ -402,6 +406,7 @@ registerProcessor('toca', Toca);`;
     segundos = 0; ocupado = true;
     $('rec').classList.add('hide');
     $('stop').classList.remove('hide');
+    $('marcar').classList.remove('hide');
     $('tempo').classList.remove('hide'); $('vu').classList.remove('hide');
     $('tempo').textContent = '00:00';
 
@@ -425,6 +430,126 @@ registerProcessor('toca', Toca);`;
   };
 
   $('stop').onclick = () => { if (gravador && gravador.state !== 'inactive') gravador.stop(); };
+
+  /* ============================================================
+     Marcar um momento durante a reunião.
+
+     É a coisa mais barata de implementar e a que mais economiza
+     tempo depois: quem está na conversa sabe na hora o que
+     importa, e não vai querer reouvir quarenta minutos para achar
+     de novo. A tecla M funciona sem tirar o olho da chamada.
+     ============================================================ */
+  function marcarMomento() {
+    if (!gravador || gravador.state === 'inactive') return;
+    const t = marcoInicio ? (performance.now() - marcoInicio) / 1000 : segundos;
+    if (momentos.some(m => Math.abs(m - t) < 1.5)) return;      // evita marcar duas vezes sem querer
+    momentos.push(t);
+    $('marcasMsg').innerHTML = `<span class="ok">momento marcado em ${fmt(t)}</span> — ` +
+      `${momentos.length} ${momentos.length === 1 ? 'marca' : 'marcas'} nesta reunião`;
+  }
+  $('marcar').onclick = marcarMomento;
+  document.addEventListener('keydown', ev => {
+    if (ev.key !== 'm' && ev.key !== 'M' || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    const t = (ev.target && ev.target.tagName) || '';
+    if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+    marcarMomento();
+  });
+
+  /* ============================================================
+     Usar uma gravação que já existe.
+
+     Aqui o áudio precisa ser decodificado de uma vez — não há como
+     decodificar um pedaço do meio de um arquivo comprimido. É a
+     única etapa do produto que ainda depende de memória, e por
+     isso está avisada na tela. Logo depois de decodificar, o áudio
+     vira PCM em disco, em blocos de trinta segundos, e a
+     transcrição volta a ser tão leve quanto a da gravação própria.
+
+     Arquivo de fora não segue a convenção de canais (você à
+     esquerda, os outros à direita), então tudo entra como um
+     interlocutor só — que pode ser renomeado na ata.
+     ============================================================ */
+
+  $('escolher').onclick = () => $('arquivo').click();
+  $('arquivo').onchange = ev => { if (ev.target.files && ev.target.files[0]) importar(ev.target.files[0]); };
+
+  ['dragenter', 'dragover'].forEach(e => $('solta').addEventListener(e, ev => {
+    ev.preventDefault(); $('solta').classList.add('sobre');
+  }));
+  ['dragleave', 'drop'].forEach(e => $('solta').addEventListener(e, ev => {
+    ev.preventDefault(); $('solta').classList.remove('sobre');
+  }));
+  $('solta').addEventListener('drop', ev => {
+    const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if (f) importar(f);
+  });
+
+  async function importar(arquivo) {
+    if (ocupado) return;
+    ocupado = true;
+    const aviso = m => { $('arqMsg').innerHTML = m; };
+    $('impWrap').classList.remove('hide');
+    $('impBar').style.width = '0%';
+    $('trans').disabled = true;
+    try {
+      aviso(`Lendo <b>${arquivo.name}</b> (${(arquivo.size/1048576).toFixed(1)} MB)…`);
+      await limparTudo();
+      esconderRecuperacao();
+      momentos = []; telas = []; falas = [];
+      $('telasCard').classList.add('hide'); $('ataCard').classList.add('hide');
+      $('marcasMsg').textContent = ''; $('recMsg').textContent = '';
+
+      const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
+      let dec;
+      try {
+        dec = await ctx.decodeAudioData(await arquivo.arrayBuffer());
+      } catch (e) {
+        throw new Error('não consegui ler o áudio deste arquivo. ' +
+          'Formatos que costumam funcionar: mp3, m4a, wav, ogg, webm e mp4.');
+      }
+      try { ctx.close(); } catch (e) {}
+      if (!dec.length) throw new Error('este arquivo não tem áudio.');
+
+      const a = dec.getChannelData(0);
+      const b = dec.numberOfChannels > 1 ? dec.getChannelData(1) : null;
+      const dep = deposito('pcm');
+      const BLOCO = 30 * SR;
+      for (let off = 0; off < dec.length; off += BLOCO) {
+        const q = Math.min(BLOCO, dec.length - off);
+        const bloco = new Int16Array(q * 2);
+        for (let i = 0; i < q; i++) {
+          let v = b ? (a[off+i] + b[off+i]) / 2 : a[off+i];
+          if (v > 1) v = 1; else if (v < -1) v = -1;
+          bloco[i*2+1] = v * 32767;        // canal dos participantes
+        }
+        await dep.escrever(new Blob([bloco.buffer]));
+        const pct = (off + q) / dec.length * 100;
+        $('impBar').style.width = pct.toFixed(1) + '%';
+        aviso(`Preparando o áudio: ${pct.toFixed(0)}%`);
+        await new Promise(r => setTimeout(r, 0));   // devolve a vez ao navegador
+      }
+
+      blobPcm = await dep.juntar();
+      blobGravacao = arquivo;
+      segundos = Math.round(dec.length / SR);
+      marcoInicio = 0; marcoFim = segundos * 1000;
+      janelas = { voce: false, outros: true };
+      importado = true;
+
+      const temVideo = /^video\//.test(arquivo.type) || /\.(mp4|webm|mkv|mov|m4v|avi)$/i.test(arquivo.name);
+      if (temVideo) $('telasCard').classList.remove('hide');
+
+      aviso(`<span class="ok">${arquivo.name} pronto</span> — ${fmt(segundos)} de áudio` +
+            (temVideo ? ', com vídeo para procurar telas' : '') +
+            '. Agora gere a transcrição no passo 2.');
+      $('trans').disabled = false;
+    } catch (e) {
+      $('impBar').style.width = '0%';
+      aviso(`<span class="err">${(e && e.message) || e}</span>`);
+    } finally {
+      ocupado = false;
+    }
+  }
 
   /* ================= transcrição por canal ================= */
   let janelas = { voce: false, outros: false };
@@ -520,6 +645,10 @@ registerProcessor('toca', Toca);`;
     $('barWrap').classList.remove('hide');
     $('fique').classList.remove('hide');
     const aviso = m => { $('trMsg').innerHTML = m; };
+    // apaga o resultado anterior na hora: deixar "Ata pronta" na tela enquanto
+    // uma transcrição nova roda faz parecer que já acabou
+    aviso('Preparando…');
+    $('bar').style.width = '0%';
     try {
       if (!blobPcm || !blobPcm.size) {
         aviso('Preparando o áudio…');
@@ -592,21 +721,83 @@ registerProcessor('toca', Toca);`;
     }
   };
 
-  /* junta falas e telas numa linha do tempo só */
+  /* ============================================================
+     Quem falou, com nome.
+
+     A separação por canal diz "você" e "os outros"; ela não sabe
+     que os outros são a Maria e o João. Quem sabe é quem estava na
+     reunião — então o nome se digita aqui e vale para a ata, o
+     PDF, o texto e a legenda. Clicar no nome de uma fala percorre
+     a lista, que é o suficiente para uma reunião com duas ou três
+     pessoas do outro lado.
+     ============================================================ */
+
+  const rotuloPadrao = f => f.quem === 'voce'
+    ? ($('nomeVoce').value.trim() || 'VOCÊ')
+    : ($('nomeGrupo').value.trim() || (importado ? 'TRANSCRIÇÃO' : 'PARTICIPANTES'));
+  const rotulo = f => f.nome || rotuloPadrao(f);
+
+  function desenharChips() {
+    $('chips').innerHTML = nomes.map((n, i) =>
+      `<span class="chip">${escapar(n)}<button data-i="${i}" title="remover">×</button></span>`).join('');
+  }
+
+  const escapar = t => String(t).replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  $('chips').onclick = ev => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    const fora = nomes.splice(+b.dataset.i, 1)[0];
+    falas.forEach(f => { if (f.nome === fora) f.nome = null; });
+    desenharChips(); mostrarAta();
+  };
+
+  $('nomeNovo').onkeydown = ev => {
+    if (ev.key !== 'Enter') return;
+    const n = $('nomeNovo').value.trim();
+    if (n && nomes.indexOf(n) < 0 && nomes.length < 8) { nomes.push(n); desenharChips(); }
+    $('nomeNovo').value = '';
+  };
+  $('nomeVoce').oninput = $('nomeGrupo').oninput = () => { if (falas.length) mostrarAta(); };
+
+  $('ata').onclick = ev => {
+    const q = ev.target.closest('.quem');
+    if (q) {
+      const f = falas[+q.dataset.i];
+      if (!f) return;
+      const lista = [null].concat(nomes);
+      f.nome = lista[(lista.indexOf(f.nome || null) + 1) % lista.length];
+      mostrarAta();
+      return;
+    }
+    const m = ev.target.closest('.momento');
+    if (m) { momentos.splice(+m.dataset.i, 1); mostrarAta(); }
+  };
+
+  /* junta falas, telas e momentos marcados numa linha do tempo só */
   function linhaDoTempo() {
-    const itens = falas.map(f => ({ tipo: 'fala', t: f.a, f }))
-      .concat(telas.filter(t => t.manter).map(t => ({ tipo: 'tela', t: t.t, tl: t })));
-    itens.sort((a, b) => a.t - b.t || (a.tipo === 'tela' ? -1 : 1));   // a tela vem antes da fala
+    const ordem = { tela: 0, momento: 1, fala: 2 };   // no mesmo segundo, a imagem vem antes da fala
+    const itens = falas.map((f, i) => ({ tipo: 'fala', t: f.a, f, i }))
+      .concat(telas.filter(t => t.manter).map(t => ({ tipo: 'tela', t: t.t, tl: t })))
+      .concat(momentos.map((m, i) => ({ tipo: 'momento', t: m, i })));
+    itens.sort((a, b) => a.t - b.t || ordem[a.tipo] - ordem[b.tipo]);
     return itens;
   }
 
   function mostrarAta() {
     $('ataCard').classList.remove('hide');
-    $('ata').innerHTML = linhaDoTempo().map(i => i.tipo === 'fala'
-      ? `<div class="fala ${i.f.quem}"><span class="t">${fmt(i.f.a)}</span>` +
-        `<b>${i.f.quem === 'voce' ? 'VOCÊ' : 'PARTICIPANTES'}</b> ${i.f.texto}</div>`
-      : `<figure class="telaAta"><img src="${i.tl.img.url}">` +
-        `<figcaption>tela mostrada em ${fmt(i.tl.t)}</figcaption></figure>`).join('');
+    $('ata').innerHTML = linhaDoTempo().map(i => {
+      if (i.tipo === 'fala')
+        return `<div class="fala ${i.f.quem}"><span class="t">${fmt(i.f.a)}</span>` +
+               `<button class="quem" data-i="${i.i}" title="clique para trocar quem falou">` +
+               `${escapar(rotulo(i.f))}</button> ${escapar(i.f.texto)}</div>`;
+      if (i.tipo === 'momento')
+        return `<div class="momento" data-i="${i.i}" title="clique para remover esta marca">` +
+               `<b>★ ${fmt(i.t)}</b> momento marcado durante a reunião</div>`;
+      return `<figure class="telaAta"><img src="${i.tl.img.url}">` +
+             `<figcaption>tela mostrada em ${fmt(i.tl.t)}</figcaption></figure>`;
+    }).join('');
   }
 
 
@@ -774,9 +965,10 @@ registerProcessor('toca', Toca);`;
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
 
-  const comoTexto = () => linhaDoTempo().map(i => i.tipo === 'fala'
-    ? `[${fmt(i.f.a)}] ${i.f.quem === 'voce' ? 'VOCÊ' : 'PARTICIPANTES'}: ${i.f.texto}`
-    : `[${fmt(i.tl.t)}] (nova tela compartilhada)`).join('\n');
+  const comoTexto = () => linhaDoTempo().map(i =>
+    i.tipo === 'fala'    ? `[${fmt(i.f.a)}] ${rotulo(i.f)}: ${i.f.texto}` :
+    i.tipo === 'momento' ? `[${fmt(i.t)}] *** momento marcado durante a reunião ***`
+                         : `[${fmt(i.tl.t)}] (nova tela compartilhada)`).join('\n');
 
   function comoVtt() {
     const t = s => {
@@ -786,7 +978,7 @@ registerProcessor('toca', Toca);`;
     return 'WEBVTT\n\n' + falas.map((f, i) => {
       const fim = i + 1 < falas.length ? Math.min(falas[i+1].a, f.a + 12) : f.a + 5;
       return `${t(f.a)} --> ${t(Math.max(fim, f.a + 0.5))}\n` +
-             `<v ${f.quem === 'voce' ? 'Você' : 'Participantes'}>${f.texto}`;
+             `<v ${rotulo(f)}>${f.texto}`;
     }).join('\n\n') + '\n';
   }
 
@@ -813,14 +1005,20 @@ registerProcessor('toca', Toca);`;
     const nTelas = telas.filter(t => t.manter).length;
     doc.text(dataTxt + '   |   duração ' + fmt(segundos) + '   |   ' + falas.length +
              (falas.length === 1 ? ' trecho' : ' trechos') +
-             (nTelas ? '   |   ' + nTelas + (nTelas === 1 ? ' tela' : ' telas') : ''), M, 38);
+             (nTelas ? '   |   ' + nTelas + (nTelas === 1 ? ' tela' : ' telas') : '') +
+             (momentos.length ? '   |   ' + momentos.length +
+               (momentos.length === 1 ? ' momento marcado' : ' momentos marcados') : ''), M, 38);
     doc.setDrawColor(215).line(M, 44, PW - M, 44);
 
     doc.setFontSize(8.6).setTextColor(130);
-    doc.text(doc.splitTextToSize(
-      'Transcrição automática, gerada no próprio computador. "VOCÊ" é a fala captada pelo microfone de ' +
-      'quem gravou; "PARTICIPANTES" reúne as demais vozes, captadas pelo áudio da chamada e não ' +
-      'separadas individualmente. O texto pode conter erros de reconhecimento.', CW), M, 51);
+    doc.text(doc.splitTextToSize(importado
+      ? 'Transcrição automática de um arquivo já existente, gerada no próprio computador. Como o áudio ' +
+        'não foi captado em canais separados, as falas não são atribuídas a pessoas diferentes. O texto ' +
+        'pode conter erros de reconhecimento.'
+      : 'Transcrição automática, gerada no próprio computador. A primeira coluna diz quem falou: o ' +
+        'microfone de quem gravou de um lado, e as demais vozes, captadas pelo áudio da chamada, do ' +
+        'outro — estas não são separadas individualmente. O texto pode conter erros de reconhecimento.',
+      CW), M, 51);
     doc.setTextColor(30);
 
     let y = 68;
@@ -839,8 +1037,24 @@ registerProcessor('toca', Toca);`;
         y += alt + 8;
         return;
       }
+      if (item.tipo === 'momento') {
+        if (y + 9 > PH - 20) { rodape(); doc.addPage(); y = M + 4; }
+        doc.setFont('helvetica', 'normal').setTextColor(140).setFontSize(8.4);
+        doc.text(fmt(item.t), M, y);
+        doc.setFont('helvetica', 'bold').setTextColor(150, 110, 40).setFontSize(8.4);
+        doc.text('MOMENTO', M + 12, y);
+        doc.setFont('helvetica', 'normal').setTextColor(120).setFontSize(9);
+        doc.text('marcado durante a reunião', M + 42, y);
+        doc.setTextColor(30);
+        y += 8;
+        return;
+      }
       const f = item.f;
-      const quem = f.quem === 'voce' ? 'VOCÊ' : 'PARTICIPANTES';
+      // o rótulo é aparado para não invadir a coluna do texto
+      let quem = rotulo(f);
+      doc.setFont('helvetica', 'bold').setFontSize(8.4);
+      while (quem.length > 4 && doc.getTextWidth(quem) > 28) quem = quem.slice(0, -1);
+      if (quem !== rotulo(f)) quem = quem.slice(0, -1) + '.';
       const linhas = doc.splitTextToSize(f.texto, CW - 42);
       const alt = Math.max(6, linhas.length * 4.6 + 2.5);
       if (y + alt > PH - 20) { rodape(); doc.addPage(); y = M + 4; }
@@ -863,14 +1077,14 @@ registerProcessor('toca', Toca);`;
     const prompt =
 `Abaixo está a transcrição de uma reunião de ${fmt(segundos)}, gerada automaticamente.
 
-Cada linha traz o instante e quem falou. "VOCÊ" é o dono da gravação, captado pelo microfone.
-"PARTICIPANTES" reúne todas as outras pessoas, captadas pelo áudio da chamada — elas não estão
-separadas individualmente. As linhas "(nova tela compartilhada)" marcam o instante em que a tela
-apresentada mudou; use-as para saber quando o assunto passou de um documento para outro.
+Cada linha traz o instante e quem falou. As linhas "(nova tela compartilhada)" marcam o instante em
+que a tela apresentada mudou; use-as para saber quando o assunto passou de um documento para outro.
+As linhas "*** momento marcado ***" foram marcadas à mão por quem estava na reunião: trate o que
+está em volta delas como importante.
 
 Ao responder:
 - cite o instante (por exemplo, 12:34) ao mencionar qualquer ponto;
-- separe claramente o que foi dito por VOCÊ do que foi dito pelos PARTICIPANTES;
+- separe claramente o que cada interlocutor disse, usando os nomes que aparecem na transcrição;
 - a transcrição é automática e contém erros: se um trecho parecer incoerente, sinalize em vez de interpretar;
 - quando a informação não estiver na transcrição, diga que não é possível saber.
 
@@ -943,6 +1157,7 @@ ${comoTexto()}`;
   procurarSobras();
 
   window.__salavox = { falas: () => falas, comoTexto, comoVtt,
+    momentos: () => momentos, nomes: () => nomes, importado: () => importado,
     gravacao: () => blobGravacao, pcm: () => blobPcm,
     tamanhos: () => ({ grav: depGrav ? depGrav.bytes : 0, pcm: depPcm ? depPcm.bytes : 0,
                        disco: !!(depGrav && depGrav.emDisco) }),

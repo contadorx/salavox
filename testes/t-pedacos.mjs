@@ -6,7 +6,7 @@
    produzia 182,79 s de áudio. Como as telas são datadas pelo vídeo e as falas
    pelo áudio, os dois se deslocavam e a tela caía no minuto errado da ata. */
 
-import { telaFalsa, paginaLimpa, bloco } from './apoio.mjs';
+import { telaFalsa, paginaLimpa, bloco, transcrever } from './apoio.mjs';
 
 const SEGUNDOS = 60;
 
@@ -68,8 +68,7 @@ export default async function (ctx, url, erros) {
   b.entre('pedaços de áudio no disco (1 a cada 4 s)', info.audio, 12, 20);
   b.verdade('os metadados da sessão foram gravados', info.meta);
 
-  await p.click('#trans');
-  await p.waitForFunction(() => /Ata pronta|Não consegui/.test(document.getElementById('trMsg').textContent), { timeout: 180000 });
+  await transcrever(p);
   const falas = await p.evaluate(() => window.__salavox.falas().map(f => ({ a: Math.round(f.a), quem: f.quem, texto: f.texto })));
   // uma janela de 30 s por vez; o modelo falso devolve dois trechos por janela
   b.conferir('as falas são datadas a partir do início de cada janela',

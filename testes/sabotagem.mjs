@@ -60,6 +60,35 @@ const SABOTAGENS = [
     trocas: [['await blobPcm.slice(ini * BYTES_POR_AMOSTRA, fim * BYTES_POR_AMOSTRA).arrayBuffer());',
               'await blobPcm.slice(0, (fim - ini) * BYTES_POR_AMOSTRA).arrayBuffer());']],
     pega: 'toda a reunião viraria repetição dos primeiros trinta segundos'
+  },
+  {
+    nome: 'nome escolhido para a fala é ignorado',
+    teste: 'extras',
+    porta: 8146,
+    trocas: [['const rotulo = f => f.nome || rotuloPadrao(f);', 'const rotulo = f => rotuloPadrao(f);']],
+    pega: 'renomear quem falou pareceria funcionar na tela e sumiria no PDF e no texto'
+  },
+  {
+    nome: 'momentos marcados fora da linha do tempo',
+    teste: 'extras',
+    porta: 8147,
+    trocas: [['.concat(momentos.map((m, i) => ({ tipo: \'momento\', t: m, i })));', ';']],
+    pega: 'marcar um momento durante a reunião não deixaria rastro nenhum na ata'
+  },
+  {
+    nome: 'arquivo importado entra no canal errado',
+    teste: 'extras',
+    porta: 8148,
+    trocas: [['bloco[i*2+1] = v * 32767;        // canal dos participantes',
+              'bloco[i*2] = v * 32767;']],
+    pega: 'o arquivo seria lido como silêncio e a ata sairia vazia sem dizer por quê'
+  },
+  {
+    nome: '"detectar o idioma" força português assim mesmo',
+    teste: 'extras',
+    porta: 8149,
+    trocas: [['if (idioma) opts.language = idioma;', "opts.language = idioma || 'pt';"]],
+    pega: 'reunião em inglês ou espanhol sairia transcrita como se fosse português'
   }
 ];
 

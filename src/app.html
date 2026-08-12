@@ -78,6 +78,28 @@
   .telaAta{margin:12px 0 14px;border:1px solid var(--line);border-radius:8px;overflow:hidden;max-width:420px}
   .telaAta img{width:100%;display:block}
   .telaAta figcaption{font:11px ui-monospace,Menlo,monospace;color:var(--muted);padding:5px 8px}
+  .ou{display:flex;align-items:center;gap:14px;margin:22px 0 16px;color:var(--muted);font-size:12.5px}
+  .ou::before,.ou::after{content:'';flex:1;height:1px;background:var(--line)}
+  .solta{border:1.5px dashed var(--line);border-radius:10px;padding:16px;transition:.15s}
+  .solta.sobre{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent)}
+  .nomes{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:16px}
+  .nomes label{font-size:12.5px;color:var(--muted);display:flex;gap:6px;align-items:center}
+  .nomes input{width:132px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;
+               background:var(--bg);color:var(--ink);font:inherit;font-size:13.5px}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--line);
+        border-radius:99px;padding:3px 6px 3px 11px;font-size:12.5px;margin:0 5px 0 0}
+  .chip button{background:none;border:0;color:var(--muted);cursor:pointer;padding:0 4px;font-size:14px;
+               line-height:1;border-radius:99px}
+  .chip button:hover{color:var(--err)}
+  .fala .quem{background:none;border:0;padding:0;margin:0 4px 0 0;font:inherit;font-weight:650;font-size:12px;
+              letter-spacing:.02em;cursor:pointer;border-bottom:1px dashed transparent;border-radius:0}
+  .fala .quem:hover{border-bottom-color:currentColor}
+  .voce .quem{color:var(--you)}
+  .outros .quem{color:var(--them)}
+  .momento{display:flex;align-items:center;gap:9px;margin:10px 0;padding:7px 11px;border-radius:7px;
+           background:color-mix(in srgb,var(--warn) 13%,transparent);font-size:12.5px;color:var(--warn);
+           cursor:pointer;max-width:420px}
+  .momento b{font-weight:650}
   .versao{margin:26px 0 0;font-size:12px;color:var(--muted);text-align:center}
   .versao code{font:11.5px ui-monospace,Menlo,monospace;color:var(--muted)}
   .versao a{color:var(--muted)}
@@ -115,10 +137,12 @@
     <div class="row">
       <button id="rec" disabled>Começar a gravar</button>
       <button class="rec hide" id="stop">Encerrar</button>
+      <button class="ghost hide" id="marcar" title="atalho: tecla M">Marcar este momento</button>
       <label class="chk"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
       <label class="chk"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
     </div>
     <p class="tempo hide" id="tempo">00:00</p>
+    <div class="status" id="marcasMsg"></div>
     <div class="vu hide" id="vu">
       <div><span>você (microfone)</span><i><u id="vuYou"></u></i></div>
       <div class="them"><span>participantes (áudio da reunião)</span><i><u id="vuThem"></u></i></div>
@@ -130,6 +154,17 @@
     <p class="note">A reunião é gravada <b>em pedaços, direto no disco</b>, e não na memória da aba: não há
     limite prático de duração, e o que já foi gravado sobrevive se o navegador fechar sozinho. Continua tudo
     no seu computador — o navegador guarda esses pedaços numa área privada do próprio site.</p>
+
+    <div class="ou"><span>ou</span></div>
+    <div class="solta" id="solta">
+      <p style="margin:0 0 10px"><b>Use uma gravação que você já tem</b></p>
+      <p class="status" style="margin:0 0 12px">Arraste aqui um arquivo de áudio ou vídeo — ou
+        <button class="ghost sm" id="escolher">escolha no computador</button>.
+        Ele também não sai daqui.</p>
+      <input type="file" id="arquivo" accept="audio/*,video/*" hidden>
+      <div class="status" id="arqMsg"></div>
+      <div class="bar hide" id="impWrap"><i id="impBar"></i></div>
+    </div>
   </div>
 
   <div class="card">
@@ -144,6 +179,7 @@
         <option value="pt" selected>Português</option>
         <option value="en">Inglês</option>
         <option value="es">Espanhol</option>
+        <option value="">Detectar o idioma</option>
       </select>
     </div>
     <div class="bar hide" id="barWrap"><i id="bar"></i></div>
@@ -176,6 +212,16 @@
       <button id="copiarPrompt" class="ghost sm">Copiar prompt para a IA</button>
       <span class="status" id="ataMsg"></span>
     </div>
+
+    <div class="nomes">
+      <label>Você é <input id="nomeVoce" placeholder="Você" maxlength="28" autocomplete="off"></label>
+      <label>Do outro lado <input id="nomeGrupo" placeholder="Participantes" maxlength="28" autocomplete="off"></label>
+      <label>Mais alguém <input id="nomeNovo" placeholder="nome e Enter" maxlength="28" autocomplete="off"></label>
+      <span id="chips"></span>
+    </div>
+    <p class="status" id="dicaNomes">Clique no nome em qualquer fala para trocar quem falou. Os nomes entram
+    na ata, no PDF, no texto e na legenda.</p>
+
     <div id="ata"></div>
   </div>
 

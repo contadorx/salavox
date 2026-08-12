@@ -7,7 +7,7 @@
    perfeita ao encerrar normalmente, e some inteira quando o navegador cai.
    Este teste existe para pegar exatamente essa troca. */
 
-import { telaFalsa, paginaLimpa, bloco } from './apoio.mjs';
+import { telaFalsa, paginaLimpa, bloco, transcrever } from './apoio.mjs';
 
 const ATE = 25;
 
@@ -40,8 +40,7 @@ export default async function (ctx, url, erros) {
   b.entre('segundos de áudio recuperados dos 25 gravados', seg, 20, 25.5);
   b.verdade('o cartão de telas volta disponível', !(await p.isHidden('#telasCard')));
 
-  await p.click('#trans');
-  await p.waitForFunction(() => /Ata pronta|Não consegui/.test(document.getElementById('trMsg').textContent), { timeout: 120000 });
+  await transcrever(p);
   b.verdade('dá para transcrever o material recuperado', /Ata pronta/.test(await p.textContent('#trMsg')));
 
   await p.click('#varrer');

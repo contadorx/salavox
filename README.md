@@ -15,6 +15,11 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
 - Pula blocos silenciosos na transcrição, o que economiza bastante tempo em reunião real.
 - **Varre a gravação atrás das telas compartilhadas**, detectando mudança de cena por assinatura RGB, e
   intercala cada tela na ata no instante em que apareceu. Clicar na miniatura tira ou põe a tela na ata.
+- **Marca momentos durante a reunião** pelo botão ou pela tecla M, e eles entram na ata, no PDF e no texto.
+- **Nomeia quem falou**: os rótulos padrão viram nomes de verdade, e clicar no nome de uma fala troca a
+  atribuição — útil quando há duas ou três pessoas do outro lado.
+- **Usa uma gravação que já existe**: arraste um arquivo de áudio ou vídeo e ele vira ata do mesmo jeito.
+- Transcreve em português, inglês ou espanhol, ou **detecta o idioma** sozinho.
 - Exporta a ata em **PDF com as telas embutidas**, em `.txt` e em `.vtt`, permite baixar a gravação bruta,
   e copia um prompt pronto para pedir a ata a uma IA.
 - Avisa antes de fechar a aba enquanto grava ou transcreve.
@@ -84,6 +89,12 @@ A gravação em pedaços foi medida em execuções de 60, 90 e 180 segundos:
 - aba fechada à força aos 25 s devolveu **24 s** de áudio, com transcrição, telas e PDF saindo normalmente
   a partir do material recuperado;
 - o botão de apagar zerou o armazenamento.
+
+Os quatro itens novos têm verificação própria (`testes/t-extras.mjs`): um WAV de 40 s montado dentro da
+página é arrastado para a área de importação e vira 2.560.000 bytes de PCM — os 40 s exatos —, as duas
+janelas de trinta segundos leem trechos diferentes do arquivo, "detectar o idioma" não manda idioma nenhum
+ao modelo, o nome digitado e o nome escolhido por clique aparecem na ata, no texto e na legenda, e duas
+marcas feitas durante a gravação (uma pela tecla M, outra pelo botão) chegam à ata, ao texto e ao PDF.
 
 ## Limites conhecidos, a testar antes de prometer
 
