@@ -10,17 +10,18 @@
 </head>
 <body>
 
-<header>
-  <div class="wrap">
-    <a class="brand" href="/"><img src="/logo.svg" alt=""><span>Sala<b>vox</b></span></a>
-    <nav><a href="/termos">Termos</a><a href="/app">Abrir o Salavox</a></nav>
+<nav class="nav">
+  <div class="wrap nav-inner">
+    <a class="marca" href="/"><img src="/logo.svg" alt=""><span>Sala<b>vox</b></span></a>
+    <div class="nav-links"><a href="/termos">Termos</a><a href="/privacidade">Privacidade</a></div>
+    <a class="btn btn-verde" href="/app">Abrir o Salavox</a>
   </div>
-</header>
+</nav>
 
-<section style="padding-top:60px">
+<section class="secao">
   <div class="wrap doc">
-    <h1 style="font-size:32px">Política de Privacidade</h1>
-    <p class="updated">Última atualização: 11 de agosto de 2026.<br>
+    <h1>Política de Privacidade</h1>
+    <p class="quando">Última atualização: 11 de agosto de 2026.<br>
     Esta política descreve o funcionamento atual do Salavox, que não possui servidor de processamento,
     banco de dados nem cadastro de usuários.</p>
 
@@ -56,8 +57,11 @@
     </div>
 
     <h2>Conexões externas</h2>
-    <p>A página faz um número reduzido de conexões a serviços de terceiros, e nenhuma delas transporta o
-    conteúdo da sua reunião:</p>
+    <p><strong>Esta página — a de apresentação, com textos e imagens — não faz nenhuma conexão a serviços de
+    terceiros.</strong> Sem fonte hospedada fora, sem rastreador, sem ferramenta de estatística. Tudo o que
+    ela carrega vem do próprio endereço do Salavox.</p>
+    <p>A ferramenta em si, no endereço <code>/app</code>, faz um número reduzido de conexões, e nenhuma
+    delas transporta o conteúdo da sua reunião:</p>
     <ul>
       <li><strong>jsDelivr</strong> — rede de distribuição que entrega as bibliotecas usadas pela página.
       Recebe apenas o pedido do arquivo.</li>
@@ -98,13 +102,10 @@
   </div>
 </section>
 
-<footer>
+<footer class="rodape">
   <div class="wrap">
-    <div>
-      <a href="/app">Abrir</a><a href="/#precos">Preços</a>
-      <a href="/privacidade">Privacidade</a><a href="/termos">Termos</a>
-    </div>
-    <div>Salavox — a reunião fica na sala</div>
+    <p><a href="/app">Abrir</a><a href="/#precos">Preços</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a></p>
+    <p style="margin-top:12px">Salavox — a reunião fica na sala.</p>
   </div>
 </footer>
 

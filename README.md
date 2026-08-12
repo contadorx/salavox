@@ -59,7 +59,13 @@ node ferramentas/ver-home.mjs        # confere a página inicial, tema claro e e
 
 As imagens da página inicial são **capturas do aplicativo de verdade**, geradas por
 `ferramentas/gerar-imagens.mjs` a partir de uma reunião de exemplo. Se a interface mudar, basta rodar de
-novo — não há maquete para manter sincronizada com nada.
+novo — não há maquete para manter sincronizada com nada. Cada captura é recortada para a proporção exata
+da moldura em que entra (4∶5 no alto, 2∶1 nas telas largas, 4∶3 no PDF), nunca esticada.
+
+A página pública não faz **nenhuma** chamada a servidor de terceiro: sem fonte hospedada fora, sem
+rastreador, sem estatística. Foi por isso que a tipografia da referência (Plus Jakarta, do Google) virou
+pilha de fontes do sistema — um produto que promete "nada sai do seu computador" não abre a página
+conversando com o Google.
 
 A versão aparece no rodapé da ferramenta e em `/versao.txt`. Para saber o que está publicado:
 `curl https://salavox.com/versao.txt` — se não bater com o zip, o que está no ar é outro produto.

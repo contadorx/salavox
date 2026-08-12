@@ -165,6 +165,26 @@ O que ficou no lugar:
 
 ---
 
+## 6b. Imagem tem proporção, não sobra
+
+Toda captura sai da tela com a altura que calhou de ter o elemento. Jogadas direto na página, viram um
+mosaico de retângulos diferentes — e é exatamente isso que dá o aspecto desleixado, mesmo quando cada
+imagem, sozinha, está boa.
+
+O que ficou valendo:
+
+- **Cada imagem é recortada para a proporção da moldura em que entra** (4∶5, 2∶1, 4∶3), nunca esticada. O
+  recorte é feito no gerador, não pelo CSS, para que o corte seja escolhido e não sorteado.
+- **A captura é enquadrada na origem.** Janela estreita quando o conteúdo é estreito: numa janela larga a
+  ata fica com meia tela vazia à direita. Parágrafos longos de explicação ficam fora do quadro — a moldura
+  não pode terminar no meio de uma frase.
+- **Desenho vetorial é feito para a largura em que vai ser visto.** O diagrama deitado, de 860 por 300,
+  virou letra de formiga numa coluna de 480 px; refeito em pé, com o mesmo conteúdo, ficou legível.
+- **Sobra branca dentro da imagem é erro de enquadramento**, não detalhe. As telas de exemplo foram
+  encurtadas até o conteúdo encostar nas bordas.
+
+---
+
 ## 7. Compatibilidade de navegador é requisito, não detalhe
 
 O produto inteiro é feito de APIs recentes: `getDisplayMedia`, OPFS, AudioWorklet, WebGPU, `MediaRecorder`.
