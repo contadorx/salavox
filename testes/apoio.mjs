@@ -127,8 +127,23 @@ export const MODELO_FALSO = {
       ]}; }; }`
 };
 
+/* O config.json que vai publicado agora tem os dados do projeto de verdade —
+   e eles são públicos por natureza, então isso é correto. Mas quase todos os
+   blocos de teste descrevem a **instalação local**: quem baixa o código e serve
+   sozinho, sem camada paga. Por isso a página de teste recebe, por padrão, um
+   config em branco.
+
+   Quem quiser o outro mundo — conta, plano, painel — registra a própria rota
+   depois desta, e a mais recente é a que vale. Assim cada bloco diz por escrito
+   em que mundo ele está, em vez de herdar o que estiver no arquivo naquele dia. */
+const CONFIG_EM_BRANCO = {
+  contentType: 'application/json',
+  body: JSON.stringify({ supabaseUrl: '', supabaseAnonKey: '' })
+};
+
 export async function paginaLimpa(ctx, erros) {
   const p = await ctx.newPage();
+  await p.route('**/config.json', r => r.fulfill(CONFIG_EM_BRANCO));
   p.on('pageerror', e => erros.push('pageerror: ' + e.message));
   p.on('console', m => {
     // a CDN do runtime de transcrição não é alcançável daqui: o aplicativo tenta,

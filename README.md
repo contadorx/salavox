@@ -94,7 +94,7 @@ PROTOCOLO.md         como se trabalha neste projeto
 python3 build.py                     # gera public/app.html e public/versao.txt
 node testes/rodar-tudo.mjs           # os nove blocos em paralelo — 70 s
 node testes/rodar-tudo.mjs silencio  # só um bloco
-node testes/sabotagem.mjs            # 37 defeitos plantados, exige que os testes peguem
+node testes/sabotagem.mjs            # 38 defeitos plantados, exige que os testes peguem
 node testes/sabotagem.mjs silencio   # só as sabotagens de uma área
 node ferramentas/gerar-imagens.mjs   # refaz as imagens da página inicial a partir do app
 node ferramentas/ver-home.mjs        # confere a página inicial
@@ -123,7 +123,7 @@ A versão aparece no rodapé da ferramenta e em `/versao.txt`. Para saber o que 
 ## O que foi verificado
 
 `node testes/rodar-tudo.mjs` roda tudo isto e sai com erro se algo falhar; `node testes/sabotagem.mjs`
-planta 37 defeitos no código, um de cada vez, e exige que a verificação correspondente pegue cada um —
+planta 38 defeitos no código, um de cada vez, e exige que a verificação correspondente pegue cada um —
 inclusive um cenário de controle, que precisa **passar**.
 
 Com captura sintética no Chromium: a gravação sai com **dois canais** de energias distintas (0,14 e 0,21

@@ -752,14 +752,32 @@ registerProcessor('toca', Toca);`;
     'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/'
   ];
 
+  /* Cada sondagem tem prazo, e a resposta fica guardada.
+
+     Sem prazo, uma rede que engole a conexão em vez de recusá-la — rede de
+     escritório com filtro costuma fazer exatamente isso — deixa esta função
+     pendurada indefinidamente. Enquanto a transcrição só acontecia no fim, o
+     efeito era uma barra parada. Depois que ela passou a começar durante a
+     reunião, virou outra coisa: a transcrição ao vivo simplesmente não começa,
+     em silêncio, e ninguém liga uma coisa à outra.
+
+     Três segundos por endereço, e o resultado guardado para a sessão inteira:
+     se o primeiro respondeu, não há motivo para perguntar de novo. */
+  let wasmAchado;
   async function acharWasm() {
+    if (wasmAchado !== undefined) return wasmAchado;
     for (const b of WASM_BASES) {
       try {
-        const r = await fetch(b + 'ort-wasm-simd-threaded.jsep.wasm', { headers: { Range: 'bytes=0-16' } });
-        if (r.ok || r.status === 206) return b;
+        const corte = new AbortController();
+        const relogio = setTimeout(() => corte.abort(), 3000);
+        try {
+          const r = await fetch(b + 'ort-wasm-simd-threaded.jsep.wasm',
+                                { headers: { Range: 'bytes=0-16' }, signal: corte.signal });
+          if (r.ok || r.status === 206) return (wasmAchado = b);
+        } finally { clearTimeout(relogio); }
       } catch (e) {}
     }
-    return null;
+    return (wasmAchado = null);
   }
 
   /* O modelo só deveria ser baixado uma vez: a transformers.js guarda os pesos

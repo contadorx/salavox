@@ -18,7 +18,9 @@
    O que continua não verificado: as respostas reais da Anthropic, do Supabase
    e do Resend. Isto testa a lógica da função, não os serviços. */
 
-import { bloco } from './apoio.mjs';
+import { bloco, RAIZ } from './apoio.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
 
 function respostaFalsa() {
   const r = { codigo: null, corpo: null };
@@ -66,6 +68,43 @@ export default async function (ctx, url, erros) {
     for (const k of ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'ANTHROPIC_API_KEY', 'ADMIN_EMAILS'])
       delete process.env[k];
   };
+
+  /* ---------- 0. o config.json que vai publicado ----------
+
+     Este arquivo é o único do projeto que carrega credencial e vai inteiro para
+     o navegador de qualquer visitante. Os dois valores que moram nele — a URL
+     do projeto e a chave `anon` — são públicos por natureza, e é assim que o
+     Supabase foi desenhado: quem protege os dados é a política de acesso do
+     banco, não o segredo da chave.
+
+     O perigo é outro, e é de um dedo só: colar aqui a chave de serviço, que
+     ignora todas as políticas e lê a base inteira. As duas se parecem — ambas
+     são JWT longos vindos da mesma tela do Supabase — e a diferença está dentro
+     do token, no campo `role`. Então é o `role` que este teste lê.
+
+     Antes daqui existia uma conferência de que o arquivo estava **em branco**.
+     Ela morreu quando o projeto ganhou um Supabase de verdade. Esta é melhor:
+     protege contra a coisa errada acontecer, não contra qualquer coisa
+     acontecer. */
+  const bruto = fs.readFileSync(path.join(RAIZ, 'public', 'config.json'), 'utf8');
+  let cfg = null;
+  try { cfg = JSON.parse(bruto); } catch (e) {}
+  b.verdade('o config.json publicado é JSON válido', !!cfg);
+
+  const papel = t => {
+    const partes = String(t || '').split('.');
+    if (partes.length !== 3) return null;
+    try { return JSON.parse(Buffer.from(partes[1], 'base64url').toString()).role || null; }
+    catch (e) { return null; }
+  };
+  b.conferir('a chave publicada é a anon, nunca a de serviço',
+             cfg && cfg.supabaseAnonKey ? papel(cfg.supabaseAnonKey) : 'vazio', 'anon');
+  b.verdade('nenhum campo do arquivo contém uma chave de serviço',
+            !Object.values(cfg || {}).some(v => papel(v) === 'service_role'));
+  b.verdade('e nada com cara de segredo entrou por outro nome',
+            !Object.keys(cfg || {}).some(k => /service|secret|segredo|senha|anthropic|resend/i.test(k)));
+  b.verdade('a URL aponta para um projeto do Supabase',
+            !cfg.supabaseUrl || /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(cfg.supabaseUrl));
 
   /* ---------- 1. painel: sem configuração, ninguém entra ----------
      Fechado por omissão. Quem esquece de configurar fica de fora — e não

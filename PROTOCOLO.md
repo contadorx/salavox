@@ -86,7 +86,7 @@ Sai com código diferente de zero quando falha. É isso que permite dizer "passo
 **Três regras que valem mais que a lista:**
 
 - **Todo teste novo é sabotado de propósito antes de ser aceito.** Auditor que só sabe dizer "ok" não é
-  trava. `testes/sabotagem.mjs` planta 37 defeitos, um de cada vez, e exige que a verificação correspondente falhe — e já
+  trava. `testes/sabotagem.mjs` planta 38 defeitos, um de cada vez, e exige que a verificação correspondente falhe — e já
   reprovou dois testes meus, um deles que "pegava" o defeito pelo motivo errado.
 - **Valor esperado é golden, escrito no arquivo.** `['00:00','00:04','00:08','00:12']` está lá em letra de
   forma. Recalcular o esperado com a mesma função que se testa faz o teste passar sempre, inclusive depois

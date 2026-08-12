@@ -233,6 +233,16 @@ const SABOTAGENS = [
     pega: 'janelas seriam transcritas pela metade, com o fim em branco, e a ata perderia falas'
   },
   {
+    nome: 'a chave de serviço vai parar no config.json publicado',
+    teste: 'funcoes',
+    porta: 8179,
+    arquivo: 'public/config.json',
+    // um JWT com role service_role, montado só para esta sabotagem
+    trocas: [['"supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.',
+              '"supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.x", "_lixo": "']],
+    pega: 'a chave que ignora todas as políticas do banco iria para o navegador de qualquer visitante'
+  },
+  {
     nome: 'o resumo da IA não chega ao PDF nem ao texto',
     teste: 'conta',
     porta: 8154,

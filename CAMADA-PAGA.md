@@ -37,22 +37,30 @@ ser verdade.
 | `REMETENTE` | ex.: `ata@salavox.com`, com o domínio verificado no Resend |
 | `ADMIN_EMAILS` | os e-mails que abrem `/painel`, separados por vírgula — **sem ela o painel não abre para ninguém** |
 
-## 3. `public/config.json` — **o arquivo já existe, só preencher**
+## 3. `public/config.json` — **já vai preenchido**
 
-Ele vem no repositório com os campos em branco:
+Desde 12/08/2026 o arquivo sai do repositório apontando para o projeto de produção:
 
 ```json
 {
-  "supabaseUrl": "",
-  "supabaseAnonKey": ""
+  "supabaseUrl": "https://zyqncemxjobkvdveordz.supabase.co",
+  "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIs…"
 }
 ```
 
-Preencha as duas linhas com o **Project URL** e a **anon public** do Supabase (Settings → API) e publique.
-Esses dois valores são públicos por natureza — vão para o navegador de qualquer visitante. A
-**service role key nunca entra aqui**; ela é variável de ambiente da função.
+Esses dois valores são **públicos por natureza** — vão para o navegador de qualquer visitante, e é assim
+que o Supabase foi desenhado: quem protege os dados é a política de acesso do banco (RLS), não o segredo
+da chave. A **service role key nunca entra aqui**; ela é variável de ambiente da função.
 
-Em branco = produto local, sem cadastro. É esse o padrão, e é assim que ele vai no repositório.
+**A trava que substituiu a antiga.** Enquanto o arquivo ia em branco, um teste conferia que ele estava em
+branco. Agora `testes/t-funcoes.mjs` faz algo melhor: decodifica o JWT publicado e exige que o campo
+`role` seja `anon`. As duas chaves do Supabase se parecem — mesmo formato, mesma tela de origem — e a
+diferença mora dentro do token. Colar a de serviço aqui por engano expõe a base inteira, e é o tipo de erro
+que se comete em três segundos; agora a suíte fica vermelha antes de o zip sair.
+
+Deixar as duas linhas vazias desliga a camada paga e devolve o Salavox ao modo local, sem cadastro — é o
+que acontece com quem baixa o código e serve por conta própria, e é o modo que quase todos os testes
+descrevem.
 
 **Se ficar pela metade, o aplicativo avisa.** Foi assim que a primeira instalação falhou: o arquivo não
 existia, o cartão de conta não aparecia e não havia como saber por quê. Agora, config existente mas

@@ -17,19 +17,22 @@ const SUPA = 'https://projeto-de-teste.supabase.co';
 export default async function (ctx, url, erros) {
   const b = bloco('conta, plano e IA do Salavox');
 
-  /* ---------- 1. config.json em branco: o produto local, que é o padrão ----------
-     O arquivo VAI no repositório, com os campos vazios. Vazio tem de ser igual a
-     não existir: nada de conta, nada de camada paga. */
+  /* ---------- 1. config.json em branco: o produto local ----------
+     Vazio tem de ser igual a não existir: nada de conta, nada de camada paga.
+     É o estado de quem baixa o código e serve sozinho.
+
+     Este bloco conferia, antes, que o arquivo publicado estava em branco. Não
+     está mais — o projeto tem um Supabase de verdade, e os dois valores que vão
+     ali são públicos por natureza. O que substituiu essa conferência está em
+     `t-funcoes.mjs`, e é mais forte: o arquivo publicado não pode conter chave
+     que não seja a `anon`. */
   const semConta = await paginaLimpa(ctx, erros);
   await semConta.addInitScript(telaFalsa(4));
   await semConta.goto(url + '/app');
   await semConta.waitForTimeout(500);
-  b.verdade('o config.json que vai no repositório está em branco',
-            await semConta.evaluate(async () => {
-              const c = await (await fetch('/config.json')).json();
-              return c && !c.supabaseUrl && !c.supabaseAnonKey;
-            }));
   b.verdade('com o config em branco o cartão de conta não aparece', await semConta.isHidden('#contaCard'));
+  b.verdade('e nada é pedido ao servidor de contas',
+            await semConta.evaluate(() => !window.__salavox.cfg()));
   await semConta.close();
 
   /* ---------- 1b. config pela metade: falar alto, não ficar mudo ----------
