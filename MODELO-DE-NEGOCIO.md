@@ -26,9 +26,15 @@ esse mercado já está bem atendido.
 | Fireflies | US$ 10 a 29 | sim (há modo sem robô) |
 | Fathom | US$ 15 a 29 | sim, visível |
 | Granola | US$ 14 a 35 | não, capta do aparelho |
+| tl;dv | R$ 116 a 179 (anual) | sim, visível |
 
 Todos processam o áudio na nuvem. É o que permite a eles separar cada locutor e integrar com calendário e
 CRM — e é exatamente o que impede o cliente que não pode deixar o áudio sair da empresa.
+
+**Cuidado com o discurso de preço.** O plano grátis do tl;dv oferece gravação e transcrição ilimitadas em
+mais de 30 idiomas, armazenamento ilimitado e aplicativo móvel. Dizer "eles cobram caro" descreve o plano
+pago e é facilmente desmentido por quem pesquisa. O que o grátis deles aperta é retenção (3 meses), volume
+(40 gravações por semana) e IA (10 reuniões com notas) — e, acima de tudo, **onde o áudio fica**.
 
 **A brecha não é preço, é arquitetura.** Um concorrente não consegue oferecer "não sai do seu computador"
 sem jogar fora o produto inteiro que construiu. É a única vantagem que nenhum deles pode copiar em um
@@ -39,17 +45,21 @@ trimestre.
 ## 3. O que temos e o que falta
 
 **Pronto e verificado:** captura de tela e áudio, microfone em canal separado, transcrição local por canal,
-ata com marcação de quem falou, saída em PDF, texto e legenda, prompt para IA, porta de consentimento e
-salto de blocos silenciosos.
+ata com marcação de quem falou, **telas compartilhadas capturadas por mudança de cena e intercaladas na ata
+em ordem cronológica**, saída em PDF com as telas embutidas, texto e legenda, download da gravação bruta,
+prompt para IA, porta de consentimento, salto de blocos silenciosos, **gravação em pedaços no disco sem
+limite prático de duração** e **recuperação da gravação quando o navegador fecha no meio**.
 
 **Falta antes de vender:**
 
-1. **Teste em reunião real de trinta minutos.** Nada substitui isso. Vai medir memória, tempo de transcrição
-   e qualidade em português com várias vozes.
+1. **Teste em reunião real de trinta minutos.** Nada substitui isso. Vai medir tempo de transcrição e
+   qualidade em português com várias vozes.
 2. **Eco:** com alto-falante, a voz de quem grava volta pelo canal dos participantes e degrada a separação.
    Precisa ser medido e, se for o caso, tratado.
-3. **Gravação longa** em memória do navegador — provavelmente exige gravar em pedaços.
-4. **Aproveitar as telas compartilhadas** como imagens na ata (o ClipContext já faz isso).
+3. **Nomear os participantes** e **registrar o consentimento com carimbo de hora**.
+
+A lista completa, comparada funcionalidade a funcionalidade com o concorrente mais completo do mercado,
+está em [ROADMAP.md](ROADMAP.md).
 
 **Limites que ficam:** não separa os participantes entre si; no macOS só funciona com reunião em aba; não
 integra com calendário nem CRM. Tudo isso está dito na landing, e deve continuar dito.
@@ -129,16 +139,23 @@ deste.
 
 ## 7. Roadmap
 
+O detalhamento está em [ROADMAP.md](ROADMAP.md), montado item a item contra a lista de funcionalidades do
+tl;dv. Em resumo:
+
 **Agora — validar**
-Teste real de trinta minutos. Medir eco, memória e qualidade. Corrigir o que quebrar.
+Teste real de trinta minutos e medição do eco. A gravação em pedaços, o aviso ao fechar a aba e a
+recuperação da gravação interrompida já estão prontos.
 
 **Depois — completar o produto grátis**
-Gravação em pedaços para reunião longa. Telas compartilhadas como imagens na ata. Modelos de ata.
-Aviso de consentimento com registro do horário.
+Nomear participantes. Vocabulário do escritório. Marcador de momento durante a reunião. Importar arquivo
+já gravado. Modelos de ata. Registro de consentimento com horário.
+
+**Então — dar memória ao produto**
+Histórico local das reuniões, busca em todas as atas e resumo por IA rodando na própria máquina (Ollama) —
+a única forma de ter "notas por IA" sem contradizer a página inicial.
 
 **Só então — construir o pago**
-Aplicativo de desktop com licença. Histórico local organizado. Identidade visual do escritório na ata.
-Suporte com prazo.
+Aplicativo de desktop com licença. Identidade visual do escritório na ata. Suporte com prazo.
 
 **Quando houver escritórios pagando**
 Documentação de conformidade, contrato padrão, política de retenção, treinamento.
