@@ -100,6 +100,29 @@
            background:color-mix(in srgb,var(--warn) 13%,transparent);font-size:12.5px;color:var(--warn);
            cursor:pointer;max-width:420px}
   .momento b{font-weight:650}
+  .alerta{border:1px solid var(--err);border-radius:8px;padding:12px 14px;margin-top:12px;
+          background:color-mix(in srgb,var(--err) 8%,transparent);font-size:13px;line-height:1.55}
+  .alerta b{color:var(--err)}
+  #iaChave input{flex:1;min-width:150px;padding:8px 11px;border:1px solid var(--line);border-radius:7px;
+                 background:var(--bg);color:var(--ink);font:inherit;font-size:13.5px}
+  #iaPergunta{flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--line);border-radius:7px;
+              background:var(--bg);color:var(--ink);font:inherit;font-size:14px}
+  .resumo{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-top:14px}
+  .resumo h3{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);
+             margin:0 0 8px;font-weight:650}
+  .resumo .corpo{font-size:14px;line-height:1.7;white-space:pre-wrap;outline:0}
+  .resumo .corpo:focus{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+  .resumo .pe{display:flex;gap:10px;margin-top:11px;align-items:center}
+  .vocab{margin-top:14px;border:1px solid var(--line);border-radius:8px;padding:10px 13px}
+  .vocab summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .vocab textarea{width:100%;border:1px solid var(--line);border-radius:7px;background:var(--bg);
+                  color:var(--ink);font:inherit;font-size:13.5px;padding:9px 11px;resize:vertical}
+  .consentReg{margin-top:16px;border:1px solid var(--line);border-left:3px solid var(--accent);
+              border-radius:8px;padding:12px 14px;font-size:12.5px;color:var(--muted);line-height:1.6}
+  .consentReg b{color:var(--ink);font-weight:650}
+  .fala .txt{outline:0;border-bottom:1px dashed transparent;cursor:text}
+  .fala .txt:hover{border-bottom-color:var(--line)}
+  .fala .txt:focus{border-bottom-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,transparent)}
   .versao{margin:26px 0 0;font-size:12px;color:var(--muted);text-align:center}
   .versao code{font:11.5px ui-monospace,Menlo,monospace;color:var(--muted)}
   .versao a{color:var(--muted)}
@@ -181,7 +204,17 @@
         <option value="es">Espanhol</option>
         <option value="">Detectar o idioma</option>
       </select>
+      <select id="saida" title="o Whisper traduz para inglês sem custo extra de tempo">
+        <option value="transcribe" selected>Ata no idioma da reunião</option>
+        <option value="translate">Ata em inglês</option>
+      </select>
     </div>
+    <details class="vocab">
+      <summary>Vocabulário do escritório</summary>
+      <p class="status" style="margin:8px 0">Nomes de clientes, siglas e termos que a transcrição costuma
+      errar. Um por linha. Depois de transcrever, o Salavox troca o que ficou parecido pelo termo certo.</p>
+      <textarea id="vocab" rows="4" placeholder="Simples Nacional&#10;DIRF&#10;Construtora Andrade&#10;pró-labore"></textarea>
+    </details>
     <div class="bar hide" id="barWrap"><i id="bar"></i></div>
     <div class="status" id="trMsg"></div>
     <p class="note hide" id="fique">Mantenha esta aba aberta e visível. A transcrição roda no seu navegador
@@ -213,6 +246,8 @@
       <span class="status" id="ataMsg"></span>
     </div>
 
+    <div class="consentReg hide" id="consentReg"></div>
+
     <div class="nomes">
       <label>Você é <input id="nomeVoce" placeholder="Você" maxlength="28" autocomplete="off"></label>
       <label>Do outro lado <input id="nomeGrupo" placeholder="Participantes" maxlength="28" autocomplete="off"></label>
@@ -223,6 +258,54 @@
     na ata, no PDF, no texto e na legenda.</p>
 
     <div id="ata"></div>
+  </div>
+
+  <div class="card hide" id="iaCard">
+    <h2><span class="step">5</span>Resumo, decisões e pendências</h2>
+
+    <div class="row">
+      <select id="iaMotor">
+        <option value="prompt" selected>Prompt para colar na IA que eu já uso</option>
+        <option value="ollama">Ollama, rodando neste computador</option>
+        <option value="chave">Serviço de IA com a minha chave</option>
+      </select>
+      <button class="ghost sm hide" id="iaProcurar">Procurar o Ollama</button>
+      <select id="iaModelo" class="hide"></select>
+      <span class="status" id="iaMotorMsg"></span>
+    </div>
+
+    <div class="hide" id="iaChave">
+      <div class="alerta">
+        <b>Atenção:</b> neste modo o <b>texto da ata sai deste computador</b> para o serviço que você
+        escolher. O áudio e o vídeo continuam aqui, mas a transcrição não. A chave fica só na memória
+        desta aba — não é gravada em lugar nenhum e some ao fechar a página.
+      </div>
+      <div class="row" style="margin-top:11px">
+        <input id="iaBase" placeholder="https://api.openai.com/v1" autocomplete="off" spellcheck="false">
+        <input id="iaNome" placeholder="modelo (ex.: gpt-4o-mini)" autocomplete="off" spellcheck="false">
+        <input id="iaSegredo" type="password" placeholder="chave" autocomplete="off" spellcheck="false">
+      </div>
+      <label class="chk" style="margin-top:9px"><input type="checkbox" id="iaOk">
+        <span>Entendo que o texto da ata será enviado ao serviço que eu escolhi.</span></label>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button id="iaResumo">Resumo executivo</button>
+      <button class="ghost" id="iaPendencias">Decisões e pendências</button>
+      <button class="ghost" id="iaEmail">E-mail de acompanhamento</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <input id="iaPergunta" placeholder="Perguntar à ata: em quanto ficou o imposto?" autocomplete="off">
+      <button class="ghost sm" id="iaPerguntar">Perguntar</button>
+    </div>
+
+    <div class="bar hide" id="iaBarWrap"><i id="iaBar"></i></div>
+    <div class="status" id="iaMsg"></div>
+    <div id="iaSaida"></div>
+
+    <p class="note"><b>Nos três modos a decisão é sua.</b> O padrão não envia nada: monta o prompt com a ata
+    dentro e você cola onde quiser. O Ollama roda no seu próprio computador — nada sai. O terceiro modo
+    manda o texto para o serviço que você indicar, e só funciona depois de você marcar que entendeu isso.</p>
   </div>
 
   <video id="vid" class="hide" muted playsinline preload="auto"></video>

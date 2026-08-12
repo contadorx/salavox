@@ -19,9 +19,20 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
 - **Nomeia quem falou**: os rótulos padrão viram nomes de verdade, e clicar no nome de uma fala troca a
   atribuição — útil quando há duas ou três pessoas do outro lado.
 - **Usa uma gravação que já existe**: arraste um arquivo de áudio ou vídeo e ele vira ata do mesmo jeito.
-- Transcreve em português, inglês ou espanhol, ou **detecta o idioma** sozinho.
+- Transcreve em português, inglês ou espanhol, **detecta o idioma** sozinho, e sabe entregar a
+  **ata em inglês** sem custo de tempo — o Whisper traduz com um parâmetro.
+- **Vocabulário do escritório**: siglas, nomes de clientes e termos que a transcrição sempre erra são
+  corrigidos no texto que sai, comparando cada palavra com a lista por distância de edição.
+- **Corrige o texto na própria ata**: clicar numa fala e escrever por cima; a correção vai para o PDF, o
+  texto e a legenda.
+- **Registra o consentimento com carimbo de hora**: quando a confirmação foi marcada, quando o aviso foi
+  copiado e quando a gravação começou, com o texto exato oferecido — na ata, no PDF e no `.txt`.
 - Exporta a ata em **PDF com as telas embutidas**, em `.txt` e em `.vtt`, permite baixar a gravação bruta,
   e copia um prompt pronto para pedir a ata a uma IA.
+- **Resumo, decisões e pendências por IA, em três motores**, escolhidos por quem usa: prompt pronto para
+  colar (padrão, não faz nenhuma requisição), Ollama rodando na própria máquina, ou serviço externo com a
+  chave do usuário — este último atrás de uma confirmação explícita, porque nele o texto realmente sai.
+  A chave vive numa variável da aba e nunca é gravada.
 - Avisa antes de fechar a aba enquanto grava ou transcreve.
 - Exige confirmação expressa de que os participantes foram avisados antes de deixar gravar.
 
@@ -51,8 +62,10 @@ PROTOCOLO.md         como se trabalha neste projeto
 
 ```bash
 python3 build.py                     # gera public/app.html e public/versao.txt
-node testes/rodar-tudo.mjs           # telas, gravação em pedaços, recuperação
-node testes/sabotagem.mjs            # quebra o app de propósito e exige que os testes peguem
+node testes/rodar-tudo.mjs           # os seis blocos em paralelo — 69 s
+node testes/rodar-tudo.mjs ia        # só um bloco
+node testes/sabotagem.mjs            # 18 defeitos plantados, exige que os testes peguem — 3 min 40 s
+node testes/sabotagem.mjs ia         # só as sabotagens de uma área
 node ferramentas/gerar-imagens.mjs   # refaz as imagens da página inicial a partir do app
 node ferramentas/ver-home.mjs        # confere a página inicial, tema claro e escuro
 ```
@@ -96,11 +109,23 @@ A gravação em pedaços foi medida em execuções de 60, 90 e 180 segundos:
   a partir do material recuperado;
 - o botão de apagar zerou o armazenamento.
 
-Os quatro itens novos têm verificação própria (`testes/t-extras.mjs`): um WAV de 40 s montado dentro da
+O pacote de conformidade tem verificação própria (`testes/t-conformidade.mjs`), com valores golden para o
+vocabulário — inclusive **o que ele não pode fazer**: não trocar palavra que só se parece com um termo, não
+mexer no que já está certo e não corrigir palavra curta. O registro de consentimento é conferido nos três
+lugares onde precisa aparecer, e a correção feita à mão é conferida depois de sair do campo.
+
+Os quatro itens do pacote anterior têm verificação própria (`testes/t-extras.mjs`): um WAV de 40 s montado dentro da
 página é arrastado para a área de importação e vira 2.560.000 bytes de PCM — os 40 s exatos —, as duas
 janelas de trinta segundos leem trechos diferentes do arquivo, "detectar o idioma" não manda idioma nenhum
 ao modelo, o nome digitado e o nome escolhido por clique aparecem na ata, no texto e na legenda, e duas
 marcas feitas durante a gravação (uma pela tecla M, outra pelo botão) chegam à ata, ao texto e ao PDF.
+
+### O que a suíte de IA protege
+
+Não é a qualidade do resumo — é a promessa. O teste registra **toda** requisição que a página tenta fazer e
+exige que o modo padrão não faça nenhuma; que o modo Ollama só fale com `127.0.0.1`; que o modo com chave
+recuse funcionar antes da confirmação; e que, depois de digitar uma chave, `localStorage`, `sessionStorage`
+e os cookies continuem **vazios**.
 
 ## Limites conhecidos, a testar antes de prometer
 
@@ -109,6 +134,11 @@ marcas feitas durante a gravação (uma pela tecla M, outra pelo botão) chegam 
 - **Reunião longa:** a memória deixou de ser o limite, mas o **tempo de transcrição** com o modelo real
   ainda não foi medido, e o disco passa a contar — cerca de 225 MB por hora só de áudio cru, mais o vídeo.
 - **Qualidade em português** com várias vozes e sotaques é incógnita.
+- **Ollama de verdade não foi testado aqui.** A integração foi verificada contra um Ollama de mentira que
+  responde como o real, inclusive nos cabeçalhos de CORS. Falta confirmar num computador com Ollama
+  instalado que o navegador aceita a conversa de uma página `https` com `http://127.0.0.1` — o Chrome
+  trata `localhost` como origem confiável, mas há a regra de rede privada, e o Ollama precisa ser iniciado
+  com `OLLAMA_ORIGINS` apontando para o endereço do Salavox. A tela já diz isso quando não encontra.
 - **Eco:** se você usar alto-falante em vez de fone, sua voz volta pelo canal dos participantes. O
   cancelamento de eco do microfone ajuda, mas o caso precisa ser testado.
 - **Consentimento:** gravar reunião exige avisar os participantes. Isso tem que estar na interface.

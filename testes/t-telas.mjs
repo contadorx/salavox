@@ -28,16 +28,21 @@ export default async function (ctx, url, erros) {
   await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), { timeout: 180000 });
 
   const instantes = await p.$$eval('.telas figcaption', e => e.map(x => x.textContent.trim()));
-  b.conferir('instantes das telas detectadas', instantes, ['00:00', '00:04', '00:08', '00:12']);
+  // a captura começa preta; a primeira tela guardada é a primeira com conteúdo
+  b.conferir('instantes das telas detectadas', instantes, ['00:01', '00:04', '00:08', '00:12']);
 
+  /* A primeira tela cai depois das primeiras falas porque a captura passa o
+     primeiro segundo preta: a tela só existe a partir de 1,2 s, e as falas do
+     modelo estão em 1,0 s. A ordem é estável por construção — a tela nunca pode
+     aparecer antes, e é isso que o golden guarda. */
   const ordem = await p.$$eval('#ata > *', e => e.map(x => x.className.includes('telaAta') ? 'TELA' : 'fala'));
   b.conferir('ata intercalada em ordem cronológica', ordem.join(' '),
-             'TELA fala fala TELA TELA fala fala TELA');
+             'fala fala TELA TELA TELA fala fala TELA');
 
   await p.click('.telas figure');                // descarta a primeira tela
   const depois = await p.$$eval('#ata > *', e => e.map(x => x.className.includes('telaAta') ? 'TELA' : 'fala'));
   b.conferir('descartar uma tela a remove da ata', depois.join(' '),
-             'fala fala TELA TELA fala fala TELA');
+             'fala fala TELA TELA fala fala TELA');   // some a primeira das três
   b.conferir('o contador acompanha o descarte', (await p.textContent('#telasTag')).trim(), '3 de 4 na ata');
 
   const esperaPdf = p.waitForEvent('download', { timeout: 60000 });

@@ -73,9 +73,12 @@ acabou de ser construído.
 Nada é anunciado como pronto sem ter rodado:
 
 ```
-python3 build.py                  # embutido no runner, mas vale rodar sozinho quando se mexe no HTML
-node testes/rodar-tudo.mjs        # telas, gravação em pedaços, recuperação
-node testes/sabotagem.mjs         # quebra o app de propósito e exige que os testes falhem
+python3 build.py                     # embutido no runner, mas vale rodar sozinho quando se mexe no HTML
+node testes/rodar-tudo.mjs           # os seis blocos, em paralelo — 69 s
+node testes/rodar-tudo.mjs ia telas  # só os blocos pedidos
+JUNTOS=1 node testes/rodar-tudo.mjs  # um de cada vez, para depurar
+node testes/sabotagem.mjs            # quebra o app de propósito e exige que os testes falhem — 3 min 40 s
+node testes/sabotagem.mjs ia         # só as sabotagens de uma área
 ```
 
 Sai com código diferente de zero quando falha. É isso que permite dizer "passou" sem ter olhado a tela.
@@ -94,7 +97,7 @@ Sai com código diferente de zero quando falha. É isso que permite dizer "passo
 
 ### O que só a sabotagem encontra
 
-O par de cenários mais útil não é "quebrei, falhou". É o **controle**: com um atraso de 1,5 s entre ligar o
+O par de cenários mais útil não é "quebrei, falhou". É o **controle**: com um atraso de 3 s entre ligar o
 áudio e começar a gravar, o teste tem de **passar**; com o mesmo atraso e sem a marcação de início, tem de
 **falhar**. Foi assim que se provou que o alinhamento entre áudio e vídeo estava mesmo protegido, e não
 apenas passando por sorte de cronometragem.
@@ -102,6 +105,40 @@ apenas passando por sorte de cronometragem.
 Foi também a sabotagem que encontrou um defeito de verdade no produto: a última janela de transcrição podia
 ser um resto de 0,05 s, e o modelo devolvia texto datado em 01:09 numa reunião de um minuto. Resto curto
 agora não entra, e o instante vem preso ao tamanho da janela.
+
+### Quanto verificar, e quando — verificação larga é por estímulo, não por hábito
+
+A suíte estava levando cinco a seis minutos e a sabotagem passava de vinte. Verificação que demora vira
+verificação que não se roda, e verificação que não se roda é pior que verificação que não existe, porque dá
+a sensação de que existe.
+
+O conserto não foi cortar cobertura. Foi tirar o desperdício:
+
+| | Antes | Agora |
+|---|---|---|
+| Suíte completa | ~5 a 6 min, um bloco de cada vez | **69 s**, três blocos em paralelo |
+| Sabotagem completa | ~25 min | **3 min 40 s** |
+
+Cada bloco roda com o seu próprio servidor, numa porta própria — porta diferente é origem diferente, e
+origem diferente é armazenamento diferente, senão um bloco apagaria a gravação do outro. E o paralelismo
+para em **três**: estes testes gravam mídia em tempo real, e com a máquina saturada o navegador perde
+quadros e o teste acusa defeito que não existe.
+
+Com esse custo, a regra de quando rodar o quê:
+
+| Estímulo | O que rodar | Custo |
+|---|---|---|
+| Qualquer alteração no aplicativo | `rodar-tudo.mjs` | 69 s — **sempre**, não se negocia |
+| Alteração só em texto, CSS ou página inicial | `ver-home.mjs` | 8 s |
+| Alteração numa área com sabotagem própria | `sabotagem.mjs <área>` | ~1 min |
+| Teste novo entrando | sabotagem da área dele | ~1 min |
+| Teste que piscou | a suíte três vezes seguidas | 3,5 min |
+| **Antes de gerar o zip de entrega** | suíte + `sabotagem.mjs` inteira | 5 min |
+| Mexeu em gravação, disco ou linha do tempo | sabotagem inteira | 3,5 min |
+
+O que **não** vale cortar em nome da velocidade: o valor golden escrito no arquivo, a sabotagem antes de
+aceitar um teste novo, e a regra de só marcar como passado o que foi verificado por inteiro. O que vale
+cortar é espera ociosa — e era disso que a demora era feita.
 
 ### Teste que pisca é teste quebrado
 

@@ -16,6 +16,13 @@
   let gravador = null, blobGravacao = null, blobPcm = null;
   let marcoInicio = 0, marcoFim = 0;          // instantes reais de início e fim, para conferência
   let momentos = [], nomes = [], importado = false;
+
+  /* Registro de consentimento. Para contador e advogado isto vale mais que
+     qualquer resumo por IA: não é o consentimento em si — que é dado na
+     conversa, entre pessoas — é a prova de que o aviso foi dado, com hora,
+     anexada ao mesmo documento que vai para o cliente. */
+  let consentimento = null;
+  const agora = () => new Date().toLocaleString('pt-BR');
   let depGrav = null, depPcm = null;
   let ctxAudio = null, ctxPcm = null, fluxos = [], relogio = null, segundos = 0;
   let ocupado = false;
@@ -253,13 +260,38 @@ registerProcessor('toca', Toca);`;
     'A gravação e a transcrição ficam no meu computador e não são enviadas a nenhum serviço externo. ' +
     'Quem preferir que não seja gravado, por favor diga agora.';
 
-  $('okConsent').onchange = () => { $('rec').disabled = !$('okConsent').checked; };
+  $('okConsent').onchange = () => {
+    $('rec').disabled = !$('okConsent').checked;
+    if ($('okConsent').checked) {
+      consentimento = { confirmado: agora(), copiado: null, iniciado: null, texto: AVISO };
+    } else {
+      consentimento = null;
+    }
+    mostrarConsentimento();
+  };
+
+  function mostrarConsentimento() {
+    const c = $('consentReg');
+    if (!consentimento || !consentimento.iniciado) { c.classList.add('hide'); return; }
+    c.classList.remove('hide');
+    c.innerHTML = '<b>Registro de consentimento.</b> ' +
+      `Quem gravou confirmou às <b>${consentimento.confirmado}</b> que avisaria os participantes` +
+      (consentimento.copiado ? `, copiou o texto do aviso às <b>${consentimento.copiado}</b>` : '') +
+      ` e iniciou a gravação às <b>${consentimento.iniciado}</b>.` +
+      '<br>Texto do aviso oferecido: <i>“' + consentimento.texto + '”</i>' +
+      '<br>Este registro é a declaração de quem gravou, não uma verificação feita pelo Salavox — ' +
+      'ele não entra na chamada e não tem como conferir o que foi dito.';
+  }
 
   $('copiarAviso').onclick = async () => {
     try {
       await navigator.clipboard.writeText(AVISO);
+      if (consentimento) consentimento.copiado = agora();
       $('avisoMsg').innerHTML = '<span class="ok">aviso copiado</span>';
     } catch (e) {
+      // navegador sem área de transferência: o texto aparece para copiar à mão,
+      // e para o registro isso conta igual — o aviso foi obtido
+      if (consentimento) consentimento.copiado = agora();
       $('avisoMsg').textContent = AVISO;
     }
     setTimeout(() => { $('avisoMsg').textContent = ''; }, 4000);
@@ -348,7 +380,7 @@ registerProcessor('toca', Toca);`;
     gravador.ondataavailable = ev => { if (ev.data && ev.data.size) depGrav.escrever(ev.data); };
 
     const meta = { inicio: Date.now(), mime: tipo || 'video/webm', mic: !!micFluxo,
-                   sistema: temSistema, tela: $('tela').checked, segundos: 0 };
+                   sistema: temSistema, tela: $('tela').checked, segundos: 0, consentimento };
     const salvarMeta = async () => {
       if (!TEM_OPFS) return;
       try {
@@ -403,6 +435,7 @@ registerProcessor('toca', Toca);`;
     gravador.start(10000);          // um arquivo a cada dez segundos
     marcarInicioPcm();              // zera o áudio cru no mesmo instante do vídeo
     marcoInicio = performance.now();
+    if (consentimento) consentimento.iniciado = agora();
     segundos = 0; ocupado = true;
     $('rec').classList.add('hide');
     $('stop').classList.remove('hide');
@@ -535,6 +568,7 @@ registerProcessor('toca', Toca);`;
       marcoInicio = 0; marcoFim = segundos * 1000;
       janelas = { voce: false, outros: true };
       importado = true;
+      consentimento = null; mostrarConsentimento();
 
       const temVideo = /^video\//.test(arquivo.type) || /\.(mp4|webm|mkv|mov|m4v|avi)$/i.test(arquivo.name);
       if (temVideo) $('telasCard').classList.remove('hide');
@@ -609,6 +643,89 @@ registerProcessor('toca', Toca);`;
      ============================================================ */
 
   const SR = 16000, BYTES_POR_AMOSTRA = 4;   // dois canais Int16
+
+  /* ============================================================
+     Vocabulário do escritório.
+
+     O modelo não conhece o nome dos seus clientes nem as siglas da
+     profissão, e erra sempre nos mesmos. Em vez de tentar ensinar
+     o modelo — caminho que depende de recurso que a biblioteca
+     pode não expor —, a correção é feita no texto que sai: cada
+     palavra é comparada com a lista do escritório e trocada
+     quando a diferença é pequena o bastante para ser erro de
+     reconhecimento, não outra palavra.
+
+     A régua é apertada de propósito. Trocar "concordata" por
+     "conta" seria pior do que deixar o erro: o limite de
+     diferença cresce devagar com o tamanho do termo, e termo
+     curto quase não é corrigido.
+     ============================================================ */
+
+  const semAcento = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  function distancia(a, b) {
+    if (a === b) return 0;
+    const m = a.length, n = b.length;
+    if (Math.abs(m - n) > 3) return 99;
+    let linha = Array.from({ length: n + 1 }, (_, i) => i);
+    for (let i = 1; i <= m; i++) {
+      let ante = linha[0]; linha[0] = i;
+      for (let j = 1; j <= n; j++) {
+        const tmp = linha[j];
+        linha[j] = Math.min(linha[j] + 1, linha[j-1] + 1, ante + (a[i-1] === b[j-1] ? 0 : 1));
+        ante = tmp;
+      }
+    }
+    return linha[n];
+  }
+
+  const folga = termo => termo.length <= 5 ? 0 : termo.length <= 8 ? 1 : termo.length <= 13 ? 2 : 3;
+
+  function lerVocabulario() {
+    return ($('vocab').value || '').split('\n')
+      .map(t => t.trim()).filter(t => t.length > 2).slice(0, 200);
+  }
+
+  /* devolve o texto corrigido e quantas trocas fez */
+  function aplicarVocabulario(texto, termos) {
+    if (!termos.length) return { texto, trocas: 0 };
+    const pedacos = texto.split(/(\s+)/);          // guarda os espaços para remontar igual
+    const palavras = [];
+    pedacos.forEach((p, i) => { if (i % 2 === 0) palavras.push(i); });
+    let trocas = 0;
+
+    for (const termo of termos) {
+      const alvo = semAcento(termo);
+      const nPalavras = termo.split(/\s+/).length;
+      for (let k = 0; k + nPalavras <= palavras.length; k++) {
+        const idx = palavras.slice(k, k + nPalavras);
+        const bruto = idx.map(i => pedacos[i]).join(' ');
+        const limpo = semAcento(bruto).replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '');
+        // compara sem acento para achar o erro, mas só desiste quando o texto já
+        // está idêntico ao termo: "pro-labore" e "pró-labore" são iguais sem
+        // acento, e é justamente o acento que precisa ser consertado
+        const cru = bruto.replace(/^[^0-9A-Za-zÀ-ÿ]+|[^0-9A-Za-zÀ-ÿ]+$/g, '');
+        if (!limpo || cru === termo) continue;
+        if (distancia(limpo, alvo) > folga(alvo)) continue;
+        const sufixo = bruto.match(/[.,;:!?)\]]+$/);         // preserva a pontuação do fim
+        pedacos[idx[0]] = termo + (sufixo ? sufixo[0] : '');
+        for (let j = 1; j < idx.length; j++) { pedacos[idx[j]] = ''; pedacos[idx[j] - 1] = ''; }
+        trocas++;
+      }
+    }
+    return { texto: pedacos.join('').replace(/\s{2,}/g, ' ').trim(), trocas };
+  }
+
+  function corrigirComVocabulario() {
+    const termos = lerVocabulario();
+    if (!termos.length) return 0;
+    let total = 0;
+    falas.forEach(f => {
+      const r = aplicarVocabulario(f.texto, termos);
+      if (r.trocas) { f.texto = r.texto; total += r.trocas; }
+    });
+    return total;
+  }
 
   /* Gravação antiga ou recuperada sem PCM: cai no caminho anterior,
      que decodifica o arquivo inteiro e só serve para reunião curta. */
@@ -685,7 +802,7 @@ registerProcessor('toca', Toca);`;
           const { dados, pico } = separar(bruto, q, desl);
           // pula blocos silenciosos: economiza muito tempo em reunião real
           if (pico >= 0.012) {
-            const opts = { return_timestamps: true, task: 'transcribe' };
+            const opts = { return_timestamps: true, task: $('saida').value };
             if (idioma) opts.language = idioma;
             const r = await pipe(dados, opts);
             const trechos = (r && r.chunks && r.chunks.length) ? r.chunks
@@ -710,8 +827,11 @@ registerProcessor('toca', Toca);`;
       }
 
       falas.sort((a, b) => a.a - b.a);
+      const trocas = corrigirComVocabulario();
       mostrarAta();
-      aviso(`<span class="ok">Ata pronta</span> — ${falas.length} trechos.`);
+      aviso(`<span class="ok">Ata pronta</span> — ${falas.length} trechos` +
+            (trocas ? `, ${trocas} ${trocas === 1 ? 'termo corrigido' : 'termos corrigidos'} pelo vocabulário` : '') +
+            '.');
     } catch (e) {
       aviso(`<span class="err">Não consegui transcrever: ${(e && e.message) || e}</span>`);
     } finally {
@@ -761,6 +881,20 @@ registerProcessor('toca', Toca);`;
   };
   $('nomeVoce').oninput = $('nomeGrupo').oninput = () => { if (falas.length) mostrarAta(); };
 
+  /* A transcrição erra, e ata com o nome do cliente escrito errado é
+     constrangimento. O texto é editável no lugar: sai daqui direto para o PDF,
+     o texto e a legenda. Só grava ao sair do campo — atualizar a cada tecla
+     redesenharia a ata e tiraria o cursor do lugar. */
+  $('ata').addEventListener('focusout', ev => {
+    const t = ev.target.closest && ev.target.closest('.txt');
+    if (!t) return;
+    const f = falas[+t.dataset.i];
+    if (!f) return;
+    const novo = t.textContent.replace(/\s+/g, ' ').trim();
+    if (novo && novo !== f.texto) { f.texto = novo; f.corrigida = true; }
+    else if (!novo) t.textContent = f.texto;
+  });
+
   $('ata').onclick = ev => {
     const q = ev.target.closest('.quem');
     if (q) {
@@ -771,6 +905,7 @@ registerProcessor('toca', Toca);`;
       mostrarAta();
       return;
     }
+    if (ev.target.closest('.txt')) return;
     const m = ev.target.closest('.momento');
     if (m) { momentos.splice(+m.dataset.i, 1); mostrarAta(); }
   };
@@ -787,11 +922,15 @@ registerProcessor('toca', Toca);`;
 
   function mostrarAta() {
     $('ataCard').classList.remove('hide');
+    $('iaCard').classList.remove('hide');
+    mostrarConsentimento();
     $('ata').innerHTML = linhaDoTempo().map(i => {
       if (i.tipo === 'fala')
         return `<div class="fala ${i.f.quem}"><span class="t">${fmt(i.f.a)}</span>` +
                `<button class="quem" data-i="${i.i}" title="clique para trocar quem falou">` +
-               `${escapar(rotulo(i.f))}</button> ${escapar(i.f.texto)}</div>`;
+               `${escapar(rotulo(i.f))}</button> ` +
+               `<span class="txt" contenteditable="true" spellcheck="true" data-i="${i.i}" ` +
+               `title="clique para corrigir o texto">${escapar(i.f.texto)}</span></div>`;
       if (i.tipo === 'momento')
         return `<div class="momento" data-i="${i.i}" title="clique para remover esta marca">` +
                `<b>★ ${fmt(i.t)}</b> momento marcado durante a reunião</div>`;
@@ -837,6 +976,19 @@ registerProcessor('toca', Toca);`;
 
   const assC = document.createElement('canvas'); assC.width = 32; assC.height = 18;
   const assX = assC.getContext('2d', { willReadFrequently: true });
+  /* Tela sem informação: preta, branca ou de uma cor só. Os primeiros instantes
+     de um compartilhamento costumam ser assim — a captura começa antes de a
+     janela pintar —, e sem esta peneira a ata abria com um retângulo preto
+     apresentado como "tela mostrada em 00:00". */
+  function semConteudo(ass) {
+    let min = 255, max = 0;
+    for (let i = 0; i < ass.length; i++) {
+      if (ass[i] < min) min = ass[i];
+      if (ass[i] > max) max = ass[i];
+    }
+    return max - min < 12;
+  }
+
   function assinatura() {
     assX.drawImage(vid, 0, 0, 32, 18);
     const d = assX.getImageData(0, 0, 32, 18).data, a = new Uint8Array(32*18*3);
@@ -889,11 +1041,15 @@ registerProcessor('toca', Toca);`;
         await esperar(t);
         await new Promise(r => requestAnimationFrame(r));
         const ass = assinatura();
-        if (anterior === null || diferenca(anterior, ass) >= limiar) {
+        const mudou = anterior === null || diferenca(anterior, ass) >= limiar;
+        // o intervalo mínimo evita guardar duas vezes a mesma tela durante uma
+        // transição, quando o quadro do meio já difere do anterior e do seguinte
+        const cedoDemais = telas.length && vid.currentTime - telas[telas.length - 1].t < 1.2;
+        if (mudou && !semConteudo(ass) && !cedoDemais) {
           telas.push({ t: vid.currentTime, img: recortar(900), manter: true, ass });
-          anterior = ass;
           guardadas++;
         }
+        if (mudou) anterior = ass;
         const pct = (i + 1) / total * 100;
         $('tbar').style.width = pct + '%';
         const resta = (performance.now() - t0) / (i + 1) * (total - i - 1) / 1000;
@@ -965,7 +1121,18 @@ registerProcessor('toca', Toca);`;
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
 
-  const comoTexto = () => linhaDoTempo().map(i =>
+  const cabecalhoConsentimento = () => (consentimento && consentimento.iniciado)
+    ? `REGISTRO DE CONSENTIMENTO\nConfirmado às ${consentimento.confirmado}` +
+      (consentimento.copiado ? `, aviso copiado às ${consentimento.copiado}` : '') +
+      `, gravação iniciada às ${consentimento.iniciado}.\nTexto oferecido: "${consentimento.texto}"\n` +
+      'Declaração de quem gravou, não verificação feita pelo Salavox.\n\n'
+    : '';
+
+  const blocosResumo = () => resumos.filter(r => r.noPdf)
+    .map(r => r.titulo.toUpperCase() + '\n' + r.texto + '\n').join('\n');
+
+  const comoTexto = () => cabecalhoConsentimento() +
+    (blocosResumo() ? blocosResumo() + '\n---\n\n' : '') + linhaDoTempo().map(i =>
     i.tipo === 'fala'    ? `[${fmt(i.f.a)}] ${rotulo(i.f)}: ${i.f.texto}` :
     i.tipo === 'momento' ? `[${fmt(i.t)}] *** momento marcado durante a reunião ***`
                          : `[${fmt(i.tl.t)}] (nova tela compartilhada)`).join('\n');
@@ -1022,6 +1189,48 @@ registerProcessor('toca', Toca);`;
     doc.setTextColor(30);
 
     let y = 68;
+    if (consentimento && consentimento.iniciado) {
+      const linhas = doc.setFontSize(8.4).splitTextToSize(
+        'REGISTRO DE CONSENTIMENTO — quem gravou confirmou às ' + consentimento.confirmado +
+        ' que avisaria os participantes' +
+        (consentimento.copiado ? ', copiou o texto do aviso às ' + consentimento.copiado : '') +
+        ' e iniciou a gravação às ' + consentimento.iniciado + '. Texto oferecido: "' +
+        consentimento.texto + '" Este registro é a declaração de quem gravou, não uma verificação ' +
+        'feita pelo Salavox.', CW - 12);
+      const alt = linhas.length * 3.6 + 8;
+      doc.setFillColor(244, 246, 246).setDrawColor(200);
+      doc.roundedRect(M, y - 4, CW, alt, 2, 2, 'FD');
+      doc.setTextColor(90).text(linhas, M + 6, y + 2, { lineHeightFactor: 1.28 });
+      doc.setTextColor(30);
+      y += alt + 8;
+    }
+    /* Resumo e pendências vêm antes da transcrição: é o que o cliente lê.
+       O texto pode ter vindo de um modelo, então sai marcado como tal — a ata
+       não pode dar a entender que alguém revisou o que a máquina escreveu. */
+    resumos.filter(r => r.noPdf).forEach(r => {
+      const titulo = r.titulo.toUpperCase();
+      const corpo = doc.setFont('helvetica', 'normal').setFontSize(9.6)
+        .splitTextToSize(r.texto, CW - 6);
+      if (y + 16 > PH - 20) { rodape(); doc.addPage(); y = M + 4; }
+      doc.setFont('helvetica', 'bold').setFontSize(9).setTextColor(47, 111, 102);
+      doc.text(titulo, M, y);
+      y += 6;
+      doc.setFont('helvetica', 'normal').setFontSize(9.6).setTextColor(35);
+      corpo.forEach(linha => {
+        if (y > PH - 22) { rodape(); doc.addPage(); y = M + 4; }
+        doc.text(linha, M + 3, y);
+        y += 4.7;
+      });
+      y += 6;
+    });
+    if (resumos.some(r => r.noPdf)) {
+      doc.setFont('helvetica', 'normal').setFontSize(7.6).setTextColor(150);
+      doc.text('Texto acima gerado por modelo de linguagem a partir da transcrição, sem revisão humana.', M, y);
+      doc.setDrawColor(225).line(M, y + 4, PW - M, y + 4);
+      doc.setTextColor(30);
+      y += 12;
+    }
+
     doc.setFontSize(9.6);
     linhaDoTempo().forEach(item => {
       if (item.tipo === 'tela') {
@@ -1102,6 +1311,218 @@ ${comoTexto()}`;
     setTimeout(() => { $('ataMsg').textContent = ''; }, 3000);
   };
 
+
+  /* ============================================================
+     Resumo, decisões e pendências — com IA, mas sem trair a promessa.
+
+     Os concorrentes vendem resumo por IA como funcionalidade
+     principal, e não dá para competir sem ter. O problema é que a
+     forma óbvia — mandar a transcrição para um servidor nosso —
+     destruiria a única vantagem que este produto tem.
+
+     Então são três motores, escolhidos por quem usa, e o padrão
+     não envia nada:
+
+     1. PROMPT   — monta o texto pronto com a ata dentro. Você cola
+                   na IA que já usa. Nada sai daqui por conta nossa.
+     2. OLLAMA   — modelo rodando no computador de quem usa. Sai da
+                   aba e não sai da máquina.
+     3. CHAVE    — serviço externo, com a chave do próprio usuário,
+                   desligado por padrão e atrás de uma confirmação
+                   explícita, porque aqui o texto realmente sai.
+
+     A chave nunca é gravada: vive numa variável desta aba e morre
+     com ela. Guardar em localStorage seria conveniente e seria a
+     forma mais fácil de vazar a chave de alguém.
+     ============================================================ */
+
+  const OLLAMA = 'http://127.0.0.1:11434';
+  let resumos = [];
+
+  const TAREFAS = {
+    resumo: {
+      titulo: 'Resumo executivo',
+      instrucao: 'Escreva um resumo executivo da reunião em até 12 linhas, em português, citando o ' +
+        'instante (mm:ss) de cada ponto relevante. Não invente nada que não esteja na transcrição.'
+    },
+    pendencias: {
+      titulo: 'Decisões e pendências',
+      instrucao: 'Liste, em português: 1) as decisões tomadas; 2) as pendências, com responsável e prazo ' +
+        'quando aparecerem; 3) os próximos passos. Cite o instante (mm:ss) de cada item. Se algo não ' +
+        'estiver claro na transcrição, escreva "não ficou claro na reunião" em vez de deduzir.'
+    },
+    email: {
+      titulo: 'E-mail de acompanhamento',
+      instrucao: 'Escreva um e-mail curto e cordial de acompanhamento para os participantes, em ' +
+        'português, confirmando o que ficou combinado e o que cada lado vai entregar. Sem saudação ' +
+        'genérica de mais de uma linha e sem inventar prazo que não foi dito.'
+    },
+    pergunta: {
+      titulo: 'Pergunta à ata',
+      instrucao: ''   // preenchida com a pergunta de quem usa
+    }
+  };
+
+  const CONTEXTO =
+    'Abaixo está a transcrição automática de uma reunião, gerada no computador de quem participou.\n' +
+    'Cada linha traz o instante e quem falou. As linhas "(nova tela compartilhada)" marcam quando a tela\n' +
+    'apresentada mudou. As linhas "*** momento marcado ***" foram marcadas à mão por quem estava lá:\n' +
+    'trate o que está em volta delas como importante.\n' +
+    'A transcrição é automática e contém erros: se um trecho parecer incoerente, sinalize em vez de\n' +
+    'interpretar. Quando a informação não estiver na transcrição, diga que não é possível saber.\n';
+
+  function montarPrompt(chave, pergunta) {
+    const t = TAREFAS[chave];
+    const tarefa = chave === 'pergunta'
+      ? 'Responda à pergunta abaixo usando apenas a transcrição, citando os instantes que sustentam a ' +
+        'resposta.\n\nPergunta: ' + pergunta
+      : t.instrucao;
+    return CONTEXTO + '\n' + tarefa + '\n\n---\n' + comoTexto();
+  }
+
+  /* ---------- motores ---------- */
+
+  $('iaMotor').onchange = () => {
+    const m = $('iaMotor').value;
+    $('iaChave').classList.toggle('hide', m !== 'chave');
+    $('iaProcurar').classList.toggle('hide', m !== 'ollama');
+    $('iaModelo').classList.add('hide');
+    $('iaMotorMsg').textContent = m === 'ollama'
+      ? 'O Ollama precisa estar aberto e aceitar esta página. Clique em procurar.'
+      : '';
+  };
+
+  $('iaProcurar').onclick = async () => {
+    $('iaMotorMsg').textContent = 'Procurando o Ollama neste computador…';
+    try {
+      const r = await fetch(OLLAMA + '/api/tags');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const dados = await r.json();
+      const nomes = (dados.models || []).map(m => m.name || m.model).filter(Boolean);
+      if (!nomes.length) throw new Error('nenhum modelo instalado');
+      $('iaModelo').innerHTML = nomes.map(n => `<option>${escapar(n)}</option>`).join('');
+      $('iaModelo').classList.remove('hide');
+      $('iaMotorMsg').innerHTML = `<span class="ok">Ollama encontrado</span> — ${nomes.length} ` +
+        (nomes.length === 1 ? 'modelo' : 'modelos') + ' disponíveis.';
+    } catch (e) {
+      // o motivo mais comum não é o Ollama estar fechado: é ele recusar a página
+      $('iaMotorMsg').innerHTML = '<span class="err">Não achei o Ollama.</span> Ele precisa estar aberto e ' +
+        'permitir esta página — inicie com <code>OLLAMA_ORIGINS=' + location.origin + ' ollama serve</code>.';
+    }
+  };
+
+  async function pedirOllama(prompt, aviso) {
+    const modelo = $('iaModelo').value;
+    if (!modelo) throw new Error('escolha um modelo do Ollama (clique em procurar).');
+    aviso('Pensando no seu computador, com ' + modelo + '…');
+    const r = await fetch(OLLAMA + '/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelo, prompt, stream: false })
+    });
+    if (!r.ok) throw new Error('o Ollama respondeu HTTP ' + r.status);
+    const d = await r.json();
+    return (d.response || '').trim();
+  }
+
+  async function pedirServico(prompt, aviso) {
+    if (!$('iaOk').checked) throw new Error('marque a confirmação: neste modo o texto da ata sai daqui.');
+    const base = ($('iaBase').value || '').trim().replace(/\/+$/, '');
+    const modelo = ($('iaNome').value || '').trim();
+    const segredo = $('iaSegredo').value;
+    if (!base || !modelo || !segredo) throw new Error('preencha endereço, modelo e chave.');
+    aviso('Enviando o texto da ata para ' + base + '…');
+    const r = await fetch(base + '/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + segredo },
+      body: JSON.stringify({ model: modelo, messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!r.ok) throw new Error('o serviço respondeu HTTP ' + r.status);
+    const d = await r.json();
+    const t = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+    if (!t) throw new Error('resposta do serviço veio vazia.');
+    return t.trim();
+  }
+
+  /* ---------- execução ---------- */
+
+  async function rodarTarefa(chave, pergunta) {
+    if (!falas.length) return;
+    const aviso = m => { $('iaMsg').innerHTML = m; };
+    const motor = $('iaMotor').value;
+    const prompt = montarPrompt(chave, pergunta);
+    const titulo = chave === 'pergunta' ? 'Pergunta: ' + pergunta : TAREFAS[chave].titulo;
+
+    if (motor === 'prompt') {
+      try {
+        await navigator.clipboard.writeText(prompt);
+        aviso('<span class="ok">Prompt copiado</span> — cole na IA que você usa. Nada saiu daqui.');
+      } catch (e) {
+        aviso('Copie o texto abaixo e cole na IA que você usa. Nada saiu daqui.');
+      }
+      guardarResumo('prompt:' + chave, 'Prompt pronto — ' + titulo, prompt);
+      return;
+    }
+
+    ocupado = true;
+    $('iaBarWrap').classList.remove('hide');
+    $('iaBar').style.width = '35%';
+    try {
+      const texto = motor === 'ollama' ? await pedirOllama(prompt, aviso) : await pedirServico(prompt, aviso);
+      $('iaBar').style.width = '100%';
+      guardarResumo(chave, titulo, texto);
+      aviso(`<span class="ok">${titulo} pronto.</span> Ele entra no PDF e no texto da ata.`);
+    } catch (e) {
+      aviso(`<span class="err">Não consegui: ${(e && e.message) || e}</span>`);
+    } finally {
+      ocupado = false;
+      setTimeout(() => { $('iaBarWrap').classList.add('hide'); $('iaBar').style.width = '0%'; }, 600);
+    }
+  }
+
+  function guardarResumo(chave, titulo, texto) {
+    const i = resumos.findIndex(r => r.chave === chave);
+    const item = { chave, titulo, texto, noPdf: chave.indexOf('prompt:') !== 0 };
+    if (i >= 0) resumos[i] = item; else resumos.push(item);
+    desenharResumos();
+  }
+
+  function desenharResumos() {
+    $('iaSaida').innerHTML = resumos.map((r, i) =>
+      `<div class="resumo"><h3>${escapar(r.titulo)}</h3>` +
+      `<div class="corpo" contenteditable="true" data-i="${i}">${escapar(r.texto)}</div>` +
+      `<div class="pe"><button class="ghost sm" data-copiar="${i}">Copiar</button>` +
+      `<button class="ghost sm" data-tirar="${i}">Tirar</button>` +
+      `<span class="status">${r.noPdf ? 'entra no PDF e no texto da ata' : 'não entra na ata: é o prompt'}</span>` +
+      `</div></div>`).join('');
+  }
+
+  $('iaSaida').addEventListener('focusout', ev => {
+    const c = ev.target.closest && ev.target.closest('.corpo');
+    if (!c) return;
+    const r = resumos[+c.dataset.i];
+    if (r) r.texto = c.textContent.trim();
+  });
+
+  $('iaSaida').onclick = async ev => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    if (b.dataset.copiar != null) {
+      try { await navigator.clipboard.writeText(resumos[+b.dataset.copiar].texto); } catch (e) {}
+      $('iaMsg').innerHTML = '<span class="ok">copiado</span>';
+    }
+    if (b.dataset.tirar != null) { resumos.splice(+b.dataset.tirar, 1); desenharResumos(); }
+  };
+
+  $('iaResumo').onclick = () => rodarTarefa('resumo');
+  $('iaPendencias').onclick = () => rodarTarefa('pendencias');
+  $('iaEmail').onclick = () => rodarTarefa('email');
+  $('iaPerguntar').onclick = () => {
+    const q = $('iaPergunta').value.trim();
+    if (q) rodarTarefa('pergunta', q);
+  };
+  $('iaPergunta').onkeydown = ev => { if (ev.key === 'Enter') $('iaPerguntar').click(); };
+
   /* ============================================================
      Recuperação. Como cada pedaço é fechado no disco assim que
      chega, uma aba que morre no meio da reunião deixa tudo o que
@@ -1141,6 +1562,7 @@ ${comoTexto()}`;
       blobPcm = await juntarPrefixo('pcm');
       segundos = Math.round(dur);
       janelas = { voce: !meta || meta.mic !== false, outros: !meta || meta.sistema !== false };
+      if (meta && meta.consentimento) { consentimento = meta.consentimento; mostrarConsentimento(); }
       $('recMsg').innerHTML = `<span class="ok">Gravação recuperada de ${fmt(dur)}</span> — ` +
         `${(blobGravacao.size/1048576).toFixed(1)} MB.`;
       $('trans').disabled = false;
@@ -1158,6 +1580,8 @@ ${comoTexto()}`;
 
   window.__salavox = { falas: () => falas, comoTexto, comoVtt,
     momentos: () => momentos, nomes: () => nomes, importado: () => importado,
+    consentimento: () => consentimento, aplicarVocabulario, corrigirComVocabulario,
+    resumos: () => resumos, montarPrompt,
     gravacao: () => blobGravacao, pcm: () => blobPcm,
     tamanhos: () => ({ grav: depGrav ? depGrav.bytes : 0, pcm: depPcm ? depPcm.bytes : 0,
                        disco: !!(depGrav && depGrav.emDisco) }),

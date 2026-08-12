@@ -40,10 +40,18 @@ export function telaFalsa(segundosPorSlide) {
     navigator.mediaDevices.getDisplayMedia = async () => {
       const c=document.createElement('canvas'); c.width=640; c.height=360;
       const x=c.getContext('2d');
-      const cores=['#c0392b','#27ae60','#2980b9','#f1c40f']; let n=0;
-      setInterval(()=>{ const i=Math.floor(n/(spp*10))%4;
+      const cores=['#c0392b','#27ae60','#2980b9','#f1c40f'];
+      // Preto no primeiro segundo e pouco, de propósito: é o que acontece quando
+      // a captura começa antes de a janela compartilhada pintar. Sem isso a
+      // peneira de tela vazia só era exercitada por sorte de cronometragem, e a
+      // sabotagem que a remove passava despercebida.
+      const t0 = performance.now();
+      x.fillStyle='#000'; x.fillRect(0,0,640,360);
+      setInterval(()=>{ const dt = performance.now() - t0;
+        if (dt < 1200) { x.fillStyle='#000'; x.fillRect(0,0,640,360); return; }
+        const i=Math.floor(dt/1000/spp)%4;
         x.fillStyle=cores[i]; x.fillRect(0,0,640,360);
-        x.fillStyle='#fff'; x.font='bold 52px sans-serif'; x.fillText('SLIDE '+(i+1),200,200); n++; },100);
+        x.fillStyle='#fff'; x.font='bold 52px sans-serif'; x.fillText('SLIDE '+(i+1),200,200); },100);
       const ac=new AudioContext(); const o=ac.createOscillator(); o.frequency.value=210;
       const g=ac.createGain(); g.gain.value=.3; const d=ac.createMediaStreamDestination();
       // o volume cai aos 20 s: é assim que o teste sabe se a segunda janela de

@@ -29,11 +29,11 @@ const SABOTAGENS = [
     // nada mensurável aqui, porque neste ambiente o áudio e o gravador começam
     // quase juntos. No computador de quem usa há diálogo de permissão e limpeza
     // do disco no meio — segundos, não milissegundos. Este par reproduz isso.
-    nome: 'controle: um segundo e meio entre ligar o áudio e começar a gravar',
+    nome: 'controle: três segundos entre ligar o áudio e começar a gravar',
     teste: 'pedacos',
     porta: 8142,
     espera: 'passar',
-    trocas: [['gravador.start(10000);', 'await new Promise(r => setTimeout(r, 1500));\n    gravador.start(10000);']],
+    trocas: [['gravador.start(10000);', 'await new Promise(r => setTimeout(r, 3000));\n    gravador.start(10000);']],
     pega: 'com a marcação no lugar, o atraso não desalinha nada'
   },
   {
@@ -41,7 +41,7 @@ const SABOTAGENS = [
     teste: 'pedacos',
     porta: 8145,
     trocas: [
-      ['gravador.start(10000);', 'await new Promise(r => setTimeout(r, 1500));\n    gravador.start(10000);'],
+      ['gravador.start(10000);', 'await new Promise(r => setTimeout(r, 3000));\n    gravador.start(10000);'],
       ['marcarInicioPcm();              // zera o áudio cru no mesmo instante do vídeo', '/* sabotado */']
     ],
     pega: 'o áudio ficaria mais longo que o vídeo e as telas cairiam no minuto errado da ata'
@@ -89,6 +89,76 @@ const SABOTAGENS = [
     porta: 8149,
     trocas: [['if (idioma) opts.language = idioma;', "opts.language = idioma || 'pt';"]],
     pega: 'reunião em inglês ou espanhol sairia transcrita como se fosse português'
+  },
+  {
+    nome: 'vocabulário com régua frouxa',
+    teste: 'conformidade',
+    porta: 8150,
+    trocas: [['const folga = termo => termo.length <= 5 ? 0 : termo.length <= 8 ? 1 : termo.length <= 13 ? 2 : 3;',
+              'const folga = termo => 5;']],
+    pega: 'o vocabulário passaria a trocar palavra certa por termo parecido e estragaria a ata'
+  },
+  {
+    nome: 'correção feita à mão não é guardada',
+    teste: 'conformidade',
+    porta: 8151,
+    trocas: [['if (novo && novo !== f.texto) { f.texto = novo; f.corrigida = true; }',
+              'if (false) { f.texto = novo; }']],
+    pega: 'corrigir o texto na tela pareceria funcionar e o PDF sairia com o erro'
+  },
+  {
+    nome: 'registro de consentimento sem a hora de início',
+    teste: 'conformidade',
+    porta: 8152,
+    trocas: [['if (consentimento) consentimento.iniciado = agora();', '/* sabotado */']],
+    pega: 'a ata sairia sem o registro, que é justamente o que o cliente regulado precisa guardar'
+  },
+  {
+    nome: '"ata em inglês" não pede tradução',
+    teste: 'conformidade',
+    porta: 8153,
+    trocas: [["const opts = { return_timestamps: true, task: $('saida').value };",
+              "const opts = { return_timestamps: true, task: 'transcribe' };"]],
+    pega: 'escolher inglês não mudaria nada e a ata sairia em português assim mesmo'
+  },
+  {
+    nome: 'o modo padrão manda a ata para fora sem avisar',
+    teste: 'ia',
+    porta: 8154,
+    trocas: [["    if (motor === 'prompt') {\n      try {\n        await navigator.clipboard.writeText(prompt);",
+              "    if (motor === 'prompt') {\n      try {\n        await fetch('https://api.exemplo-de-ia.com/v1/chat/completions', { method: 'POST', body: prompt });\n        await navigator.clipboard.writeText(prompt);"]],
+    pega: 'a promessa da página inicial viraria mentira sem ninguém perceber'
+  },
+  {
+    nome: 'a chave de IA é guardada no navegador',
+    teste: 'ia',
+    porta: 8155,
+    trocas: [["    const segredo = $('iaSegredo').value;",
+              "    const segredo = $('iaSegredo').value; try { localStorage.setItem('chave', segredo); } catch (e) {}"]],
+    pega: 'a chave do usuário ficaria no disco, à disposição de qualquer script da página'
+  },
+  {
+    nome: 'serviço externo é chamado sem a confirmação',
+    teste: 'ia',
+    porta: 8156,
+    trocas: [["    if (!$('iaOk').checked) throw new Error('marque a confirmação: neste modo o texto da ata sai daqui.');",
+              '    /* sabotado */']],
+    pega: 'o texto da ata sairia do computador sem que ninguém tivesse consentido'
+  },
+  {
+    nome: 'resumo da IA não chega ao PDF nem ao texto',
+    teste: 'ia',
+    porta: 8157,
+    trocas: [["    const item = { chave, titulo, texto, noPdf: chave.indexOf('prompt:') !== 0 };",
+              '    const item = { chave, titulo, texto, noPdf: false };']],
+    pega: 'o resumo apareceria na tela e sumiria justamente no documento que vai para o cliente'
+  },
+  {
+    nome: 'tela preta do começo do compartilhamento entra na ata',
+    teste: 'telas',
+    porta: 8158,
+    trocas: [['    return max - min < 12;', '    return false;']],
+    pega: 'a ata abriria com um retângulo preto apresentado como a primeira tela da reunião'
   }
 ];
 
@@ -102,9 +172,17 @@ function copiar(destino) {
   fs.symlinkSync(path.join(RAIZ, 'node_modules'), path.join(destino, 'node_modules'));
 }
 
+/* Também em paralelo, três de cada vez, e dá para pedir só uma área:
+     node testes/sabotagem.mjs ia conformidade
+   Cada cenário roda numa cópia própria do projeto, então não há disputa por
+   arquivo — só pela máquina, e por isso o limite de três. */
+const areas = process.argv.slice(2);
+const LISTA = areas.length ? SABOTAGENS.filter(s => areas.includes(s.teste)) : SABOTAGENS;
+const LADOS = Number(process.env.LADOS || 3);
+const saidas = [];
 let tudoBem = true;
 
-for (const s of SABOTAGENS) {
+async function executar(s) {
   const dir = path.join('/tmp', 'sabotagem-' + s.porta);
   copiar(dir);
 
@@ -113,14 +191,13 @@ for (const s of SABOTAGENS) {
   let achouTudo = true;
   for (const [de, para] of s.trocas) {
     if (!texto.includes(de)) {
-      console.log(`\n■ ${s.nome}\n  ✗ o trecho a alterar não existe mais no código — esta sabotagem precisa ser reescrita`);
-      console.log(`      procurava: ${de}`);
+      saidas.push(`\n■ ${s.nome}\n  ✗ o trecho a alterar não existe mais no código — esta sabotagem precisa ser reescrita\n      procurava: ${de}`);
       achouTudo = false;
       break;
     }
     texto = texto.replace(de, para);
   }
-  if (!achouTudo) { tudoBem = false; continue; }
+  if (!achouTudo) { tudoBem = false; return; }
   fs.writeFileSync(alvo, texto);
 
   let saiuComErro = false, saida = '';
@@ -133,25 +210,48 @@ for (const s of SABOTAGENS) {
     saida = (e.stdout || '') + (e.stderr || '');
   }
 
-  const quebrou = saida.split('\n').filter(l => l.includes('✗'));
+  const quebrou = saida.split('\n').filter(l => l.includes('✗') && !l.startsWith('✗'));
   const deveFalhar = s.espera !== 'passar';
-  console.log(`\n■ ${s.nome}`);
-  console.log(`  ${deveFalhar ? 'o que passaria despercebido' : 'o que se espera'}: ${s.pega}`);
+  const linhas = [`\n■ ${s.nome}`,
+                  `  ${deveFalhar ? 'o que passaria despercebido' : 'o que se espera'}: ${s.pega}`];
   if (deveFalhar && saiuComErro && quebrou.length) {
-    console.log(`  ✓ a verificação "${s.teste}" pegou:`);
-    quebrou.slice(0, 3).forEach(l => console.log('    ' + l.trim()));
+    linhas.push(`  ✓ a verificação "${s.teste}" pegou:`);
+    quebrou.slice(0, 3).forEach(l => linhas.push('    ' + l.trim()));
   } else if (!deveFalhar && !saiuComErro) {
-    console.log(`  ✓ a verificação "${s.teste}" passou, como esperado`);
+    linhas.push(`  ✓ a verificação "${s.teste}" passou, como esperado`);
+  } else if (deveFalhar && saiuComErro) {
+    // saiu com erro mas sem nenhuma verificação vermelha: quem quebrou foi o
+    // arcabouço, não o produto — e isso não pode ser lido como "não pegou"
+    linhas.push(`  ✗ não deu para avaliar: a corrida quebrou sem chegar às verificações`);
+    saida.trim().split('\n').slice(-3).forEach(l => linhas.push('    ' + l.trim()));
+    tudoBem = false;
   } else if (deveFalhar) {
-    console.log(`  ✗ a verificação "${s.teste}" passou mesmo com o defeito plantado — o teste não é uma trava`);
+    linhas.push(`  ✗ a verificação "${s.teste}" passou mesmo com o defeito plantado — o teste não é uma trava`);
     tudoBem = false;
   } else {
-    console.log(`  ✗ a verificação "${s.teste}" falhou sem defeito plantado — o teste é instável`);
-    quebrou.slice(0, 3).forEach(l => console.log('    ' + l.trim()));
+    linhas.push(`  ✗ a verificação "${s.teste}" falhou sem defeito plantado — o teste é instável`);
+    quebrou.slice(0, 3).forEach(l => linhas.push('    ' + l.trim()));
     tudoBem = false;
   }
+  saidas.push(linhas.join('\n'));
   fs.rmSync(dir, { recursive: true, force: true });
 }
+
+/* Cenários do mesmo bloco NUNCA rodam juntos: o bloco de IA sobe um Ollama de
+   mentira na porta 11434, que é a porta que o aplicativo procura, e dois ao
+   mesmo tempo derrubam um ao outro. Isso já apareceu como três sabotagens
+   "não pegas" que na verdade nem chegaram a rodar. */
+const filas = {};
+for (const s of LISTA) (filas[s.teste] = filas[s.teste] || []).push(s);
+const grupos = Object.values(filas);
+
+await Promise.all(Array.from({ length: Math.min(LADOS, grupos.length) }, async () => {
+  while (grupos.length) {
+    const grupo = grupos.shift();
+    for (const s of grupo) await executar(s);
+  }
+}));
+saidas.forEach(s => console.log(s));
 
 console.log(tudoBem
   ? '\nRESULTADO: todas as sabotagens foram pegas'

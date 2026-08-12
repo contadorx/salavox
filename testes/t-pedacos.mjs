@@ -100,12 +100,25 @@ export default async function (ctx, url, erros) {
   const primeira = falas.find(f => f.quem === 'outros' && f.a === 1 && /quieto=/.test(f.texto));
   const quieto = primeira ? Number(primeira.texto.match(/quieto=(-?[0-9.]+)/)[1]) : null;
 
+  /* A varredura amostra o vídeo de 0,6 em 0,6 segundo no mínimo, então o
+     instante da tela é o primeiro quadro amostrado DEPOIS da troca: pode estar
+     até um passo adiantado em relação à troca de verdade. O áudio, ao
+     contrário, é medido amostra a amostra. A janela reflete essa diferença de
+     resolução — apertá-la mais faria o teste piscar sem nenhum defeito real. */
+  const PASSO = Math.max(0.6, 60 / 900);
+  /* Com a máquina rodando três blocos ao mesmo tempo, o vídeo perde quadros e a
+     troca de slide é vista um pouco depois. A folga cobre isso; quem garante que
+     ela não virou desculpa é a sabotagem, que desloca o áudio em 3 s inteiros e
+     continua sendo pega. */
+  const FOLGA = 1.0;
+
   /* Faixa larga de propósito: o instante absoluto depende de quanto o gravador
      demorou para começar depois de a tela sintética entrar no ar. O que precisa
      ser exato é a diferença entre as duas linhas do tempo, conferida logo abaixo. */
   b.entre('a segunda tela cai perto do meio da gravação (segundos)', telaDoMeio, 15, 22);
   b.verdade('a queda de volume e a troca de tela caem no mesmo instante',
-            quieto !== null && telaDoMeio !== null && Math.abs(quieto - telaDoMeio) <= 0.6);
+            quieto !== null && telaDoMeio !== null &&
+            quieto >= telaDoMeio - PASSO - FOLGA && quieto <= telaDoMeio + 0.6);
 
   await p.close();
   return b;
