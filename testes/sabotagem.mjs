@@ -62,6 +62,16 @@ const SABOTAGENS = [
     pega: 'toda a reunião viraria repetição dos primeiros trinta segundos'
   },
   {
+    /* O degrau que segura a queda. Sem ele, a máquina que recusa o arquivo de
+       4 bits fica sem ata nenhuma — foi o que aconteceu numa reunião de
+       verdade em 13/08/2026. */
+    nome: 'a fila de tentativas perde o degrau do processador',
+    teste: 'extras',
+    porta: 8198,
+    trocas: [["          tentativas.push({ motor: 'processador', opcoes: { dtype: 'q8' } });", "          /* sabotado */"]],
+    pega: 'quem não consegue abrir o modelo de 4 bits ficaria sem transcrição, com uma linha de C++ na tela'
+  },
+  {
     nome: 'nome escolhido para a fala é ignorado',
     teste: 'extras',
     porta: 8146,

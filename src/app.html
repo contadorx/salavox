@@ -89,6 +89,13 @@
      para saber quando passar de um para o outro". Agora os cinco estão sempre
      lá; o que muda é o cartão estar cinza com uma frase dizendo o que vai
      acontecer, ou aceso com o conteúdo dentro. */
+  /* A opção que mais muda o tempo de espera não pode parecer mais uma caixa
+     entre outras: a queixa foi "não achei a opção". */
+  label.chk.destaque{align-items:flex-start;background:var(--verde-50);border:1px solid var(--verde-claro);
+                     border-radius:10px;padding:10px 13px;margin-top:10px;max-width:640px;
+                     font-size:13.5px;line-height:1.5}
+  label.chk.destaque input{margin-top:3px}
+  label.chk.destaque b{color:var(--verde-escuro)}
   .espera{font-size:13.5px;color:var(--muted);margin:-4px 0 0 41px;max-width:640px}
   .card.agora .espera,.card.feito .espera{display:none}
 
@@ -327,7 +334,9 @@
       <button class="ghost hide" id="calar">Fechar meu microfone</button>
       <label class="chk" id="labelMic"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
       <label class="chk" id="labelTela"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
-      <label class="chk" id="labelVivo"><input type="checkbox" id="aoVivo" checked> transcrever durante a reunião</label>
+      <label class="chk destaque" id="labelVivo"><input type="checkbox" id="aoVivo" checked>
+        <span><b>Transcrever durante a reunião</b> — a cada trinta segundos gravados aquele trecho já vira
+        texto. Ao encerrar, quase toda a ata está pronta.</span></label>
     </div>
     <p class="tempo hide" id="tempo">00:00</p>
     <div class="status" id="marcasMsg"></div>

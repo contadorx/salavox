@@ -85,6 +85,19 @@ export default async function (ctx, url, erros) {
 
   b.verdade('ao encerrar, a tela diz o que já foi adiantado',
             /já (foi|foram) transcrit/.test(await p.textContent('#vivoMsg')));
+  /* E não diz mais "preparando o modelo" numa reunião que acabou: um pedaço de
+     áudio atrasado chamava o desenho da mensagem com o estado já encerrado, e a
+     tela voltava para a frase de preparação. */
+  b.verdade('e não volta a dizer que está preparando o modelo',
+            !/Preparando o modelo/.test(await p.textContent('#vivoMsg')));
+
+  /* A prova de que o trabalho aconteceu DURANTE a gravação, e não depois: o
+     modelo já foi chamado antes de alguém clicar em "Gerar a transcrição".
+     Sem isto, a promessa "ao encerrar, quase tudo está pronto" seria só uma
+     frase na tela. */
+  const antesDoPasso2 = await p.evaluate(() => window.__salavox.pedidosAoModelo());
+  b.verdade('o modelo já tinha sido chamado antes do passo 2 — o trabalho correu em paralelo',
+            antesDoPasso2 > 0);
 
   const duracao = info.pcmBytes / 4 / 16000;                  // 2 canais Int16 a 16 kHz
   b.entre('taxa do áudio cru em KB/s', info.pcmBytes / duracao / 1024, 62.4, 62.6);

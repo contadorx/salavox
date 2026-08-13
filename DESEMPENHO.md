@@ -355,3 +355,46 @@ aproveita o que já ficou pronto, dizendo quantos trechos foram adiantados.
 O que faltava não era começar antes: era o modelo conseguir acompanhar. Numa linha só, cada janela de
 trinta segundos podia demorar mais de trinta segundos, e a transcrição ao vivo ficava para trás sem
 nunca alcançar. É esta mudança que fecha aquela conta.
+
+---
+
+## 13/08/2026, fim do dia — o modelo que não abre
+
+Uma reunião de verdade devolveu isto, duas vezes: durante a gravação e de novo no passo 2.
+
+```
+Can't create a session. ERROR_CODE: 1, ERROR_MESSAGE: qdq_actions.cc:137
+TransposeDQWeightsForMatMulNBits Missing required scale:
+model.decoder.embed_tokens.weight_merged_0_scale for node:
+model.decoder.embed_tokens.weight_transposed_DequantizeLinear
+```
+
+`MatMulNBits` é o operador de **4 bits**. O único caminho que pede um arquivo de 4 bits é o da placa de
+vídeo — o decodificador `decoder_model_merged_q4`. **Não era falta de WebGPU:** era o arquivo de 4 bits
+que aquela máquina não consegue abrir, e a exceção acontecia *depois* de a placa ter sido escolhida.
+
+O defeito estrutural não era o erro do ONNX. Era não haver degrau nenhum embaixo dele. A escolha do
+motor era uma tentativa só: falhou, acabou. A transcrição ao vivo morreu e o passo 2 morreu igual,
+meia hora depois, quando a reunião já tinha acabado — a pessoa ficou com uma linha de C++ e nenhuma
+ata.
+
+### O que mudou
+
+A escolha do motor virou uma **fila de tentativas**. Cada uma que falha é anunciada na tela e a
+próxima entra. O processador com pesos de 8 bits é o degrau que segura quase tudo: ele não usa o
+operador de 4 bits, que é onde este defeito mora.
+
+A mensagem de erro também mudou de tom. A linha do ONNX continua lá — é o que permite pesquisar ou
+me mandar —, mas agora vem acompanhada da frase que resolve («desmarque *usar a placa de vídeo* no
+passo 2») e do carimbo de versão, que diz qual código estava rodando.
+
+### Como isto é verificado
+
+O simulacro do modelo ganhou um irmão que **falha no mesmo lugar e com a mesma frase**: recusa quando
+as opções pedem WebGPU ou um `dtype` por arquivo. O teste marca a placa, importa um áudio e exige que
+a ata saia assim mesmo, transcrita no processador. Uma sabotagem remove o degrau do processador da
+fila e a corrida fica vermelha — sem ela, o degrau poderia ser apagado sem ninguém notar.
+
+A reunião inteira também foi reproduzida com `ferramentas/medir-paralelo.mjs`: com a placa marcada e o
+modelo recusando, a transcrição ao vivo começa aos 18 s **no processador** e faz quatro chamadas
+durante a gravação, em vez de morrer no primeiro segundo.

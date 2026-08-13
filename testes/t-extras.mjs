@@ -5,7 +5,7 @@
    segundos e baixo depois, o que também prova que a janela de trinta segundos
    lê o pedaço certo do arquivo importado. */
 
-import { telaFalsa, paginaLimpa, bloco, transcrever } from './apoio.mjs';
+import { telaFalsa, paginaLimpa, bloco, transcrever, modeloQueRecusaQuatroBits } from './apoio.mjs';
 
 const MONTAR_WAV = `(seg => {
   const SR = 16000, n = SR * seg;
@@ -50,6 +50,31 @@ export default async function (ctx, url, erros) {
   await p.uncheck('#placa');
   await p.selectOption('#modelo', 'onnx-community/whisper-small');
   await p.waitForTimeout(120);
+
+  /* ---------- 0a. o modelo que recusa abrir na placa de vídeo ----------
+
+     Isto é a reprodução de uma reunião de verdade. Com a placa marcada, o ONNX
+     recusou o decodificador de 4 bits e devolveu uma linha de C++; a
+     transcrição ao vivo morreu e o passo 2 morreu igual, no fim da reunião.
+     O caminho do processador usa outro arquivo e não tem esse defeito — mas
+     ninguém chegava lá, porque a falha acontecia depois da escolha. */
+  {
+    const q = await paginaLimpa(ctx, erros);
+    await q.route('**/@huggingface/transformers@**', r => r.fulfill(modeloQueRecusaQuatroBits()));
+    await q.addInitScript(telaFalsa(4));
+    await q.goto(url + '/app');
+    await q.check('#placa');
+    await q.evaluate(MONTAR_WAV);
+    await q.waitForFunction(() => /pronto|<span class="err">/.test(document.getElementById('arqMsg').innerHTML),
+                            null, { timeout: 60000 });
+    await transcrever(q);
+
+    b.verdade('a ata sai mesmo quando o modelo recusa abrir na placa de vídeo',
+              (await q.evaluate(() => window.__salavox.falas().length)) > 0);
+    b.conferir('e quem transcreveu foi o processador, no degrau seguinte',
+               await q.evaluate(() => window.__salavox.desempenho().motor), 'processador');
+    await q.close();
+  }
 
   /* ---------- 0b. as linhas do processador ----------
 

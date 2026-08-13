@@ -16,7 +16,6 @@
  "só o microfone — é o modo que funciona no celular": "microphone only — this is the mode that works on a phone",
  "Começar a gravar": "Start recording",
  "Encerrar": "Stop",
- "transcrever durante a reunião": "transcribe during the meeting",
  "você (microfone)": "you (microphone)",
  "participantes (áudio da reunião)": "participants (meeting audio)",
  "Ao começar, o navegador pergunta qual janela compartilhar — escolha a da reunião e": "When you start, the browser asks which window to share — pick the meeting window and",
@@ -30,7 +29,7 @@
  "A reunião é gravada": "The meeting is recorded",
  "em pedaços, direto no disco": "in chunks, straight to disk",
  ", e não na memória da aba: não há limite prático de duração, e o que já foi gravado sobrevive se o navegador fechar sozinho.": ", not in the tab's memory: there is no practical limit on length, and whatever was already recorded survives if the browser closes on its own.",
- "Transcrever durante a reunião": "Transcribing during the meeting",
+ "Transcrever durante a reunião": "Transcribe during the meeting",
  "adianta o trabalho: a cada trinta segundos gravados, aquele trecho já vira texto. Ao encerrar, quase tudo está pronto. O modelo roda numa linha separada do navegador, para não atrapalhar a gravação. Se o computador for modesto, desmarque.": "gets the work done ahead: every thirty seconds recorded, that stretch already becomes text. By the time you stop, almost everything is ready. The model runs on a separate browser thread so it does not disturb the recording. On a modest computer, untick it.",
  "Use uma gravação que você já tem": "Use a recording you already have",
  "Arraste aqui um arquivo de áudio ou vídeo — ou": "Drag an audio or video file here — or",
@@ -630,5 +629,11 @@
  "— after that it is kept in the browser and is not downloaded again.": "— after that it is kept in the browser and is not downloaded again.",
  "On the graphics card the encoder comes uncompressed, which is why it is": "On the graphics card the encoder comes uncompressed, which is why it is",
  "the size of the processor path.": "the size of the processor path.",
- "the best text Whisper produces, and the only one in a different size league. Only choose it on a machine with room to spare.": "the best text Whisper produces, and the only one in a different size league. Only choose it on a machine with room to spare."
+ "the best text Whisper produces, and the only one in a different size league. Only choose it on a machine with room to spare.": "the best text Whisper produces, and the only one in a different size league. Only choose it on a machine with room to spare.",
+ "— a cada trinta segundos gravados aquele trecho já vira texto. Ao encerrar, quase toda a ata está pronta.": "— every thirty seconds recorded, that stretch already becomes text. By the time you stop, almost all the minutes are ready.",
+ "durante a reunião": "during the meeting",
+ "— o passo 2 vai aproveitá-las.": "— step 2 will make use of them.",
+ "Transcrito no": "Transcribed on the",
+ "A transcrição ao vivo parou.": "Live transcription stopped.",
+ "A gravação segue normal e a ata será feita inteira no fim.": "Recording carries on normally and the minutes will be produced in full at the end."
 }

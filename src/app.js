@@ -746,10 +746,11 @@ registerProcessor('toca', Toca);`;
         return;
       }
       vivo.ativo = false;          // a partir daqui quem manda é a medição completa
+      vivo.fim = true;             // e a mensagem da tela é a do resumo, não a de preparação
       if (vivo.ligado && !vivo.erro && vivo.proxima) {
         $('vivoMsg').innerHTML = `<span class="ok">${vivo.proxima} ` +
-          `${vivo.proxima === 1 ? 'trecho de 30 s já foi transcrito' : 'trechos de 30 s já foram transcritos'} ` +
-          'durante a reunião</span> — o passo 2 vai aproveitá-los.';
+          `${vivo.proxima === 1 ? 'janela de 30 s já foi transcrita' : 'janelas de 30 s já foram transcritas'} ` +
+          'durante a reunião</span> — o passo 2 vai aproveitá-las.';
       }
       const ondeFica = depGrav.emDisco && depPcm.emDisco ? 'em disco' : 'na memória da aba';
       $('recMsg').innerHTML = `<span class="ok">Gravação de ${fmt(segundos)} pronta</span> — ` +
@@ -1260,22 +1261,48 @@ registerProcessor('toca', Toca);`;
              Quem quiser a placa marca a caixa e vê o tamanho mudar na tela
              antes de decidir. Se ela falhar, cai no processador — o caminho
              que agora é o padrão, e não mais o castigo. */
-          let motor = 'processador';
-          if (m.placa) {
+          /* Uma fila de tentativas, e não uma tentativa só.
+
+             Isto veio de uma reunião de verdade. O caminho da placa de vídeo
+             usa um decodificador de 4 bits, e em parte das máquinas o ONNX
+             recusa esse arquivo na hora de montar a sessão:
+
+               Missing required scale: model.decoder.embed_tokens.weight_...
+               for node: ..._DequantizeLinear
+
+             Não é falta de WebGPU — é o arquivo de 4 bits que aquele
+             computador não consegue abrir. E como a exceção acontecia DEPOIS
+             de a placa ter sido escolhida, ninguém caía no processador:
+             a transcrição ao vivo morria, e o passo 2 morria igual no fim da
+             reunião. A pessoa via só uma linha de erro em C++ e uma ata que
+             não veio.
+
+             Agora cada tentativa que falha é anunciada e a próxima entra. O
+             processador com pesos de 8 bits é o degrau que segura quase tudo:
+             ele não usa o operador de 4 bits, que é onde este defeito mora. */
+          const tentativas = [];
+          if (m.placa) tentativas.push({ motor: 'placa de vídeo',
+            opcoes: { device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' } } });
+          tentativas.push({ motor: 'processador', opcoes: { dtype: 'q8' } });
+
+          let motor = null, ultimoErro = null;
+          for (let i = 0; i < tentativas.length; i++) {
+            const t = tentativas[i];
             try {
               pipe = await mod.pipeline('automatic-speech-recognition', m.modelo,
-                { device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
-                  progress_callback });
-              motor = 'placa de vídeo';
+                Object.assign({ progress_callback }, t.opcoes));
+              motor = t.motor;
+              break;
             } catch (e) {
-              self.postMessage({ tipo: 'aviso',
-                msg: 'WebGPU indisponível — usando o processador.' });
+              ultimoErro = (e && e.message) || String(e);
+              const resta = tentativas[i + 1];
+              self.postMessage({ tipo: 'aviso', msg: resta
+                ? 'O modelo não abriu na ' + t.motor + '. Tentando ' +
+                  (resta.motor === 'processador' ? 'no processador' : 'na ' + resta.motor) + '…'
+                : 'O modelo não abriu.' });
             }
           }
-          if (!pipe) {
-            pipe = await mod.pipeline('automatic-speech-recognition', m.modelo,
-              { dtype: 'q8', progress_callback });
-          }
+          if (!pipe) throw new Error(ultimoErro || 'não consegui montar o modelo');
           self.postMessage({ tipo: 'pronto', motor });
           return;
         }
@@ -1335,7 +1362,7 @@ registerProcessor('toca', Toca);`;
        e só apareceria como "está lento". */
     const linhas = d.motor === 'processador' && d.linhas > 1
       ? ` em <b>${d.linhas} linhas</b>` : '';
-    return `<br>Transcrito na <b>${escapar(d.motor || 'máquina local')}</b>${linhas}: ` +
+    return `<br>Transcrito ${artigoDoMotor(d.motor)} <b>${escapar(d.motor || 'máquina local')}</b>${linhas}: ` +
       `${quanto(d.segundosDeAudio)} s de áudio em ${quanto(d.segundos)} s — ` +
       `<b>${v >= 10 ? v.toFixed(0) : v.toFixed(1)}× o tempo real</b>` +
       (v < 1 ? '. <span class="err">Mais lento que a própria reunião</span> — vale escolher o modelo ' +
@@ -1775,7 +1802,7 @@ registerProcessor('toca', Toca);`;
     vivo.ativo = false; vivo.erro = null;
     vivo.quadros = { voce: [], outros: [] };
     vivo.porJanela = []; vivo.falas = new Map(); vivo.feitas = new Set();
-    vivo.proxima = 0; vivo.ocupado = false; vivo.preparando = false;
+    vivo.proxima = 0; vivo.ocupado = false; vivo.preparando = false; vivo.fim = false;
   }
 
   /* Baixar o modelo DURANTE a reunião, com ou sem transcrição ao vivo.
@@ -1870,12 +1897,53 @@ registerProcessor('toca', Toca);`;
     }
   }
 
+  /* O que fazer quando o modelo não abre.
+
+     A mensagem que o ONNX devolve é uma linha de C++ com nome de nó de grafo —
+     verdadeira, inútil para quem só queria a ata. Ela continua na tela, porque
+     é o que permite alguém pesquisar ou me mandar; mas vem acompanhada da
+     frase que resolve, e do carimbo de versão, que é o que diz qual código
+     estava rodando quando aquilo aconteceu. */
+  /* A versão sai do rodapé, que o build carimba. Ler dali evita um segundo
+     lugar para o mesmo número — e um segundo lugar é onde ele fica velho. */
+  const VERSAO = (() => {
+    const c = document.querySelector('.rodape code');
+    return c ? c.textContent.trim() : '?';
+  })();
+
+  function comoConsertar(erro) {
+    const txt = String(erro || '');
+    const quatroBits = /MatMulNBits|Missing required scale|DequantizeLinear/i.test(txt);
+    const dica = quatroBits
+      ? T('Este é o arquivo de <b>4 bits</b>, que só o caminho da placa de vídeo usa e que algumas ' +
+          'máquinas não conseguem abrir. <b>Desmarque "usar a placa de vídeo"</b> no passo 2 e tente de ' +
+          'novo — no processador o modelo é outro arquivo, e este defeito não existe lá.',
+          'This is the <b>4-bit</b> file, which only the graphics-card path uses and which some machines ' +
+          'cannot open. <b>Untick "use the graphics card"</b> in step 2 and try again — on the processor ' +
+          'the model is a different file, and this fault does not exist there.')
+      : T('Vale tentar o modelo <b>rápido</b> no passo 2, que é bem menor.',
+          'It is worth trying the <b>fast</b> model in step 2, which is much smaller.');
+    return dica + `<br><span class="status">${T('Erro do motor', 'Engine error')}: ` +
+           `${escapar(txt.slice(0, 240))} — Salavox ${VERSAO}</span>`;
+  }
+
+  /* "no processador" e "na placa de vídeo". Enquanto a placa era o padrão, o
+     artigo fixo em "na" nunca apareceu errado; no dia em que o processador
+     virou o caminho normal, a tela passou a dizer "na processador" para todo
+     mundo. */
+  const artigoDoMotor = m => (m === 'placa de vídeo' ? 'na' : 'no');
+
   function mostrarVivo() {
     if (!vivo.ligado) { $('vivoMsg').textContent = ''; return; }
-    const onde = motorEmUso ? ` — na <b>${escapar(motorEmUso)}</b>` : '';
+    /* Depois de encerrar, quem manda na mensagem é o resumo escrito pelo
+       `onstop`. Sem esta linha, um pedaço de áudio que chega atrasado chama
+       esta função com `ativo` já falso, e a tela volta a dizer "preparando o
+       modelo" numa reunião que acabou — foi o que a medição de 90 s pegou. */
+    if (vivo.fim) return;
+    const onde = motorEmUso ? ` — ${artigoDoMotor(motorEmUso)} <b>${escapar(motorEmUso)}</b>` : '';
     if (vivo.erro) {
-      $('vivoMsg').innerHTML = `<span class="err">A transcrição ao vivo parou: ${escapar(vivo.erro)}</span>` +
-        ' — a gravação segue normal e a ata será feita inteira no fim.';
+      $('vivoMsg').innerHTML = `<span class="err">A transcrição ao vivo parou.</span> ` +
+        'A gravação segue normal e a ata será feita inteira no fim. ' + comoConsertar(vivo.erro);
       return;
     }
     if (!vivo.ativo) { $('vivoMsg').textContent = 'Preparando o modelo para transcrever durante a reunião…'; return; }

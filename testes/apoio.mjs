@@ -117,6 +117,33 @@ export function telaFalsa(segundosPorSlide) {
    vezes no canal do microfone fechado. Se o modelo simulado fosse educado e
    devolvesse vazio no silêncio, a peneira poderia ser removida do produto sem
    nenhum teste ficar vermelho. Aqui ele alucina igual. */
+/* O modelo que recusa o arquivo de 4 bits.
+
+   Copiado de uma reunião de verdade, de 13/08/2026: com o caminho da placa de
+   vídeo escolhido, o ONNX recusou montar a sessão e devolveu uma linha de C++
+   sobre um nó de grafo. Não era falta de WebGPU — era o decodificador de 4
+   bits que aquela máquina não abre. A transcrição ao vivo morreu, e o passo 2
+   morreu igual no fim da reunião.
+
+   Este simulacro falha no mesmo lugar e com a mesma frase: quando as opções
+   pedem WebGPU ou um `dtype` por arquivo (que é como se pede o de 4 bits).
+   Nas demais, ele transcreve normalmente — é isso que permite verificar que a
+   ferramenta cai no processador em vez de desistir. */
+export function modeloQueRecusaQuatroBits() {
+  const ERRO = "Can't create a session. ERROR_CODE: 1, ERROR_MESSAGE: qdq_actions.cc:137 " +
+    "TransposeDQWeightsForMatMulNBits Missing required scale: " +
+    "model.decoder.embed_tokens.weight_merged_0_scale for node: " +
+    "model.decoder.embed_tokens.weight_transposed_DequantizeLinear";
+  return {
+    contentType: 'application/javascript',
+    body: MODELO_FALSO.body.replace(
+      'export async function pipeline(){',
+      'export async function pipeline(tarefa, modelo, opts){\n' +
+      '      if (opts && (opts.device === "webgpu" || (opts.dtype && typeof opts.dtype === "object")))\n' +
+      '        throw new Error(' + JSON.stringify(ERRO) + ');\n')
+  };
+}
+
 export const MODELO_FALSO = {
   contentType: 'application/javascript',
   body: `export const env={allowLocalModels:1,allowRemoteModels:1,backends:{onnx:{wasm:{}}}};

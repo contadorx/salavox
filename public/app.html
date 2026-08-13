@@ -89,6 +89,13 @@
      para saber quando passar de um para o outro". Agora os cinco estão sempre
      lá; o que muda é o cartão estar cinza com uma frase dizendo o que vai
      acontecer, ou aceso com o conteúdo dentro. */
+  /* A opção que mais muda o tempo de espera não pode parecer mais uma caixa
+     entre outras: a queixa foi "não achei a opção". */
+  label.chk.destaque{align-items:flex-start;background:var(--verde-50);border:1px solid var(--verde-claro);
+                     border-radius:10px;padding:10px 13px;margin-top:10px;max-width:640px;
+                     font-size:13.5px;line-height:1.5}
+  label.chk.destaque input{margin-top:3px}
+  label.chk.destaque b{color:var(--verde-escuro)}
   .espera{font-size:13.5px;color:var(--muted);margin:-4px 0 0 41px;max-width:640px}
   .card.agora .espera,.card.feito .espera{display:none}
 
@@ -327,7 +334,9 @@
       <button class="ghost hide" id="calar">Fechar meu microfone</button>
       <label class="chk" id="labelMic"><input type="checkbox" id="mic" checked> incluir meu microfone</label>
       <label class="chk" id="labelTela"><input type="checkbox" id="tela" checked> guardar as telas compartilhadas</label>
-      <label class="chk" id="labelVivo"><input type="checkbox" id="aoVivo" checked> transcrever durante a reunião</label>
+      <label class="chk destaque" id="labelVivo"><input type="checkbox" id="aoVivo" checked>
+        <span><b>Transcrever durante a reunião</b> — a cada trinta segundos gravados aquele trecho já vira
+        texto. Ao encerrar, quase toda a ata está pronta.</span></label>
     </div>
     <p class="tempo hide" id="tempo">00:00</p>
     <div class="status" id="marcasMsg"></div>
@@ -529,7 +538,7 @@
 </div>
 
 <footer class="rodape">
-  Salavox versão <code>2026-08-13.4373a10</code> — tudo roda neste computador.
+  Salavox versão <code>2026-08-13.4d01d9f</code> — tudo roda neste computador.
   <a href="/privacidade">privacidade</a><a href="/termos">termos</a><a href="/">site</a>
 </footer>
 <script>/* ============================================================
@@ -646,10 +655,12 @@
     "A ferramenta no navegador não nos custa nada, porque não há servidor processando as suas reuniões — e por isso ela é grátis de verdade, sem limite de minutos, de reuniões ou de duração. O que se paga é o que precisa de servidor: a IA pronta e o envio da ata por e-mail.": "The tool in the browser costs us nothing, because there is no server processing your meetings — and that is why it is genuinely free, with no limit on minutes, meetings or length. What you pay for is what needs a server: the ready-made AI and sending the minutes by e-mail.",
     "A gravação": "The recording",
     "A gravação e a transcrição acontecem": "The recording and the transcript happen",
+    "A gravação segue normal e a ata será feita inteira no fim.": "Recording carries on normally and the minutes will be produced in full at the end.",
     "A ideia": "The idea",
     "A legislação de proteção de dados garante direitos como acesso, correção e exclusão dos seus dados pessoais. Sem conta, não tratamos dado pessoal seu nenhum, e não há o que acessar, corrigir ou excluir. Com conta, o que temos é o seu e-mail, o plano e a contagem de resumos do mês: basta pedir por e-mail para receber essas informações, corrigi-las ou apagá-las junto com a conta.": "Data protection law guarantees rights such as access, correction and deletion of your personal data. Without an account, we process no personal data of yours, and there is nothing to access, correct or delete. With an account, what we have is your e-mail, the plan and the month's summary count: just ask by e-mail to receive that information, correct it or delete it along with the account.",
     "A reunião é gravada": "The meeting is recorded",
     "A reunião é gravada em pedaços, no disco. Ao reabrir a página, o que já tinha sido gravado está lá esperando.": "The meeting is recorded in chunks, on disk. When you reopen the page, whatever had already been recorded is there waiting.",
+    "A transcrição ao vivo parou.": "Live transcription stopped.",
     "A transcrição erra?": "Does the transcript make mistakes?",
     "Abrir": "Open",
     "Abrir o Salavox": "Open Salavox",
@@ -999,8 +1010,9 @@
     "Tirar a marca do Salavox do rodapé da ata": "Remove the Salavox mark from the footer of the minutes",
     "Transcreva": "Transcribe",
     "Transcrever": "Transcribe",
-    "Transcrever durante a reunião": "Transcribing during the meeting",
+    "Transcrever durante a reunião": "Transcribe during the meeting",
     "Transcrito na": "Transcribed on the",
+    "Transcrito no": "Transcribed on the",
     "Transcrição local, sem limite de minutos": "Local transcription, no limit on minutes",
     "Trechos:": "Passages:",
     "Treinamento da equipe": "Team training",
@@ -1076,6 +1088,7 @@
     "disponível agora": "available now",
     "do computador": "your computer",
     "do seu computador": "leaving your computer",
+    "durante a reunião": "during the meeting",
     "e": "e",
     "e na": "and in the",
     "e o": "and the",
@@ -1184,7 +1197,6 @@
     "texto da ata": "text of the minutes",
     "the best text Whisper produces, and the only one in a different size league. Only choose it on a machine with room to spare.": "the best text Whisper produces, and the only one in a different size league. Only choose it on a machine with room to spare.",
     "the size of the processor path.": "the size of the processor path.",
-    "transcrever durante a reunião": "transcribe during the meeting",
     "transcrita": "transcribed",
     "tudo funciona assim mesmo": "everything works anyway",
     "usar a placa de vídeo": "use the graphics card",
@@ -1198,6 +1210,7 @@
     "É a única forma de resumo por IA em que a gravação continua sendo só sua.": "It is the only form of AI summary in which the recording remains yours alone.",
     "Última atualização: 12 de agosto de 2026.": "Last updated: 12 August 2026. The English text is a courtesy translation; the Portuguese version is the one that governs.",
     "é enviado ao nosso servidor e deste ao provedor de modelo de linguagem que usamos. O texto é usado para produzir aquela resposta e descartado: não é gravado em banco de dados nosso, não vira histórico e não é usado para treinar modelo nenhum. O áudio e o vídeo continuam no seu computador, inclusive nessa hora.": "is sent to our server and from there to the language-model provider we use. The text is used to produce that answer and discarded: it is not written to any database of ours, does not become history and is not used to train any model. The audio and the video stay on your computer, even then.",
+    "— a cada trinta segundos gravados aquele trecho já vira texto. Ao encerrar, quase toda a ata está pronta.": "— every thirty seconds recorded, that stretch already becomes text. By the time you stop, almost all the minutes are ready.",
     "— after that it is kept in the browser and is not downloaded again.": "— after that it is kept in the browser and is not downloaded again.",
     "— como qualquer servidor web, registra tecnicamente os acessos à página.": "— like any web server, it technically logs page accesses.",
     "— de onde o modelo de transcrição é baixado, na primeira vez que você transcreve. Recebe o pedido do modelo, nunca o seu áudio.": "— where the transcription model is downloaded from, the first time you transcribe. It receives the request for the model, never your audio.",
@@ -1205,6 +1218,7 @@
     "— está no que você entrega em troca. Nelas, o resumo sai de uma reunião que já mora no servidor delas, com áudio e vídeo. Aqui, o áudio nunca sai do seu computador: o que sobe é o": "— it is in what you hand over in exchange. In theirs, the summary comes from a meeting that already lives on their server, with audio and video. Here the audio never leaves your computer: what goes up is the",
     "— guardamos o seu e-mail, o plano, a data de validade e a contagem de resumos usados no mês. É o mínimo para saber quem você é e se a assinatura está em dia. Não há senha: a entrada é por link enviado ao seu e-mail, e a sessão fica no seu navegador.": "— we keep your e-mail, the plan, the expiry date and the count of summaries used this month. It is the minimum needed to know who you are and whether the subscription is current. There is no password: entry is by a link sent to your e-mail, and the session stays in your browser.",
     "— o arquivo fica lá dentro": "— the file stays inside",
+    "— o passo 2 vai aproveitá-las.": "— step 2 will make use of them.",
     "— para assinar é preciso informar nome e CPF/CNPJ, que são enviados à": "— to subscribe you must give a name and a tax ID, which are sent to",
     "— poucas horas somando todo mundo, e depois é apagar reunião para gravar a próxima —, costumam": "— a few hours counting everybody, and after that you delete a meeting to record the next one —, they usually",
     "— quando você clica em gerar um resumo, o": "— when you click to generate a summary, the",
@@ -2605,10 +2619,11 @@ registerProcessor('toca', Toca);`;
         return;
       }
       vivo.ativo = false;          // a partir daqui quem manda é a medição completa
+      vivo.fim = true;             // e a mensagem da tela é a do resumo, não a de preparação
       if (vivo.ligado && !vivo.erro && vivo.proxima) {
         $('vivoMsg').innerHTML = `<span class="ok">${vivo.proxima} ` +
-          `${vivo.proxima === 1 ? 'trecho de 30 s já foi transcrito' : 'trechos de 30 s já foram transcritos'} ` +
-          'durante a reunião</span> — o passo 2 vai aproveitá-los.';
+          `${vivo.proxima === 1 ? 'janela de 30 s já foi transcrita' : 'janelas de 30 s já foram transcritas'} ` +
+          'durante a reunião</span> — o passo 2 vai aproveitá-las.';
       }
       const ondeFica = depGrav.emDisco && depPcm.emDisco ? 'em disco' : 'na memória da aba';
       $('recMsg').innerHTML = `<span class="ok">Gravação de ${fmt(segundos)} pronta</span> — ` +
@@ -3119,22 +3134,48 @@ registerProcessor('toca', Toca);`;
              Quem quiser a placa marca a caixa e vê o tamanho mudar na tela
              antes de decidir. Se ela falhar, cai no processador — o caminho
              que agora é o padrão, e não mais o castigo. */
-          let motor = 'processador';
-          if (m.placa) {
+          /* Uma fila de tentativas, e não uma tentativa só.
+
+             Isto veio de uma reunião de verdade. O caminho da placa de vídeo
+             usa um decodificador de 4 bits, e em parte das máquinas o ONNX
+             recusa esse arquivo na hora de montar a sessão:
+
+               Missing required scale: model.decoder.embed_tokens.weight_...
+               for node: ..._DequantizeLinear
+
+             Não é falta de WebGPU — é o arquivo de 4 bits que aquele
+             computador não consegue abrir. E como a exceção acontecia DEPOIS
+             de a placa ter sido escolhida, ninguém caía no processador:
+             a transcrição ao vivo morria, e o passo 2 morria igual no fim da
+             reunião. A pessoa via só uma linha de erro em C++ e uma ata que
+             não veio.
+
+             Agora cada tentativa que falha é anunciada e a próxima entra. O
+             processador com pesos de 8 bits é o degrau que segura quase tudo:
+             ele não usa o operador de 4 bits, que é onde este defeito mora. */
+          const tentativas = [];
+          if (m.placa) tentativas.push({ motor: 'placa de vídeo',
+            opcoes: { device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' } } });
+          tentativas.push({ motor: 'processador', opcoes: { dtype: 'q8' } });
+
+          let motor = null, ultimoErro = null;
+          for (let i = 0; i < tentativas.length; i++) {
+            const t = tentativas[i];
             try {
               pipe = await mod.pipeline('automatic-speech-recognition', m.modelo,
-                { device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
-                  progress_callback });
-              motor = 'placa de vídeo';
+                Object.assign({ progress_callback }, t.opcoes));
+              motor = t.motor;
+              break;
             } catch (e) {
-              self.postMessage({ tipo: 'aviso',
-                msg: 'WebGPU indisponível — usando o processador.' });
+              ultimoErro = (e && e.message) || String(e);
+              const resta = tentativas[i + 1];
+              self.postMessage({ tipo: 'aviso', msg: resta
+                ? 'O modelo não abriu na ' + t.motor + '. Tentando ' +
+                  (resta.motor === 'processador' ? 'no processador' : 'na ' + resta.motor) + '…'
+                : 'O modelo não abriu.' });
             }
           }
-          if (!pipe) {
-            pipe = await mod.pipeline('automatic-speech-recognition', m.modelo,
-              { dtype: 'q8', progress_callback });
-          }
+          if (!pipe) throw new Error(ultimoErro || 'não consegui montar o modelo');
           self.postMessage({ tipo: 'pronto', motor });
           return;
         }
@@ -3194,7 +3235,7 @@ registerProcessor('toca', Toca);`;
        e só apareceria como "está lento". */
     const linhas = d.motor === 'processador' && d.linhas > 1
       ? ` em <b>${d.linhas} linhas</b>` : '';
-    return `<br>Transcrito na <b>${escapar(d.motor || 'máquina local')}</b>${linhas}: ` +
+    return `<br>Transcrito ${artigoDoMotor(d.motor)} <b>${escapar(d.motor || 'máquina local')}</b>${linhas}: ` +
       `${quanto(d.segundosDeAudio)} s de áudio em ${quanto(d.segundos)} s — ` +
       `<b>${v >= 10 ? v.toFixed(0) : v.toFixed(1)}× o tempo real</b>` +
       (v < 1 ? '. <span class="err">Mais lento que a própria reunião</span> — vale escolher o modelo ' +
@@ -3634,7 +3675,7 @@ registerProcessor('toca', Toca);`;
     vivo.ativo = false; vivo.erro = null;
     vivo.quadros = { voce: [], outros: [] };
     vivo.porJanela = []; vivo.falas = new Map(); vivo.feitas = new Set();
-    vivo.proxima = 0; vivo.ocupado = false; vivo.preparando = false;
+    vivo.proxima = 0; vivo.ocupado = false; vivo.preparando = false; vivo.fim = false;
   }
 
   /* Baixar o modelo DURANTE a reunião, com ou sem transcrição ao vivo.
@@ -3729,12 +3770,53 @@ registerProcessor('toca', Toca);`;
     }
   }
 
+  /* O que fazer quando o modelo não abre.
+
+     A mensagem que o ONNX devolve é uma linha de C++ com nome de nó de grafo —
+     verdadeira, inútil para quem só queria a ata. Ela continua na tela, porque
+     é o que permite alguém pesquisar ou me mandar; mas vem acompanhada da
+     frase que resolve, e do carimbo de versão, que é o que diz qual código
+     estava rodando quando aquilo aconteceu. */
+  /* A versão sai do rodapé, que o build carimba. Ler dali evita um segundo
+     lugar para o mesmo número — e um segundo lugar é onde ele fica velho. */
+  const VERSAO = (() => {
+    const c = document.querySelector('.rodape code');
+    return c ? c.textContent.trim() : '?';
+  })();
+
+  function comoConsertar(erro) {
+    const txt = String(erro || '');
+    const quatroBits = /MatMulNBits|Missing required scale|DequantizeLinear/i.test(txt);
+    const dica = quatroBits
+      ? T('Este é o arquivo de <b>4 bits</b>, que só o caminho da placa de vídeo usa e que algumas ' +
+          'máquinas não conseguem abrir. <b>Desmarque "usar a placa de vídeo"</b> no passo 2 e tente de ' +
+          'novo — no processador o modelo é outro arquivo, e este defeito não existe lá.',
+          'This is the <b>4-bit</b> file, which only the graphics-card path uses and which some machines ' +
+          'cannot open. <b>Untick "use the graphics card"</b> in step 2 and try again — on the processor ' +
+          'the model is a different file, and this fault does not exist there.')
+      : T('Vale tentar o modelo <b>rápido</b> no passo 2, que é bem menor.',
+          'It is worth trying the <b>fast</b> model in step 2, which is much smaller.');
+    return dica + `<br><span class="status">${T('Erro do motor', 'Engine error')}: ` +
+           `${escapar(txt.slice(0, 240))} — Salavox ${VERSAO}</span>`;
+  }
+
+  /* "no processador" e "na placa de vídeo". Enquanto a placa era o padrão, o
+     artigo fixo em "na" nunca apareceu errado; no dia em que o processador
+     virou o caminho normal, a tela passou a dizer "na processador" para todo
+     mundo. */
+  const artigoDoMotor = m => (m === 'placa de vídeo' ? 'na' : 'no');
+
   function mostrarVivo() {
     if (!vivo.ligado) { $('vivoMsg').textContent = ''; return; }
-    const onde = motorEmUso ? ` — na <b>${escapar(motorEmUso)}</b>` : '';
+    /* Depois de encerrar, quem manda na mensagem é o resumo escrito pelo
+       `onstop`. Sem esta linha, um pedaço de áudio que chega atrasado chama
+       esta função com `ativo` já falso, e a tela volta a dizer "preparando o
+       modelo" numa reunião que acabou — foi o que a medição de 90 s pegou. */
+    if (vivo.fim) return;
+    const onde = motorEmUso ? ` — ${artigoDoMotor(motorEmUso)} <b>${escapar(motorEmUso)}</b>` : '';
     if (vivo.erro) {
-      $('vivoMsg').innerHTML = `<span class="err">A transcrição ao vivo parou: ${escapar(vivo.erro)}</span>` +
-        ' — a gravação segue normal e a ata será feita inteira no fim.';
+      $('vivoMsg').innerHTML = `<span class="err">A transcrição ao vivo parou.</span> ` +
+        'A gravação segue normal e a ata será feita inteira no fim. ' + comoConsertar(vivo.erro);
       return;
     }
     if (!vivo.ativo) { $('vivoMsg').textContent = 'Preparando o modelo para transcrever durante a reunião…'; return; }
