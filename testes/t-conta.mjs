@@ -223,6 +223,14 @@ export default async function (ctx, url, erros) {
   await p.goto(url + '/app');
   await p.waitForFunction(() => !document.getElementById('contaCard').classList.contains('hide'),
                           null, { timeout: 15000 });
+  /* Guardado agora, conferido depois da ata: o passo 5 precisa existir na
+     escada desde a abertura, cinza e fechado, e não brotar do nada no fim. */
+  await p.evaluate(() => {
+    const c = document.getElementById('iaCard');
+    window.__passo5Antes = !c.classList.contains('hide') &&
+                           c.classList.contains('dormindo') &&
+                           document.getElementById('corpo5').classList.contains('hide');
+  });
   b.verdade('cadastro e cobrança não estão mais no meio do caminho',
             await p.evaluate(() => !document.getElementById('cobDoc') && !document.getElementById('assinar')));
 
@@ -236,6 +244,11 @@ export default async function (ctx, url, erros) {
 
   b.verdade('sem conta, o cartão da IA aparece e os botões não',
             !(await p.isHidden('#iaCard')) && await p.isHidden('#iaAcoes'));
+  /* Com camada paga configurada, o passo 5 entra na escada desde a abertura —
+     cinza e fechado — e só abre quando há ata na tela. */
+  b.verdade('e o passo 5 já estava na escada antes da ata',
+            await p.evaluate(() => !!window.__passo5Antes));
+  b.verdade('agora ele está aberto, porque há ata', !(await p.isHidden('#corpo5')));
   b.verdade('e o cartão diz onde entrar', /sua conta/i.test(await p.textContent('#iaEstado')));
 
   /* O link do e-mail chegando com a aba já aberta: sem recarregar, sem perder

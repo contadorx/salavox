@@ -301,6 +301,10 @@ registerProcessor('toca', Toca);`;
      vez. Nada de máquina de estados; a ordem dos passos É a máquina de estados.
      ============================================================ */
 
+  /* Este passo faz sentido nesta gravação? Só o 3 depende disso: uma reunião
+     só de microfone, ou um arquivo só de áudio, não tem tela para varrer. */
+  let podeTelas = false;
+
   const PASSOS = [
     { cartao: 'gravarCard', selo: 'selo1' },
     { cartao: 'transCard',  selo: 'selo2' },
@@ -314,14 +318,30 @@ registerProcessor('toca', Toca);`;
     const temAta = falas.length > 0;
     const temTelas = telas.length > 0;
     return [
-      { feito: temGravacao, rotulo: temGravacao ? 'gravação pronta' : 'comece aqui' },
-      { feito: temAta, rotulo: temAta ? 'transcrita' : (temGravacao ? 'sua vez' : 'depois de gravar') },
-      { feito: temTelas, rotulo: temTelas ? `${telas.length} telas` : 'opcional' },
-      { feito: temAta, rotulo: temAta ? 'pronta' : 'sai pronta' },
-      { feito: false, rotulo: cfg ? (temPlano() || (cortesia && cortesia > 0) ? 'disponível' : 'com o plano') : 'com conta' }
+      { feito: temGravacao, aberto: true,
+        rotulo: temGravacao ? 'gravação pronta' : 'comece aqui' },
+      { feito: temAta, aberto: true,
+        rotulo: temAta ? 'transcrita' : (temGravacao ? 'sua vez' : 'depois de gravar') },
+      { feito: temTelas, aberto: podeTelas,
+        rotulo: temTelas ? `${telas.length} telas` : (podeTelas ? 'sua vez' : 'opcional') },
+      { feito: temAta, aberto: temAta,
+        rotulo: temAta ? 'pronta' : 'sai pronta' },
+      { feito: false, aberto: !!(cfg && ataNaTela),
+        rotulo: cfg ? (temPlano() || (cortesia && cortesia > 0) ? 'disponível' : 'com o plano') : 'com conta' }
     ];
   }
 
+  /* Dono único da visibilidade dos cinco cartões e do que há dentro deles.
+
+     Os passos 3, 4 e 5 costumavam aparecer do nada quando ficavam prontos, e
+     sumir de novo — cada um com o seu `classList.remove('hide')` espalhado
+     pelo código. Duas consequências: quem abria a ferramenta via dois passos e
+     não tinha como saber que existiam mais três, e a visibilidade não tinha
+     dono, que é como nasce a linha que conserta o defeito da outra.
+
+     Agora os cinco estão sempre na tela. O que muda é o estado: cinza com uma
+     frase dizendo o que vai acontecer ali, ou aceso com o conteúdo dentro.
+     Quem decide é esta função, e só ela. */
   function desenharPassos() {
     const estados = passos();
     /* O primeiro não concluído é o da vez — e a etapa 3 não conta, porque é
@@ -329,6 +349,10 @@ registerProcessor('toca', Toca);`;
        preso ali para sempre. */
     let daVez = estados.findIndex((e, i) => !e.feito && i !== 2);
     if (daVez < 0) daVez = PASSOS.length - 1;
+
+    /* O cartão da IA não existe na instalação sem servidor: lá ele seria um
+       botão que do outro lado não faz nada. Os demais existem sempre. */
+    $('iaCard').classList.toggle('hide', !cfg);
 
     PASSOS.forEach((p, i) => {
       const el = $(p.cartao);
@@ -340,6 +364,11 @@ registerProcessor('toca', Toca);`;
       else if (i > daVez) el.classList.add('dormindo');
       const selo = $(p.selo);
       if (selo) selo.textContent = estados[i].rotulo;
+
+      /* O corpo do passo só entra quando ele pode ser usado de verdade.
+         Enquanto não pode, no lugar dele fica a frase de espera. */
+      const corpo = $('corpo' + (i + 1));
+      if (corpo) corpo.classList.toggle('hide', !estados[i].aberto);
     });
   }
 
@@ -348,9 +377,17 @@ registerProcessor('toca', Toca);`;
      de quem grava — a ferramenta não tem como verificar isso, então
      ao menos obriga a confirmação explícita e oferece o texto pronto.
      ============================================================ */
-  const AVISO = 'Aviso a todos: estou gravando esta reunião para gerar a ata. ' +
+  /* O texto do aviso é uma função, e não uma constante, porque ele vai para
+     dentro do documento: quem grava em inglês precisa colar no chat um aviso
+     em inglês, e o registro de consentimento na ata precisa citar o texto que
+     foi realmente oferecido. */
+  const AVISO = () => T(
+    'Aviso a todos: estou gravando esta reunião para gerar a ata. ' +
     'A gravação e a transcrição ficam no meu computador e não são enviadas a nenhum serviço externo. ' +
-    'Quem preferir que não seja gravado, por favor diga agora.';
+    'Quem preferir que não seja gravado, por favor diga agora.',
+    'A note to everyone: I am recording this meeting to produce the minutes. ' +
+    'The recording and the transcript stay on my computer and are not sent to any outside service. ' +
+    'If you would rather not be recorded, please say so now.');
 
   /* No celular não existe compartilhamento de tela em navegador nenhum: o modo
      presencial já vem escolhido, e o outro fica explicado em vez de quebrado. */
@@ -375,7 +412,7 @@ registerProcessor('toca', Toca);`;
   $('okConsent').onchange = () => {
     $('rec').disabled = !$('okConsent').checked;
     if ($('okConsent').checked) {
-      consentimento = { confirmado: agora(), copiado: null, iniciado: null, texto: AVISO };
+      consentimento = { confirmado: agora(), copiado: null, iniciado: null, texto: AVISO() };
     } else {
       consentimento = null;
     }
@@ -397,14 +434,14 @@ registerProcessor('toca', Toca);`;
 
   $('copiarAviso').onclick = async () => {
     try {
-      await navigator.clipboard.writeText(AVISO);
+      await navigator.clipboard.writeText(AVISO());
       if (consentimento) consentimento.copiado = agora();
       $('avisoMsg').innerHTML = '<span class="ok">aviso copiado</span>';
     } catch (e) {
       // navegador sem área de transferência: o texto aparece para copiar à mão,
       // e para o registro isso conta igual — o aviso foi obtido
       if (consentimento) consentimento.copiado = agora();
-      $('avisoMsg').textContent = AVISO;
+      $('avisoMsg').textContent = AVISO();
     }
     setTimeout(() => { $('avisoMsg').textContent = ''; }, 4000);
   };
@@ -590,7 +627,7 @@ registerProcessor('toca', Toca);`;
             : 'Não há o que transcrever.');
       }
       $('trans').disabled = false;
-      if (gravaVideo) $('telasCard').classList.remove('hide'); else $('telasCard').classList.add('hide');
+      podeTelas = gravaVideo; desenharPassos();
       desenharPassos();
     };
 
@@ -755,7 +792,7 @@ registerProcessor('toca', Toca);`;
       zerarVivo(); vivo.ligado = false; $('vivoMsg').textContent = '';
       esconderRecuperacao();
       momentos = []; telas = []; falas = [];
-      $('telasCard').classList.add('hide'); $('ataCard').classList.add('hide');
+      podeTelas = false; desenharPassos();
       $('marcasMsg').textContent = ''; $('recMsg').textContent = '';
 
       const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
@@ -799,7 +836,7 @@ registerProcessor('toca', Toca);`;
       consentimento = null; mostrarConsentimento();
 
       const temVideo = /^video\//.test(arquivo.type) || /\.(mp4|webm|mkv|mov|m4v|avi)$/i.test(arquivo.name);
-      if (temVideo) $('telasCard').classList.remove('hide');
+      podeTelas = temVideo;
 
       desenharPassos();
       aviso(`<span class="ok">${arquivo.name} pronto</span> — ${fmt(segundos)} de áudio` +
@@ -1912,7 +1949,6 @@ registerProcessor('toca', Toca);`;
   }
 
   function mostrarAta() {
-    $('ataCard').classList.remove('hide');
     ataNaTela = true;
     desenharIa();
     desenharPassos();
@@ -2024,7 +2060,7 @@ registerProcessor('toca', Toca);`;
       const dur = vid.duration;
       if (!vid.videoWidth) {
         // não é erro: é uma gravação só de áudio. O cartão some e a ata segue.
-        $('telasCard').classList.add('hide');
+        podeTelas = false; desenharPassos();
         $('telasMsg').textContent = '';
         $('varrer').disabled = false;
         $('pararVarre').classList.add('hide');
@@ -2371,7 +2407,7 @@ registerProcessor('toca', Toca);`;
         doc.setFont('helvetica', 'normal').setTextColor(140).setFontSize(8.4);
         doc.text(fmt(item.tl.t), M, y);
         doc.setFont('helvetica', 'bold').setTextColor(110).setFontSize(8.4);
-        doc.text('TELA', M + 12, y);
+        doc.text(T('TELA', 'SCREEN'), M + 12, y);
         doc.addImage(item.tl.img.url, 'JPEG', M + 42, y - 4, larg, alt);
         y += alt + 8;
         return;
@@ -2572,7 +2608,6 @@ registerProcessor('toca', Toca);`;
   }
 
   function desenharIa() {
-    $('iaCard').classList.toggle('hide', !(cfg && ataNaTela));
     if (!cfg) return;
     const pago = temPlano();
     /* Quem entrou na conta tem os botões, assinando ou não.
@@ -2986,7 +3021,7 @@ registerProcessor('toca', Toca);`;
       $('recMsg').innerHTML = `<span class="ok">Gravação recuperada de ${fmt(dur)}</span> — ` +
         `${(blobGravacao.size/1048576).toFixed(1)} MB.`;
       $('trans').disabled = false;
-      if (!meta || meta.tela !== false) $('telasCard').classList.remove('hide');
+      podeTelas = !meta || meta.tela !== false;
       esconderRecuperacao();
       desenharPassos();
       $('trans').scrollIntoView({ behavior: 'smooth', block: 'center' });

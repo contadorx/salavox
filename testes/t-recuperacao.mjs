@@ -38,7 +38,7 @@ export default async function (ctx, url, erros) {
 
   const seg = await p.evaluate(() => window.__salavox.pcm().size / 4 / 16000);
   b.entre('segundos de áudio recuperados dos 25 gravados', seg, 20, 25.5);
-  b.verdade('o cartão de telas volta disponível', !(await p.isHidden('#telasCard')));
+  b.verdade('o cartão de telas volta disponível', !(await p.isHidden('#corpo3')));
 
   await transcrever(p);
   b.verdade('dá para transcrever o material recuperado', /Ata pronta/.test(await p.textContent('#trMsg')));

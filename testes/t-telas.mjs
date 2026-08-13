@@ -19,7 +19,7 @@ export default async function (ctx, url, erros) {
   await p.click('#stop');
   await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
 
-  b.verdade('o cartão de telas aparece quando se grava a tela', !(await p.isHidden('#telasCard')));
+  b.verdade('o passo de telas abre quando se grava a tela', !(await p.isHidden('#corpo3')));
 
   /* Este bloco mede as telas: onde elas caem e como se intercalam com as falas.
      A compactação de silêncio reescreve a linha do tempo das falas de propósito

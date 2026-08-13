@@ -82,6 +82,16 @@
   .card.agora .selo{color:var(--verde-escuro)}
   .card.feito .selo{color:var(--verde-escuro)}
 
+  /* A linha que ocupa o lugar do passo enquanto ele não chega.
+
+     Antes os passos 3, 4 e 5 simplesmente não existiam na tela até serem
+     habilitados, e a queixa foi exata: "só o passo 1 e 2 fica visível, não dá
+     para saber quando passar de um para o outro". Agora os cinco estão sempre
+     lá; o que muda é o cartão estar cinza com uma frase dizendo o que vai
+     acontecer, ou aceso com o conteúdo dentro. */
+  .espera{font-size:13.5px;color:var(--muted);margin:-4px 0 0 41px;max-width:640px}
+  .card.agora .espera,.card.feito .espera{display:none}
+
   /* ---------- botões ---------- */
   button{font-family:var(--f);font-weight:700;font-size:14.5px;border:0;border-radius:11px;
          padding:12px 22px;cursor:pointer;background:var(--verde);color:#fff;
@@ -390,17 +400,24 @@
     <div class="status" id="trMsg"></div>
     <div class="status" id="modeloMsg" style="margin-top:6px"></div>
     <p class="note" id="modeloAviso"></p>
-    <p class="note"><b>Compactar o silêncio</b> costura a fala de cada lado, tirando os vãos, e manda ao
-    modelo conversa em vez de espera. O Whisper processa sempre trinta segundos, com ou sem fala dentro —
-    então numa reunião normal isso corta o tempo pela metade ou mais. O corte só acontece em silêncio de
-    pelo menos 0,4 s, com folga em volta das palavras, e os instantes voltam para o minuto certo da
-    reunião. Se algum trecho sair no lugar errado, desmarque e refaça: a ata sai igual, só demora mais.</p>
+    <details class="explica">
+      <summary>O que é compactar o silêncio</summary>
+      <p class="note" style="margin-top:10px"><b>Compactar o silêncio</b> costura a fala de cada lado,
+      tirando os vãos, e manda ao modelo conversa em vez de espera. O Whisper processa sempre trinta
+      segundos, com ou sem fala dentro — então numa reunião normal isso corta o tempo pela metade ou
+      mais. O corte só acontece em silêncio de pelo menos 0,4 s, com folga em volta das palavras, e os
+      instantes voltam para o minuto certo da reunião. Se algum trecho sair no lugar errado, desmarque
+      e refaça: a ata sai igual, só demora mais.</p>
+    </details>
     <p class="note hide" id="fique">Mantenha esta aba aberta e visível. A transcrição roda no seu navegador
     e fica muito mais lenta se a aba for para segundo plano.</p>
   </div>
 
-  <div class="card hide" id="telasCard">
+  <div class="card" id="telasCard">
     <h2><span class="step">3</span>Telas compartilhadas<span class="selo" id="selo3">opcional</span></h2>
+    <p class="espera" id="espera3">Aparece depois de gravar com a tela compartilhada — é aqui que as
+    telas mostradas na reunião viram parte da ata.</p>
+    <div class="corpoPasso hide" id="corpo3">
     <div class="row">
       <button id="varrer">Procurar as telas mostradas</button>
       <button class="ghost hide" id="pararVarre">Parar</button>
@@ -411,10 +428,14 @@
     <div class="status" id="telasMsg"></div>
     <p class="status hide" id="telasDica">Clique em qualquer tela para tirá-la da ata.</p>
     <div class="telas" id="telas"></div>
+    </div>
   </div>
 
-  <div class="card hide" id="ataCard">
+  <div class="card" id="ataCard">
     <h2><span class="step">4</span>Ata<span class="selo" id="selo4">sai pronta</span></h2>
+    <p class="espera" id="espera4">Aparece quando a transcrição terminar: cada fala com o instante e
+    quem falou, para baixar em PDF, texto ou legenda.</p>
+    <div class="corpoPasso hide" id="corpo4">
 
     <div class="infoReuniao" id="infoReuniao">
       <label class="campo">Título da reunião
@@ -442,11 +463,15 @@
     <p class="status" id="dicaNomes">Clique no nome em qualquer fala para trocar quem falou. Os nomes entram
     na ata, no PDF, no texto e na legenda.</p>
 
-    <div id="ata" data-usuario></div>
+    <div id="ata"></div>
+    </div>
   </div>
 
   <div class="card hide" id="iaCard">
     <h2><span class="step">5</span>Resumo, decisões e pendências<span class="selo" id="selo5">com conta</span></h2>
+    <p class="espera" id="espera5">Aparece com a ata na tela: resumo da reunião, decisões, pendências
+    com responsável e prazo, e o e-mail pronto para os participantes.</p>
+    <div class="corpoPasso hide" id="corpo5">
 
     <div class="status" id="iaEstado"></div>
 
@@ -470,7 +495,7 @@
 
     <div class="bar hide" id="iaBarWrap"><i id="iaBar"></i></div>
     <div class="status" id="iaMsg"></div>
-    <div id="iaSaida" data-usuario></div>
+    <div id="iaSaida"></div>
 
     <div class="emailBox hide" id="emailBox">
       <h3>E-mail para os participantes</h3>
@@ -493,6 +518,7 @@
     <p class="note"><b>O que sai daqui:</b> o texto da ata, e só quando você clica. O áudio e o vídeo
     continuam no seu computador, sempre. O texto é usado para gerar o resumo e descartado — não fica
     guardado em servidor nenhum, nem no nosso.</p>
+    </div>
   </div>
 
   <video id="vid" class="hide" muted playsinline preload="auto"></video>

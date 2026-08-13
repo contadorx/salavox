@@ -21,10 +21,18 @@
       a ferramenta guarda a gravação no disco, não na memória da
       aba. Durante uma gravação o seletor fica desligado.
 
-   2. Nada que a pessoa escreveu é traduzido. A ata, o resumo, o
-      e-mail e os campos de nome ficam de fora da varredura por
-      `data-usuario` — traduzir a fala de um cliente seria o pior
+   2. Nada que a pessoa escreveu é traduzido. O que ela escreve é
+      editável na tela — a fala da ata, o corpo do resumo, o texto
+      do e-mail — e `contenteditable` já marca isso melhor do que
+      qualquer atributo nosso. O que não é editável mas também é
+      dela, como os nomes digitados e o assunto do e-mail, leva
+      `data-usuario`. Traduzir a fala de um cliente seria o pior
       defeito possível neste produto.
+
+      A primeira versão marcava a ata inteira como da pessoa, e
+      com isso a legenda "tela mostrada em 00:09" — que é
+      interface, não fala de ninguém — ficava em português dentro
+      da ata em inglês.
 
    O que garante que não fica texto para trás não é a boa vontade:
    é `testes/t-idioma.mjs`, que percorre a ferramenta inteira em
@@ -121,6 +129,9 @@
     "Ao usar o envio por e-mail você declara ter autorização para enviar aquele conteúdo aos endereços informados. A mensagem sai identificada como enviada pelo Salavox, com a sua conta como remetente para resposta. É proibido usar essa função para mensagem não solicitada em massa.": "By using the e-mail sending function you declare that you are authorised to send that content to the addresses given. The message goes out identified as sent by Salavox, with your account as the address for replies. Using this function for unsolicited bulk messaging is prohibited.",
     "Ao usar o serviço, você concorda com estes termos. Se não concordar, não o utilize.": "By using the service, you agree to these terms. If you do not agree, do not use it.",
     "Apagar": "Delete",
+    "Aparece com a ata na tela: resumo da reunião, decisões, pendências com responsável e prazo, e o e-mail pronto para os participantes.": "Appears once the minutes are on screen: meeting summary, decisions, open items with owner and due date, and the e-mail ready for the participants.",
+    "Aparece depois de gravar com a tela compartilhada — é aqui que as telas mostradas na reunião viram parte da ata.": "Appears after you record with the screen shared — this is where the screens shown in the meeting become part of the minutes.",
+    "Aparece quando a transcrição terminar: cada fala com o instante e quem falou, para baixar em PDF, texto ou legenda.": "Appears when the transcription finishes: every line with its timestamp and who spoke, to download as PDF, text or subtitles.",
     "Aplicativo de celular": "Phone app",
     "Armazenamento no seu navegador": "Storage in your browser",
     "Arquivo": "File",
@@ -179,6 +190,7 @@
     "Copiar o e-mail": "Copy the e-mail",
     "Crie a conta e experimente com": "Create the account and try it with",
     "Dados que não coletamos, em nenhum plano": "Data we do not collect, on any plan",
+    "Decisions": "Decisions",
     "Depende do seu computador e do modelo escolhido. Blocos sem fala são pulados, o que ajuda bastante em reunião real. A tela mostra percentual e previsão enquanto roda.": "It depends on your computer and the model you choose. Blocks with no speech are skipped, which helps a lot in a real meeting. The screen shows a percentage and an estimate while it runs.",
     "Depois da primeira vez, sem internet": "After the first time, no internet needed",
     "Detalhes nos": "Details in the",
@@ -259,7 +271,9 @@
     "Marcar este momento": "Flag this moment",
     "Marcar momentos e nomear quem falou": "Flag moments and name who spoke",
     "Meeting of 13 August 2026": "Meeting of 13 August 2026",
+    "Meeting summary": "Meeting summary",
     "Menores de idade": "Minors",
+    "Minutes organised.": "Minutes organised.",
     "Modelo de aviso e política de retenção": "Notice template and retention policy",
     "Momentos marcados:": "Flagged moments:",
     "Na máxima extensão permitida pela lei, não nos responsabilizamos por perdas ou danos decorrentes do uso ou da impossibilidade de uso do serviço, incluindo gravação perdida, transcrição incorreta, resumo impreciso, perda de dados, lucros cessantes, danos reputacionais ou responsabilização de terceiros. Na parte gratuita, o uso se dá por conta e risco do usuário. Na parte paga, e onde a lei não permitir exclusão, nossa responsabilidade fica limitada ao valor pago pelo usuário nos doze meses anteriores ao evento.": "To the fullest extent permitted by law, we are not liable for losses or damages arising from the use or the impossibility of use of the service, including a lost recording, an incorrect transcript, an inaccurate summary, data loss, lost profits, reputational harm or liability towards third parties. In the free part, use is at the user's own risk. In the paid part, and where the law does not permit exclusion, our liability is limited to the amount paid by the user in the twelve months before the event.",
@@ -269,6 +283,7 @@
     "Nenhum robô entra na chamada e nada sai do seu computador — a gravação e a transcrição acontecem aqui, no seu navegador.": "No bot joins the call and nothing leaves your computer — recording and transcription happen right here, in your browser.",
     "Nenhum robô entra na chamada — e, mais importante,": "No bot joins the call — and, more to the point,",
     "Nenhuma ferramenta de nuvem faz isso": "No cloud tool does this",
+    "Next steps": "Next steps",
     "No seu computador, e só. A gravação, a transcrição e a ata nascem e ficam aí — não há para onde elas subirem. Se você assinar o plano pago existe conta e existe servidor, mas o que ele vê é o seu e-mail, o seu plano e quantos resumos você pediu no mês; gravação, ele nunca vê. Esta página, aliás, não faz uma única chamada a servidor de terceiro: nem fonte, nem rastreador, nem estatística.": "On your computer, and nowhere else. The recording, the transcript and the minutes are born and stay there — there is nowhere for them to go up to. If you subscribe to the paid plan there is an account and there is a server, but what it sees is your e-mail, your plan and how many summaries you asked for this month; the recording, it never sees. This page, incidentally, does not make a single call to any third-party server: no font, no tracker, no analytics.",
     "Nome de cliente, sigla e termo técnico que a transcrição sempre erra: escreva uma vez e ele corrige em todas as atas. Em português — o que nem os pagos oferecem.": "Client names, acronyms and technical terms the transcript always gets wrong: write them once and it fixes them in every set of minutes.",
     "Nome ou razão social": "Name or company name",
@@ -303,6 +318,7 @@
     "O que sai daqui:": "What leaves this page:",
     "O que sai de cada lado já vem etiquetado, sem precisar reconhecer voz nenhuma.": "What comes out of each side arrives already labelled, without recognising any voice.",
     "O que você leva embora": "What you take away",
+    "O que é compactar o silêncio": "What compacting the silence means",
     "O que é seu deixa de ser seu": "What is yours stops being yours",
     "O reconhecimento de voz roda no seu próprio computador, usando a placa de vídeo. Em português, inglês, espanhol — ou deixe que ele descubra o idioma.": "Speech recognition runs on your own computer, using the graphics card. In Portuguese, English, Spanish — or let it work out the language.",
     "O registro do consentimento": "The consent record",
@@ -319,6 +335,8 @@
     "Onde ele ganha e onde ele perde": "Where it wins and where it loses",
     "Onde ficam as gravações?": "Where are the recordings kept?",
     "Onde o áudio é processado": "Where the audio is processed",
+    "Open items": "Open items",
+    "Organised minutes": "Organised minutes",
     "Organizar a ata": "Organise the minutes",
     "Os dados dos participantes são de sua responsabilidade": "The participants' data are your responsibility",
     "Os nomes são seus": "The names are yours",
@@ -327,6 +345,7 @@
     "Ou detecção automática, quando a reunião muda de idioma no meio e ninguém quer escolher antes.": "Or automatic detection, for when the meeting switches language halfway and nobody wants to choose in advance.",
     "PARTICIPANTES": "PARTICIPANTS",
     "PARTICIPANTES, VOCÊ": "PARTICIPANTS, YOU",
+    "PARTICIPANTS": "PARTICIPANTS",
     "PARTICIPANTS, YOU": "PARTICIPANTS, YOU",
     "PDF, texto ou legenda, com o instante de cada fala, quem falou e as telas compartilhadas. Com o resumo e as pendências junto, se você assinar.": "PDF, text or subtitles, with the timestamp of every line, who spoke and the screens that were shared. With the summary and the open items alongside, if you subscribe.",
     "PDF, texto, legenda e a gravação": "PDF, text, subtitles and the recording",
@@ -368,6 +387,7 @@
     "R$ 0": "R$ 0",
     "R$ 19,90": "R$ 19.90",
     "R$ 19,90 — sem entregar a reunião": "R$ 19.90 — without handing over the meeting",
+    "ROOM": "ROOM",
     "Receba a ata": "Get the minutes",
     "Receber o link": "Get the link",
     "Recupera a reunião se o navegador fechar no meio": "Recovers the meeting if the browser closes halfway",
@@ -422,6 +442,7 @@
     "Só há 0.4 GB livres para o navegador.": "Only 0.4 GB free for the browser.",
     "Só o texto sobe": "Only the text goes up",
     "Só para quem assina:": "Only for subscribers:",
+    "TRANSCRIPT": "TRANSCRIPT",
     "Tecla M marca o momento": "The M key flags the moment",
     "Telas compartilhadas": "Shared screens",
     "Telas compartilhadas embutidas na ata": "Shared screens embedded in the minutes",
@@ -473,6 +494,7 @@
     "Você é o único responsável pelo que grava, por como usa o material e por eventuais danos a terceiros decorrentes da gravação, da transcrição ou da divulgação do conteúdo. Isso inclui responsabilidade civil, criminal, administrativa e disciplinar perante conselhos profissionais.": "You are solely responsible for what you record, for how you use the material and for any harm to third parties arising from the recording, the transcript or the disclosure of the content. This includes civil, criminal, administrative and disciplinary liability before professional bodies.",
     "Vocês têm SOC 2, ISO 27001, essas certificações?": "Do you have SOC 2, ISO 27001, those certifications?",
     "When:": "When:",
+    "YOU": "YOU",
     "a hora em que a gravação começou": "the time the recording started",
     "a hora em que copiou o texto do aviso": "the time you copied the text of the notice",
     "a hora em que você confirmou": "the time you confirmed",
@@ -485,8 +507,12 @@
     "até encher a cota; depois se apaga para gravar de novo": "until the quota fills; then things are deleted to record again",
     "canal direito": "right channel",
     "canal esquerdo": "left channel",
+    "clique para corrigir o texto": "click to fix the text",
+    "clique para remover esta marca": "click to remove this mark",
+    "clique para trocar quem falou": "click to change who spoke",
     "com conta": "with an account",
     "com hora e o texto do aviso": "with the time and the text of the notice",
+    "com o plano": "with the plan",
     "comece aqui": "start here",
     "compactar o silêncio antes de transcrever": "compact the silence before transcribing",
     "compartilha a tela e capta o áudio da chamada": "shares the screen and captures the call audio",
@@ -538,6 +564,7 @@
     "já chegam separadas": "arrive already separated",
     "mandar o áudio para fora": "send the audio outside",
     "marque a opção de compartilhar o áudio": "tick the option to share the audio",
+    "momento marcado durante a reunião": "moment flagged during the meeting",
     "momento marcado em 00:02": "moment flagged at 00:02",
     "na chamada": "in the call",
     "na maioria, sim": "in most, yes",
@@ -607,6 +634,7 @@
     "sua conta": "your account",
     "sua vez": "your turn",
     "só o microfone — é o modo que funciona no celular": "microphone only — this is the mode that works on a phone",
+    "telas": "screens",
     "ter": "having it",
     "termos": "terms",
     "termos de uso": "terms of use",
@@ -641,6 +669,7 @@
     "— sem cartão. Depois, o plano profissional tem 30 rápidos e 5 precisos por mês, mais o envio da ata por e-mail. Gravar, transcrever, varrer as telas e exportar continua": "— no card. After that, the professional plan has 30 fast and 5 precise per month, plus sending the minutes by e-mail. Recording, transcribing, sweeping the screens and exporting stay",
     "— tudo roda neste computador.": "— everything runs on this computer.",
     "— você escolhe na hora de pagar": "— you choose at the moment of payment",
+    "“A note to everyone: I am recording this meeting to produce the minutes. The recording and the transcript stay on my computer and are not sent to any outside service. If you would rather not be recorded, please say so now.”": "“A note to everyone: I am recording this meeting to produce the minutes. The recording and the transcript stay on my computer and are not sent to any outside service. If you would rather not be recorded, please say so now.”",
     "“Aviso a todos: estou gravando esta reunião para gerar a ata. A gravação e a transcrição ficam no meu computador e não são enviadas a nenhum serviço externo. Quem preferir que não seja gravado, por favor diga agora.”": "“A note to everyone: I am recording this meeting to produce the minutes. The recording and the transcript stay on my computer and are not sent to any outside service. If you would rather not be recorded, please say so now.”",
     "← voltar ao site": "← back to the site"
   };
@@ -675,6 +704,7 @@
     [/^Perguntar à ata: (.+)$/, 'Ask the minutes: $1'],
     [/^momento marcado em ([\d:]+)$/, 'moment flagged at $1'],
     [/^tela mostrada em ([\d:]+)$/, 'screen shown at $1'],
+    [/^★ ([\d:]+)$/, '★ $1'],
     [/^— (\d+) trechos?\.$/, '— $1 passages.'],
     [/^([\d.,]+)× o tempo real$/, '$1× real time'],
     [/^(\d+) resumos? de cortesia$/, '$1 complimentary summaries']
@@ -850,11 +880,25 @@
     });
   }
 
+  /* As capturas da página inicial são da ferramenta de verdade, com uma
+     reunião de verdade dentro — e por isso elas também têm idioma. Existem em
+     `/img/` e em `/img/en/`, geradas pelo mesmo script. Se a versão em inglês
+     faltar, o `onerror` devolve a original: página com imagem quebrada é pior
+     do que página com imagem na língua errada. */
+  function trocarImagens() {
+    document.querySelectorAll('img[src^="/img/"]').forEach(im => {
+      const antes = im.getAttribute('src');
+      if (antes.indexOf('/img/en/') === 0) return;
+      im.onerror = () => { im.onerror = null; im.setAttribute('src', antes); };
+      im.setAttribute('src', antes.replace('/img/', '/img/en/'));
+    });
+  }
+
   function iniciar() {
     const id = idiomaAtual();
     document.documentElement.lang = id === 'en' ? 'en' : 'pt-BR';
     ligarSeletor();
-    if (id === 'en') { traduzirCabeca(); varrer(document.body); observar(); }
+    if (id === 'en') { traduzirCabeca(); trocarImagens(); varrer(document.body); observar(); }
   }
 
   window.SalavoxIdioma = {

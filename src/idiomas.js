@@ -21,10 +21,18 @@
       a ferramenta guarda a gravação no disco, não na memória da
       aba. Durante uma gravação o seletor fica desligado.
 
-   2. Nada que a pessoa escreveu é traduzido. A ata, o resumo, o
-      e-mail e os campos de nome ficam de fora da varredura por
-      `data-usuario` — traduzir a fala de um cliente seria o pior
+   2. Nada que a pessoa escreveu é traduzido. O que ela escreve é
+      editável na tela — a fala da ata, o corpo do resumo, o texto
+      do e-mail — e `contenteditable` já marca isso melhor do que
+      qualquer atributo nosso. O que não é editável mas também é
+      dela, como os nomes digitados e o assunto do e-mail, leva
+      `data-usuario`. Traduzir a fala de um cliente seria o pior
       defeito possível neste produto.
+
+      A primeira versão marcava a ata inteira como da pessoa, e
+      com isso a legenda "tela mostrada em 00:09" — que é
+      interface, não fala de ninguém — ficava em português dentro
+      da ata em inglês.
 
    O que garante que não fica texto para trás não é a boa vontade:
    é `testes/t-idioma.mjs`, que percorre a ferramenta inteira em
@@ -75,6 +83,7 @@
     [/^Perguntar à ata: (.+)$/, 'Ask the minutes: $1'],
     [/^momento marcado em ([\d:]+)$/, 'moment flagged at $1'],
     [/^tela mostrada em ([\d:]+)$/, 'screen shown at $1'],
+    [/^★ ([\d:]+)$/, '★ $1'],
     [/^— (\d+) trechos?\.$/, '— $1 passages.'],
     [/^([\d.,]+)× o tempo real$/, '$1× real time'],
     [/^(\d+) resumos? de cortesia$/, '$1 complimentary summaries']
@@ -250,11 +259,25 @@
     });
   }
 
+  /* As capturas da página inicial são da ferramenta de verdade, com uma
+     reunião de verdade dentro — e por isso elas também têm idioma. Existem em
+     `/img/` e em `/img/en/`, geradas pelo mesmo script. Se a versão em inglês
+     faltar, o `onerror` devolve a original: página com imagem quebrada é pior
+     do que página com imagem na língua errada. */
+  function trocarImagens() {
+    document.querySelectorAll('img[src^="/img/"]').forEach(im => {
+      const antes = im.getAttribute('src');
+      if (antes.indexOf('/img/en/') === 0) return;
+      im.onerror = () => { im.onerror = null; im.setAttribute('src', antes); };
+      im.setAttribute('src', antes.replace('/img/', '/img/en/'));
+    });
+  }
+
   function iniciar() {
     const id = idiomaAtual();
     document.documentElement.lang = id === 'en' ? 'en' : 'pt-BR';
     ligarSeletor();
-    if (id === 'en') { traduzirCabeca(); varrer(document.body); observar(); }
+    if (id === 'en') { traduzirCabeca(); trocarImagens(); varrer(document.body); observar(); }
   }
 
   window.SalavoxIdioma = {

@@ -5,8 +5,15 @@
    esquecer de regerar, a diferença aparece — o que é bem melhor do que uma
    maquete bonita que nunca correspondeu a nada.
 
-   Uso:  node ferramentas/gerar-imagens.mjs
-   Saída: public/img/*.webp  e  public/img/pdf.png (via pdftoppm) */
+   Uso:  node ferramentas/gerar-imagens.mjs        (português)
+         node ferramentas/gerar-imagens.mjs en     (inglês)
+   Saída: public/img/*.webp  —  e public/img/en/*.webp no caso do inglês.
+
+   Por que duas vezes e não uma tradução da imagem: a captura é da ferramenta
+   de verdade, com uma reunião de verdade dentro. Traduzir só as legendas
+   deixaria a reunião de exemplo em português dentro de uma página em inglês —
+   que foi exatamente o que aconteceu quando o site ganhou inglês e as imagens
+   não. Aqui a reunião de exemplo também muda de língua. */
 
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
@@ -14,12 +21,61 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { servir, RAIZ } from '../testes/apoio.mjs';
 
-const IMG = path.join(RAIZ, 'public', 'img');
+const IDIOMA = (process.argv[2] || 'pt').toLowerCase() === 'en' ? 'en' : 'pt';
+const IMG = IDIOMA === 'en' ? path.join(RAIZ, 'public', 'img', 'en')
+                            : path.join(RAIZ, 'public', 'img');
 fs.mkdirSync(IMG, { recursive: true });
+
+/* A reunião de exemplo, nas duas línguas. É conteúdo, não interface: o
+   dicionário de `idiomas.js` não alcança o que é pintado num canvas nem o que
+   sai do modelo de transcrição. */
+const CONTEUDO = {
+  pt: {
+    telas: ['Fechamento de agosto — apuração', 'Conciliação bancária — pendências',
+            'Pendências do cliente', 'Próximos passos'],
+    colunas: ['Regime', 'Base de cálculo', 'Alíquota', 'Imposto'],
+    linhas: [['Simples Nacional', 'R$ 184.200,00', '6,00%', 'R$ 11.052,00'],
+             ['Lucro Presumido', 'R$ 96.500,00', '11,33%', 'R$ 10.933,45'],
+             ['Retenções', 'R$ 12.400,00', '4,65%', 'R$ 576,60']],
+    total: 'Total apurado',
+    nota: 'três lançamentos sem contrapartida na semana de 15/08',
+    tarefas: ['Enviar extratos de duas contas', 'Confirmar a nota 4.812 cancelada',
+              'Assinar a guia do INSS', 'Retorno sobre o pró-labore'],
+    passos: [['sexta-feira', 'entrega da apuração'], ['segunda', 'fechamento com o cliente'],
+             ['dia 20', 'envio das guias']],
+    voce: [[2, 'Vamos começar pelo fechamento de agosto.'],
+           [11, 'Consigo entregar a apuração até sexta-feira.'],
+           [21, 'Te mando hoje a relação dos lançamentos que faltam.']],
+    outros: [[6, 'A conciliação ainda está com três lançamentos em aberto.'],
+             [15, 'Esse valor de imposto ficou diferente do mês passado?'],
+             [26, 'Perfeito, aí a gente fecha na segunda.']]
+  },
+  en: {
+    telas: ['August close — tax computation', 'Bank reconciliation — open items',
+            'Client open items', 'Next steps'],
+    colunas: ['Regime', 'Taxable base', 'Rate', 'Tax'],
+    linhas: [['Simplified regime', '184,200.00', '6.00%', '11,052.00'],
+             ['Deemed profit', '96,500.00', '11.33%', '10,933.45'],
+             ['Withholdings', '12,400.00', '4.65%', '576.60']],
+    total: 'Total computed',
+    nota: 'three entries with no matching counterpart in the week of the 15th',
+    tarefas: ['Send statements for two accounts', 'Confirm invoice 4,812 was cancelled',
+              'Sign the payroll tax form', 'Come back on the owner\'s draw'],
+    passos: [['Friday', 'deliver the computation'], ['Monday', 'close with the client'],
+             ['the 20th', 'file the payment forms']],
+    voce: [[2, 'Let us start with the August close.'],
+           [11, 'I can deliver the computation by Friday.'],
+           [21, 'I will send you the list of missing entries today.']],
+    outros: [[6, 'The reconciliation still has three open entries.'],
+             [15, 'Did this tax figure come out different from last month?'],
+             [26, 'Perfect, then we close on Monday.']]
+  }
+}[IDIOMA];
 
 /* Tela compartilhada de exemplo: um material de escritório contábil, trocando
    a cada nove segundos. Nada de "SLIDE 1" — a imagem vai para a página inicial. */
 const TELA_EXEMPLO = `(() => {
+  const C = ${JSON.stringify(CONTEUDO)};
   /* Disco de uma máquina normal. Sem isso, a captura sai com o aviso de pouco
      espaço do ambiente de teste — que é verdadeiro aqui e mentira no computador
      de quem vai ver a imagem. */
@@ -42,17 +98,16 @@ const TELA_EXEMPLO = `(() => {
     };
 
     const telas = [
-      () => { moldura('Fechamento de agosto — apuração');
-        linha(120, ['Regime','Base de cálculo','Alíquota','Imposto'], [280,260,180,200], M, '600');
+      () => { moldura(C.telas[0]);
+        linha(120, C.colunas, [280,260,180,200], M, '600');
         x.fillStyle = L; x.fillRect(40,136,920,1);
-        [['Simples Nacional','R$ 184.200,00','6,00%','R$ 11.052,00'],
-         ['Lucro Presumido','R$ 96.500,00','11,33%','R$ 10.933,45'],
-         ['Retenções','R$ 12.400,00','4,65%','R$ 576,60']]
+        C.linhas
           .forEach((r,i) => { linha(180+i*54, r, [280,260,180,200], T);
                               x.fillStyle=L; x.fillRect(40,196+i*54,920,1); });
-        linha(350, ['Total apurado','','','R$ 22.562,05'], [280,260,180,200], A, '600'); },
+        linha(350, [C.total,'','','22.562,05'.replace(',', C.total === 'Total computed' ? '.' : ',')],
+              [280,260,180,200], A, '600'); },
 
-      () => { moldura('Conciliação bancária — pendências');
+      () => { moldura(C.telas[1]);
         const barras = [['01/08',150],['08/08',95],['15/08',210],['22/08',60],['29/08',130]];
         barras.forEach((b,i) => {
           const h = b[1]; const px = 90 + i*170;
@@ -60,18 +115,16 @@ const TELA_EXEMPLO = `(() => {
           x.fillStyle = M; x.font='15px system-ui,sans-serif'; x.fillText(b[0], px+18, 406);
         });
         x.fillStyle = M; x.font='16px system-ui,sans-serif';
-        x.fillText('três lançamentos sem contrapartida na semana de 15/08', 90, 444); },
+        x.fillText(C.nota, 90, 444); },
 
-      () => { moldura('Pendências do cliente');
-        ['Enviar extratos de duas contas','Confirmar a nota 4.812 cancelada',
-         'Assinar a guia do INSS','Retorno sobre o pró-labore'].forEach((t,i) => {
+      () => { moldura(C.telas[2]);
+        C.tarefas.forEach((t,i) => {
           x.strokeStyle = A; x.lineWidth = 2; x.strokeRect(42, 118+i*62, 20, 20);
           x.fillStyle = T; x.font='19px system-ui,sans-serif'; x.fillText(t, 80, 136+i*62);
         }); },
 
-      () => { moldura('Próximos passos');
-        [['sexta-feira','entrega da apuração'],['segunda','fechamento com o cliente'],
-         ['dia 20','envio das guias']].forEach((r,i) => {
+      () => { moldura(C.telas[3]);
+        C.passos.forEach((r,i) => {
           x.fillStyle = A; x.font='600 19px system-ui,sans-serif'; x.fillText(r[0], 40, 150+i*70);
           x.fillStyle = T; x.font='19px system-ui,sans-serif'; x.fillText(r[1], 240, 150+i*70);
           x.fillStyle = L; x.fillRect(40, 172+i*70, 920, 1); }); }
@@ -93,12 +146,8 @@ const TELA_EXEMPLO = `(() => {
 const MODELO_EXEMPLO = { contentType: 'application/javascript', body: `
   export const env={allowLocalModels:1,allowRemoteModels:1,backends:{onnx:{wasm:{}}}};
   let n=0;
-  const VOCE=[[2,'Vamos começar pelo fechamento de agosto.'],
-              [11,'Consigo entregar a apuração até sexta-feira.'],
-              [21,'Te mando hoje a relação dos lançamentos que faltam.']];
-  const OUTROS=[[6,'A conciliação ainda está com três lançamentos em aberto.'],
-                [15,'Esse valor de imposto ficou diferente do mês passado?'],
-                [26,'Perfeito, aí a gente fecha na segunda.']];
+  const VOCE=${JSON.stringify(CONTEUDO.voce)};
+  const OUTROS=${JSON.stringify(CONTEUDO.outros)};
   export async function pipeline(){ return async () => { n++;
     const f = n===1 ? VOCE : OUTROS;
     return { chunks: f.map(p => ({ timestamp:[p[0], p[0]+3], text:p[1] })) };
@@ -113,10 +162,18 @@ const servidor = await servir(8161);
 const ctx = await nav.newContext({ permissions: ['microphone'], viewport: { width: 820, height: 900 }, deviceScaleFactor: 2 });
 const p = await ctx.newPage();
 await p.route('**/@huggingface/transformers@**', r => r.fulfill(MODELO_EXEMPLO));
+await p.addInitScript(`try { localStorage.setItem('salavox.idioma', ${JSON.stringify(IDIOMA)}); } catch (e) {}`);
 await p.addInitScript(TELA_EXEMPLO);
 await p.goto(servidor.url + '/app');
 
 console.log('gravando 30 s de reunião de exemplo…');
+/* Sem transcrição ao vivo nesta captura.
+
+   Com ela ligada o modelo de mentira é chamado mais vezes do que os dois
+   canais, e como ele alterna as respostas por contagem de chamada, a ata de
+   exemplo saiu com três falas repetidas no fim. Numa imagem de página inicial
+   isso lê como defeito do produto — e é defeito do simulacro. */
+await p.uncheck('#aoVivo');
 await p.check('#okConsent');
 await p.click('#rec');
 await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), { timeout: 20000 });
@@ -137,10 +194,10 @@ await p.evaluate(() => document.querySelectorAll('.card .note, #solta, .ou')
 
 await p.waitForTimeout(19000);
 await p.click('#stop');
-await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), { timeout: 60000 });
+await p.waitForFunction(() => /pronta|vazia|ready|empty/i.test(document.getElementById('recMsg').textContent), { timeout: 60000 });
 
 await p.click('#trans');
-await p.waitForFunction(() => /Ata pronta|Não consegui/.test(document.getElementById('trMsg').textContent), { timeout: 120000 });
+await p.waitForFunction(() => /Ata pronta|Não consegui|Minutes ready|Could not/.test(document.getElementById('trMsg').textContent), { timeout: 120000 });
 await p.click('#varrer');
 await p.waitForFunction(() => document.querySelector('#telasMsg .ok') || document.querySelector('#telasMsg .err'), { timeout: 240000 });
 
@@ -209,4 +266,4 @@ console.log(converter(cru('ata'), pronto('hero'), 4 / 5, 690));
 console.log(converter(cru('ata'), pronto('ata'),  3 / 4, 0));
 
 for (const n of ['gravando', 'telas', 'pdf', 'ata']) fs.rmSync(cru(n));
-console.log('imagens em public/img/');
+console.log('imagens em ' + IMG);

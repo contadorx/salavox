@@ -38,7 +38,12 @@ export default async function (ctx, url, erros) {
   const importou = /pronto/.test(await p.textContent('#arqMsg'));
   b.verdade('o arquivo arrastado é aceito', importou);
   b.verdade('a transcrição fica liberada', !(await p.isEnabled('#trans')) === false);
-  b.verdade('o cartão de telas fica escondido para arquivo só de áudio', await p.isHidden('#telasCard'));
+  /* O cartão continua na tela — os cinco passos estão sempre lá. O que fica
+     fechado é o corpo dele: arquivo só de áudio não tem tela para varrer. */
+  b.verdade('o passo de telas continua na escada, mas fechado para arquivo só de áudio',
+            !(await p.isHidden('#telasCard')) && await p.isHidden('#corpo3'));
+  b.verdade('e ele diz por que ainda não dá para usar',
+            /Aparece depois de gravar/.test(await p.textContent('#espera3')));
 
   const bytes = await p.evaluate(() => window.__salavox.pcm().size);
   b.conferir('o áudio virou PCM de 40 s em disco (bytes)', bytes, 40 * 16000 * 4);

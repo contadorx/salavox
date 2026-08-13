@@ -129,6 +129,18 @@ export default async function (ctx, url, erros) {
     await q.waitForTimeout(400);
     for (const d of await q.$$('details summary')) { await d.click().catch(() => {}); }
     await q.waitForTimeout(200);
+    /* As capturas também têm idioma: elas mostram uma reunião de exemplo, e
+       uma reunião em português dentro de uma página em inglês é o mesmo
+       descuido que uma frase não traduzida — só que maior. */
+    if (nome === 'site') {
+      const fotos = await q.evaluate(() => Array.from(document.images)
+        .filter(i => /\/img\//.test(i.getAttribute('src') || ''))
+        .map(i => ({ src: i.getAttribute('src'), largura: i.naturalWidth })));
+      b.verdade('as capturas da home apontam para a versão em inglês',
+                fotos.length > 0 && fotos.every(f => f.src.indexOf('/img/en/') === 0));
+      b.verdade('e todas elas carregam de verdade',
+                fotos.length > 0 && fotos.every(f => f.largura > 0));
+    }
     const v = await q.evaluate(() => window.SalavoxIdioma ? window.SalavoxIdioma.vazamentos() : ['SEM RUNTIME']);
     v.forEach(t => sobrouFora.push(nome + ' → ' + t));
     b.verdade('a página ' + nome + ' se declara em inglês',

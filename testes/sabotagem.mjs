@@ -405,7 +405,7 @@ const SABOTAGENS = [
     nome: 'o cartão de IA aparece na instalação sem servidor',
     teste: 'telas',
     porta: 8157,
-    trocas: [["    $('iaCard').classList.toggle('hide', !(cfg && ataNaTela));",
+    trocas: [["    $('iaCard').classList.toggle('hide', !cfg);",
               "    $('iaCard').classList.remove('hide');"]],
     pega: 'quem serve o código sozinho veria um cartão de resumo que do lado dele não faz nada'
   },

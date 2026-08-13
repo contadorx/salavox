@@ -40,6 +40,31 @@ export default async function (ctx, url, erros) {
   await p.addInitScript(telaFalsa(4));
   await p.goto(url + '/app');
 
+  /* ---------- a escada de passos, antes de qualquer clique ----------
+
+     A queixa que originou isto foi literal: "somente o passo 1 e 2 fica
+     visível, não dá para saber quando passar de um passo para o outro". Os
+     passos 3, 4 e 5 só existiam depois de prontos, então quem abria a
+     ferramenta não sabia que existiam. Agora os cinco estão sempre na tela;
+     o que muda é estar cinza com uma frase ou aceso com o conteúdo. */
+  const escada = await p.evaluate(() => ['gravarCard','transCard','telasCard','ataCard','iaCard']
+    .map(id => {
+      const el = document.getElementById(id);
+      const corpo = document.getElementById('corpo' + (['gravarCard','transCard','telasCard','ataCard','iaCard'].indexOf(id) + 1));
+      return { id,
+               naTela: !el.classList.contains('hide'),
+               estado: ['agora','feito','dormindo'].find(c => el.classList.contains(c)) || 'nenhum',
+               aberto: !corpo || !corpo.classList.contains('hide') };
+    }));
+
+  b.conferir('os quatro primeiros passos aparecem antes de qualquer clique',
+             escada.slice(0, 4).map(e => e.naTela), [true, true, true, true]);
+  b.conferir('só o primeiro está aceso; os seguintes ficam cinza',
+             escada.slice(0, 4).map(e => e.estado), ['agora', 'dormindo', 'dormindo', 'dormindo']);
+  b.conferir('e os que ainda não podem ser usados ficam fechados',
+             escada.slice(2, 4).map(e => e.aberto), [false, false]);
+  b.verdade('sem camada paga, o passo 5 não entra na escada', !escada[4].naTela);
+
   /* ---------- vocabulário: a função pura, com valores golden ---------- */
   const casos = await p.evaluate(() => {
     const v = window.__salavox.aplicarVocabulario;
@@ -100,6 +125,13 @@ export default async function (ctx, url, erros) {
   b.verdade('o registro de consentimento aparece na ata',
             !(await p.isHidden('#consentReg')) &&
             /Registro de consentimento/.test(await p.textContent('#consentReg')));
+
+  const depois = await p.evaluate(() => ['telasCard','ataCard']
+    .map(id => ({ id,
+      aberto: !document.getElementById('corpo' + (id === 'telasCard' ? 3 : 4)).classList.contains('hide'),
+      estado: ['agora','feito','dormindo'].find(c => document.getElementById(id).classList.contains(c)) || 'nenhum' })));
+  b.conferir('com a ata pronta, o passo 4 abre e deixa de estar cinza',
+             depois[1], { id: 'ataCard', aberto: true, estado: 'feito' });
 
   const texto = await p.evaluate(() => window.__salavox.comoTexto());
   b.verdade('o registro entra no texto exportado', /REGISTRO DE CONSENTIMENTO/.test(texto));
