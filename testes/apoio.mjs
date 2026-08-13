@@ -143,6 +143,14 @@ const CONFIG_EM_BRANCO = {
 
 export async function paginaLimpa(ctx, erros) {
   const p = await ctx.newPage();
+  /* O Chromium do robô se declara `en-US`, e desde que a ferramenta ganhou
+     inglês isso passou a mudar o produto embaixo dos testes: a mesma mensagem
+     saía traduzida e as esperas por texto em português morriam de tempo. Os
+     blocos foram escritos para o produto em português — quem quiser o outro
+     idioma pede explicitamente, como faz `t-idioma.mjs`. */
+  await p.addInitScript(() => {
+    try { localStorage.setItem('salavox.idioma', 'pt'); } catch (e) {}
+  });
   await p.route('**/config.json', r => r.fulfill(CONFIG_EM_BRANCO));
   p.on('pageerror', e => erros.push('pageerror: ' + e.message));
   p.on('console', m => {
@@ -183,6 +191,9 @@ export async function transcrever(p, timeout = 180000) {
   await p.evaluate(() => { document.getElementById('trMsg').textContent = ''; });
   await p.click('#trans');
   await p.waitForFunction(
-    () => /Ata pronta|Não consegui/.test(document.getElementById('trMsg').textContent), null, { timeout });
+    /* Em inglês a mesma mensagem sai traduzida — esperar só pelo português
+       transformaria o bloco de idioma numa espera de três minutos. */
+    () => /Ata pronta|Não consegui|Minutes ready|Could not/.test(
+      document.getElementById('trMsg').textContent), null, { timeout });
   return p.textContent('#trMsg');
 }
