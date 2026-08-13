@@ -357,6 +357,30 @@ export default async function (ctx, url, erros) {
   espiao.restaurar();
   b.conferir('banco fora do ar ainda responde 2xx, para não travar a fila do Asaas', res.codigo, 200);
 
+  /* ---------- o que a hospedagem promete ----------
+
+     A velocidade da transcrição depende de dois cabeçalhos que não estão em
+     nenhum arquivo que o navegador execute: sem isolamento entre origens não
+     há memória compartilhada, e sem memória compartilhada o WASM roda numa
+     linha só — num computador de oito núcleos, sete parados.
+
+     O navegador testa o efeito; este trecho testa a causa. Sem ele, alguém
+     limpando o vercel.json deixaria o produto três vezes mais lento sem uma
+     linha vermelha em lugar nenhum, porque nada quebra: só fica devagar. */
+  const vercel = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'), 'utf8'));
+  const cabecalhos = {};
+  for (const r of vercel.headers || []) {
+    if (r.source !== '/(.*)') continue;
+    for (const h of r.headers || []) cabecalhos[h.key] = h.value;
+  }
+  b.conferir('a hospedagem declara o isolamento que libera as linhas do WASM',
+             { abertura: cabecalhos['Cross-Origin-Opener-Policy'],
+               embutido: cabecalhos['Cross-Origin-Embedder-Policy'] },
+             { abertura: 'same-origin', embutido: 'credentialless' });
+  /* `credentialless`, e não `require-corp`: com require-corp toda imagem, script
+     e modelo de fora precisaria mandar um cabeçalho próprio, e o modelo vem de
+     uma CDN que não manda. Seria trocar velocidade por produto quebrado. */
+
   limpar();
   for (const k of ['ASAAS_API_KEY', 'ASAAS_URL', 'ASAAS_WEBHOOK_TOKEN']) delete process.env[k];
   return b;

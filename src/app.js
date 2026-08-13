@@ -1139,6 +1139,20 @@ registerProcessor('toca', Toca);`;
   }
   mostrarModeloGuardado();
 
+  /* Quantas linhas de processador a transcrição pode usar.
+
+     `crossOriginIsolated` é a pergunta que o navegador responde depois de ler
+     os cabeçalhos de isolamento: sem isolamento não há SharedArrayBuffer, e
+     sem SharedArrayBuffer o WASM roda numa linha só, por mais núcleos que a
+     máquina tenha. */
+  const quantasLinhas = (nucleos, isolado) => {
+    if (!isolado) return 1;
+    return Math.max(1, Math.min(4, (nucleos || 2) - 1));
+  };
+
+  const linhasDoWasm = () =>
+    quantasLinhas(navigator.hardwareConcurrency, !!self.crossOriginIsolated);
+
   /* De onde vem o modelo.
 
      A primeira escolha é o nosso próprio domínio: rede de escritório costuma
@@ -1192,9 +1206,26 @@ registerProcessor('toca', Toca);`;
           mod.env.allowLocalModels = false;
           mod.env.allowRemoteModels = true;
           mod.env.useBrowserCache = true;   // sem isto, alguns navegadores baixam de novo toda vez
+          /* Quantas linhas o WASM pode usar.
+
+             Estava fixo em 1 — e passou a ser o item mais caro do produto no
+             dia em que o processador virou o caminho padrão. Uma linha só num
+             computador de oito núcleos deixa sete parados enquanto alguém
+             espera a ata.
+
+             Mais de uma linha exige memória compartilhada, e memória
+             compartilhada exige que a página esteja isolada entre origens.
+             Quem decide isso são dois cabeçalhos, que agora a hospedagem
+             manda. Onde eles não chegarem, isolado é falso e volta a ser uma
+             linha: não há como quebrar, só como não melhorar.
+
+             O teto de quatro não é timidez. O ganho achata depois disso, e a
+             transcrição divide a máquina com uma reunião acontecendo — tomar
+             todos os núcleos faria a chamada engasgar, que é o oposto do
+             objetivo. */
           try {
             const w = mod.env.backends && mod.env.backends.onnx && mod.env.backends.onnx.wasm;
-            if (w) { w.numThreads = 1; if (m.wasm) w.wasmPaths = m.wasm; }
+            if (w) { w.numThreads = m.linhas || 1; if (m.wasm) w.wasmPaths = m.wasm; }
           } catch (e) {}
           /* Progresso em bytes, não só em porcentagem.
 
@@ -1283,6 +1314,8 @@ registerProcessor('toca', Toca);`;
 
   const desempenho = () => ({
     motor: motorEmUso,
+    linhas: linhasDoWasm(),
+    isolado: !!self.crossOriginIsolated,
     modelo: promessaModelo ? promessaModelo.modelo : null,
     segundosDeAudio: relogioModelo.segundosDeAudio,
     segundos: relogioModelo.milissegundos / 1000,
@@ -1295,11 +1328,18 @@ registerProcessor('toca', Toca);`;
     if (!d.vezesOTempoReal || d.segundosDeAudio < 5) return '';
     const v = d.vezesOTempoReal;
     const quanto = n => n < 10 ? n.toFixed(1).replace('.', ',') : n.toFixed(0);
-    return `<br>Transcrito na <b>${escapar(d.motor || 'máquina local')}</b>: ` +
+    /* As linhas entram no relatório porque são a diferença entre uma máquina
+       de oito núcleos usar um e usar quatro — e porque, quando a hospedagem
+       não manda os cabeçalhos de isolamento, o número cai para 1 sem nenhum
+       erro na tela. Sem dizer aqui, uma configuração perdida ficaria invisível
+       e só apareceria como "está lento". */
+    const linhas = d.motor === 'processador' && d.linhas > 1
+      ? ` em <b>${d.linhas} linhas</b>` : '';
+    return `<br>Transcrito na <b>${escapar(d.motor || 'máquina local')}</b>${linhas}: ` +
       `${quanto(d.segundosDeAudio)} s de áudio em ${quanto(d.segundos)} s — ` +
       `<b>${v >= 10 ? v.toFixed(0) : v.toFixed(1)}× o tempo real</b>` +
       (v < 1 ? '. <span class="err">Mais lento que a própria reunião</span> — vale escolher o modelo ' +
-               'rápido, ou abrir em um navegador com aceleração por placa de vídeo.' : '.');
+               'rápido, ou marcar a placa de vídeo no passo 2.' : '.');
   }
 
   function ligarTrabalhador() {
@@ -1362,7 +1402,8 @@ registerProcessor('toca', Toca);`;
       const wasm = await acharWasm();
       return new Promise((ok, falhou) => {
         pendentes.set('modelo', { ok, falhou });
-        w.postMessage({ tipo: 'carregar', tjs: TJS, modelo, espelho, wasm, placa: usaPlaca() });
+        w.postMessage({ tipo: 'carregar', tjs: TJS, modelo, espelho, wasm,
+                        placa: usaPlaca(), linhas: linhasDoWasm() });
       });
     })();
     promessaModelo = { chave, p };
@@ -3318,7 +3359,7 @@ registerProcessor('toca', Toca);`;
     origemModelo: () => origemModelo, espelhoLocal,
     consentimento: () => consentimento, aplicarVocabulario, corrigirComVocabulario,
     resumos: () => resumos, montarPrompt, perfil: () => perfil, temPlano, cfg: () => cfg,
-    tirarLacos, nivelAlto, janelaTemVoz, limiarDoCanal, canalMudo, rmsPorQuadro,
+    tirarLacos, nivelAlto, janelaTemVoz, limiarDoCanal, canalMudo, rmsPorQuadro, quantasLinhas,
     acharFala, empacotar, instanteReal,
     podeSalvarEmFluxo, cobranca: () => cobranca, desempenho, pedidosAoModelo: () => proximoPedido - 1, vivo: () => ({ ligado: vivo.ligado, ativo: vivo.ativo, erro: vivo.erro,
                                       janelas: vivo.proxima, feitas: [...vivo.feitas] }),

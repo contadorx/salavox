@@ -51,6 +51,30 @@ export default async function (ctx, url, erros) {
   await p.selectOption('#modelo', 'onnx-community/whisper-small');
   await p.waitForTimeout(120);
 
+  /* ---------- 0b. as linhas do processador ----------
+
+     Com o processador virando o caminho padrão, o número de linhas do WASM
+     passou a ser o item mais caro do produto: estava fixo em 1, e uma linha só
+     num computador de oito núcleos deixa sete parados enquanto alguém espera a
+     ata.
+
+     Duas coisas se verificam aqui, e são independentes. A primeira é a
+     capacidade: mais de uma linha exige memória compartilhada, que só existe
+     em página isolada entre origens — se os cabeçalhos sumirem da hospedagem
+     ou do servidor de teste, isto fica vermelho em vez de ficar lento em
+     silêncio. A segunda é a conta, com valores escritos à mão. */
+  b.verdade('a página está isolada entre origens, que é o que libera as linhas',
+            await p.evaluate(() => self.crossOriginIsolated === true));
+  b.verdade('e a memória compartilhada existe',
+            await p.evaluate(() => typeof SharedArrayBuffer === 'function'));
+
+  const contas = await p.evaluate(() => {
+    const q = window.__salavox.quantasLinhas;
+    return [q(8, true), q(4, true), q(2, true), q(1, true), q(16, true), q(8, false), q(undefined, true)];
+  });
+  b.conferir('quantas linhas pedir, por núcleos e por isolamento',
+             contas, [4, 3, 1, 1, 4, 1, 1]);
+
   /* ---------- A. arquivo que já existe, arrastado para a página ---------- */
   await p.selectOption('#idioma', '');                      // detectar o idioma
   await p.evaluate(MONTAR_WAV);

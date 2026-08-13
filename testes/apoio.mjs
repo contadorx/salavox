@@ -24,7 +24,18 @@ export function servir(porta = 8131, raiz = PUBLICO) {
     if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, 'index.html');
     if (!fs.existsSync(p) && fs.existsSync(p + '.html')) p += '.html';
     if (!fs.existsSync(p)) { res.writeHead(404); res.end('nao achei'); return; }
-    res.writeHead(200, { 'Content-Type': TIPOS[path.extname(p)] || 'application/octet-stream' });
+    /* Os mesmos cabeçalhos que a Vercel manda em produção.
+
+       Sem eles aqui, a suíte validaria uma configuração que não é a que vai
+       ao ar: o isolamento entre origens muda o que o navegador permite
+       carregar, e é ele que libera as linhas do WASM. Testar sem isso seria
+       testar outro produto. */
+    res.writeHead(200, {
+      'Content-Type': TIPOS[path.extname(p)] || 'application/octet-stream',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Resource-Policy': 'cross-origin'
+    });
     fs.createReadStream(p).pipe(res);
   });
   return new Promise(ok => s.listen(porta, '127.0.0.1', () => ok({

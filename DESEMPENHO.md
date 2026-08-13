@@ -297,3 +297,61 @@ linha, e é a diferença entre «baixa uma vez» e «baixa de vez em quando».
 Espelhar o modelo no próprio domínio (`ferramentas/baixar-modelo.mjs`) já existe e resolve rede de
 escritório que bloqueia CDN de terceiro — falta decidir o custo de banda na hospedagem. As linhas do
 WASM (item 4) continuam dependendo dos cabeçalhos COOP/COEP na Vercel.
+
+---
+
+## 13/08/2026, mais tarde — as linhas do processador
+
+O item 4 desta lista estava marcado como «só ajuda quem está sem WebGPU». Isso deixou de ser verdade
+na mesma tarde em que o processador virou o caminho padrão: agora ele ajuda **todo mundo**, e passou
+a ser o item mais caro do produto.
+
+O ONNX Runtime rodava com `numThreads = 1`, escrito à mão no código. Num computador de oito núcleos,
+sete ficavam parados enquanto alguém esperava a ata.
+
+### Por que estava em 1
+
+Mais de uma linha exige `SharedArrayBuffer`, e o navegador só entrega memória compartilhada para
+páginas **isoladas entre origens**. Isolamento se pede por dois cabeçalhos de resposta, que a
+hospedagem manda — não é código que roda no navegador, é configuração de quem serve.
+
+### `credentialless`, e não `require-corp`
+
+Há duas formas de pedir isolamento. Com `require-corp`, **toda** imagem, script ou arquivo vindo de
+fora precisa mandar um cabeçalho próprio autorizando o embutimento — e o modelo vem de uma CDN que
+não manda. Seria trocar velocidade por produto quebrado.
+
+Com `credentialless`, o navegador busca o que é de fora sem credenciais e libera o isolamento assim
+mesmo. É o que está no `vercel.json`. Onde `credentialless` não existir — hoje, no Safari — o
+cabeçalho é ignorado, a página não fica isolada e volta a ser uma linha. **Não há como quebrar, só
+como não melhorar.**
+
+### O teto de quatro linhas
+
+Não é timidez: o ganho achata depois disso, e a transcrição divide a máquina com uma reunião
+acontecendo. Tomar todos os núcleos faria a chamada engasgar, que é o oposto do objetivo. A conta é
+`min(4, núcleos − 1)`, e ela tem valores golden no teste — inclusive o caso «isolado, mas máquina de
+dois núcleos», que continua em 1.
+
+### O que foi verificado, e o que não foi
+
+Verificado nesta máquina: a página fica isolada de verdade com os cabeçalhos que vão ao ar,
+`SharedArrayBuffer` existe, e a suíte inteira continua passando com o isolamento ligado — inclusive a
+conta falando com o Supabase simulado, a janela flutuante e o modelo vindo da CDN simulada. Era esse
+o risco: isolamento quebra carregamento de terceiro, e não quebrou nada.
+
+**Não verificado:** o ganho de tempo real com o modelo de verdade. Esta máquina tem dois núcleos, e
+`min(4, 2−1)` dá 1 — a única máquina onde a mudança não faz efeito nenhum. O número que vale medir é
+o «× o tempo real» que aparece no fim da transcrição, agora acompanhado de quantas linhas foram
+usadas. Se a hospedagem deixar de mandar os cabeçalhos, esse texto passa a não dizer «em N linhas»,
+e é assim que dá para perceber sem abrir o inspetor.
+
+### E a transcrição durante a reunião
+
+Ela já existe e já vem ligada — é a caixa «transcrever durante a reunião» do passo 1. A cada trinta
+segundos gravados, aquele trecho vira texto enquanto a conversa continua, e ao encerrar o passo 2
+aproveita o que já ficou pronto, dizendo quantos trechos foram adiantados.
+
+O que faltava não era começar antes: era o modelo conseguir acompanhar. Numa linha só, cada janela de
+trinta segundos podia demorar mais de trinta segundos, e a transcrição ao vivo ficava para trás sem
+nunca alcançar. É esta mudança que fecha aquela conta.
