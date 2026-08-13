@@ -40,6 +40,9 @@
   .marca img{width:30px;height:30px;display:block}
   .marca span{font-weight:800;font-size:17px;letter-spacing:-.2px;color:var(--tinta)}
   .marca b{color:var(--verde);font-weight:800}
+  .nav-fim{display:flex;align-items:center;gap:14px}
+  .selIdioma{padding:6px 8px;font-size:13px;border-radius:8px;border:1.5px solid var(--linha);
+             background:#fff;color:var(--muted)}
   .nav a.voltar{color:var(--muted);font-size:14px;font-weight:600}
   .nav a.voltar:hover{color:var(--verde-escuro)}
 
@@ -49,12 +52,35 @@
   .abertura p{color:var(--muted);font-size:16px;max-width:640px}
 
   /* ---------- cartões ---------- */
+  /* Faixa fina no topo, no lugar do antigo cartão de conta. */
+  .faixaConta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;
+              border:1px solid var(--linha);border-radius:12px;padding:11px 16px;margin-bottom:18px;
+              font-size:13.5px;color:var(--tinta-media)}
+  .faixaConta .link{color:var(--verde-escuro);font-weight:700;text-decoration:none;margin-left:auto}
+  .faixaConta .link:hover{text-decoration:underline}
+
   .card{background:#fff;border:1px solid var(--linha);border-radius:16px;padding:24px;
         margin-bottom:18px;box-shadow:var(--sombra)}
   .card h2{display:flex;align-items:center;gap:11px;font-size:19px;font-weight:800;
            letter-spacing:-.35px;color:var(--tinta);margin-bottom:16px}
   .step{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;
-        background:var(--verde-claro);color:var(--verde-escuro);font-size:14px;font-weight:800;flex:none}
+        background:var(--verde-claro);color:var(--verde-escuro);font-size:14px;font-weight:800;flex:none;
+        transition:background .25s,color .25s}
+
+  /* Passo cuja vez ainda não chegou fica cinza, e o cartão inteiro recua. Antes
+     todos pareciam disponíveis ao mesmo tempo e não havia como saber quando
+     passar de um para o outro: a pessoa procurava o que clicar num cartão que
+     ainda não fazia nada. */
+  .card.dormindo{opacity:.5}
+  .card.dormindo .step{background:var(--linha);color:var(--tinta-suave)}
+  .card.dormindo h2{color:var(--tinta-suave)}
+  .card.agora{border-color:var(--verde);box-shadow:0 0 0 1px var(--verde),var(--sombra)}
+  .card.agora .step{background:var(--verde);color:#fff}
+  .card.feito .step{background:var(--verde-claro);color:var(--verde-escuro)}
+  .selo{margin-left:auto;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+        color:var(--tinta-suave)}
+  .card.agora .selo{color:var(--verde-escuro)}
+  .card.feito .selo{color:var(--verde-escuro)}
 
   /* ---------- botões ---------- */
   button{font-family:var(--f);font-weight:700;font-size:14.5px;border:0;border-radius:11px;
@@ -170,6 +196,11 @@
   .vocab{margin-top:16px;border:1px solid var(--linha);border-radius:12px;padding:13px 16px;background:#fff}
   .vocab summary{cursor:pointer;font-size:14px;font-weight:700;color:var(--muted)}
   .vocab textarea{width:100%;margin-top:8px;resize:vertical;font-size:13.5px}
+  /* Mesmo desenho da lista de vocabulário, classe própria de propósito: `.vocab`
+     é o nome do bloco de vocabulário, e um teste que procurava "o primeiro
+     .vocab da página" passou a abrir a caixa errada quando esta apareceu. */
+  .explica{margin-top:10px;border:1px solid var(--linha);border-radius:12px;padding:13px 16px;background:#fff}
+  .explica summary{cursor:pointer;font-size:14px;font-weight:700;color:var(--muted)}
   .alerta{border:1.5px solid var(--err);border-radius:12px;padding:14px 16px;margin-top:14px;
           background:#FDF1EE;font-size:13.5px;line-height:1.6;color:var(--tinta)}
   .alerta b{color:var(--err);font-weight:800}
@@ -181,6 +212,30 @@
   .resumo .corpo{font-size:14px;line-height:1.75;white-space:pre-wrap;outline:0}
   .resumo .corpo:focus{background:#fff;border-radius:6px}
   .resumo .pe{display:flex;gap:10px;margin-top:13px;align-items:center;flex-wrap:wrap}
+
+  /* as informações da reunião, juntas e no alto — é o que vira cabeçalho do PDF,
+     do texto e do e-mail */
+  .infoReuniao{border:1px solid var(--linha);border-radius:12px;padding:14px 16px;margin-bottom:16px;
+               background:var(--verde-50)}
+  .infoReuniao .campo{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;
+                      letter-spacing:.4px;text-transform:uppercase;color:var(--verde-escuro)}
+  .infoReuniao .campo input{flex:1;min-width:200px;font-size:15px;font-weight:600;
+                            text-transform:none;letter-spacing:0}
+  .infoReuniao .grade{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:11px;font-size:13px;
+                      color:var(--muted)}
+  .infoReuniao .grade b{color:var(--tinta);font-weight:700}
+
+  /* o e-mail sai da IA já endereçado; esta caixa é onde ele é conferido e enviado */
+  .emailBox{margin-top:18px;border:1px solid var(--linha);border-radius:12px;padding:16px 18px;
+            background:#fff}
+  .emailBox h3{font-size:11.5px;letter-spacing:1.3px;text-transform:uppercase;
+               color:var(--verde-escuro);margin-bottom:12px;font-weight:800}
+  .emailBox .campo{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px;
+                   color:var(--muted)}
+  .emailBox .campo input{flex:1;min-width:200px}
+  .emailBox .corpo{font-size:14px;line-height:1.75;white-space:pre-wrap;outline:0;
+                   border:1px solid var(--linha);border-radius:8px;padding:12px 14px;margin:10px 0 13px}
+  .emailBox .corpo:focus{border-color:var(--verde)}
 
   /* ---------- rodapé ---------- */
   .rodape{background:var(--trilho-2);color:rgba(255,255,255,.45);text-align:center;
@@ -200,7 +255,13 @@
 <nav class="nav">
   <div class="nav-inner">
     <a class="marca" href="/"><img src="/logo.svg" alt=""><span>Sala<b>vox</b></span></a>
-    <a class="voltar" href="/">&larr; voltar ao site</a>
+    <div class="nav-fim">
+      <select id="lingua" class="selIdioma" data-usuario aria-label="Idioma / Language">
+        <option value="pt">Português</option>
+        <option value="en">English</option>
+      </select>
+      <a class="voltar" href="/">&larr; voltar ao site</a>
+    </div>
   </div>
 </nav>
 
@@ -212,34 +273,15 @@
     aqui, no seu navegador.</p>
   </div>
 
-  <div class="card hide" id="contaCard">
-    <h2><span class="step">✦</span>Sua conta</h2>
-    <div class="status" id="contaEstado"></div>
-    <div class="row" style="margin-top:12px">
-      <input type="text" id="contaEmail" placeholder="seu@email.com" autocomplete="email" style="min-width:230px">
-      <button id="contaEntrar" class="hide">Entrar sem senha</button>
-      <button id="contaSair" class="ghost sm hide">Sair</button>
-      <button id="diagnostico" class="ghost sm hide">Diagnóstico</button>
-      <button id="assinar" class="hide">Assinar por R$ 19,90/mês</button>
-      <button id="cancelar" class="ghost sm hide">Cancelar assinatura</button>
-      <span class="status" id="contaMsg"></span>
-    </div>
-
-    <div class="hide" id="dadosCobranca" style="margin-top:12px">
-      <div class="row">
-        <input type="text" id="cobNome" placeholder="Nome ou razão social" maxlength="80" style="min-width:230px">
-        <input type="text" id="cobDoc" placeholder="CPF ou CNPJ" maxlength="18" autocomplete="off" style="min-width:170px">
-        <input type="text" id="cobFone" placeholder="Celular (opcional)" maxlength="16" autocomplete="off" style="min-width:150px">
-        <button id="cobConfirmar">Gerar a cobrança</button>
-        <button class="ghost sm" id="cobCancelar">Deixa pra lá</button>
-      </div>
-      <p class="note">O meio de pagamento exige nome e CPF/CNPJ para emitir a cobrança — e você vai
-      precisar deles na nota. Esses dados vão para o <b>Asaas</b>, que processa o pagamento; do nosso lado
-      fica só o identificador que ele devolve. Você escolhe <b>Pix, boleto ou cartão</b> na tela dele.</p>
-    </div>
-
-    <p class="note">A conta guarda o seu e-mail, o plano e quantos resumos você usou no mês.
-    <b>Nunca</b> guarda áudio, vídeo, transcrição ou ata — nada disso chega ao nosso servidor.</p>
+  <!-- A conta virou página própria (/conta). Aqui fica só a faixa que diz quem
+       está logado e quanto resta — cadastro e cobrança não são passo de gravar
+       ata, e ficavam no caminho todos os dias para resolver algo que se resolve
+       uma vez. -->
+  <div class="faixaConta hide" id="contaCard">
+    <span id="contaEstado">—</span>
+    <a class="link" href="/conta" id="irConta">sua conta</a>
+    <button id="diagnostico" class="ghost sm hide">Diagnóstico</button>
+    <span class="status" id="contaMsg"></span>
   </div>
 
   <div class="card hide" id="recupCard" style="border-color:var(--warn)">
@@ -251,8 +293,8 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2><span class="step">1</span>Gravar</h2>
+  <div class="card" id="gravarCard">
+    <h2><span class="step">1</span>Gravar<span class="selo" id="selo1">comece aqui</span></h2>
     <div class="consent" id="consent">
       <label class="chk"><input type="checkbox" id="okConsent">
         <span>Confirmo que vou avisar os participantes de que a reunião está sendo gravada.</span></label>
@@ -284,21 +326,24 @@
     </div>
     <div class="status" id="vivoMsg"></div>
     <div class="status" id="recMsg" style="margin-top:10px"></div>
-    <p class="note"><b>Como funciona:</b> ao começar, o navegador pergunta qual janela ou tela compartilhar —
-    escolha a da reunião e marque a opção de compartilhar o áudio. Seu microfone entra por um caminho
-    separado, e é isso que permite saber depois quem falou o quê.</p>
-    <p class="note"><b>Ficar mudo na reunião não fecha o microfone aqui.</b> O botão de silenciar do Meet, do
-    Teams ou do Zoom cala você para os outros; o Salavox continua ouvindo o microfone por conta própria — é
-    até desejável, porque assim a sua fala entra na ata mesmo quando você esquece de reabrir. Se quiser
-    mesmo parar de captar, use o botão <b>Fechar meu microfone</b> acima, que aparece durante a gravação.</p>
-    <p class="note">A reunião é gravada <b>em pedaços, direto no disco</b>, e não na memória da aba: não há
-    limite prático de duração, e o que já foi gravado sobrevive se o navegador fechar sozinho. Continua tudo
-    no seu computador — o navegador guarda esses pedaços numa área privada do próprio site.</p>
-    <p class="note"><b>Transcrever durante a reunião</b> adianta o trabalho: a cada trinta segundos gravados,
-    esse trecho já vira texto enquanto a conversa continua. Ao encerrar, quase tudo está pronto. O modelo roda
-    numa linha separada do navegador, para não atrapalhar a gravação — e no fim o áudio é medido por inteiro
-    e o que foi adiantado é conferido de novo. Se o computador for modesto, desmarque: a ata sai igual, só
-    demora mais depois.</p>
+    <p class="note" style="margin-top:14px">Ao começar, o navegador pergunta qual janela compartilhar —
+    escolha a da reunião e <b>marque a opção de compartilhar o áudio</b>. É só isso.</p>
+
+    <details class="explica">
+      <summary>Como funciona, se você quiser saber</summary>
+      <p class="note" style="margin-top:10px">Seu microfone entra por um caminho separado do áudio da
+      chamada, e é isso que permite saber depois quem falou o quê — sem robô, sem nuvem, sem separação de
+      voz por inteligência artificial.</p>
+      <p class="note"><b>Ficar mudo na reunião não fecha o microfone aqui.</b> O botão de silenciar do
+      Meet, do Teams ou do Zoom cala você para os outros; o Salavox continua ouvindo por conta própria — é
+      até desejável, porque assim a sua fala entra na ata mesmo quando você esquece de reabrir. Para parar
+      mesmo, use o botão <b>Fechar meu microfone</b>, que aparece durante a gravação.</p>
+      <p class="note">A reunião é gravada <b>em pedaços, direto no disco</b>, e não na memória da aba: não
+      há limite prático de duração, e o que já foi gravado sobrevive se o navegador fechar sozinho.</p>
+      <p class="note"><b>Transcrever durante a reunião</b> adianta o trabalho: a cada trinta segundos
+      gravados, aquele trecho já vira texto. Ao encerrar, quase tudo está pronto. O modelo roda numa linha
+      separada do navegador, para não atrapalhar a gravação. Se o computador for modesto, desmarque.</p>
+    </details>
 
     <div class="ou"><span>ou</span></div>
     <div class="solta" id="solta">
@@ -312,8 +357,8 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2><span class="step">2</span>Transcrever</h2>
+  <div class="card" id="transCard">
+    <h2><span class="step">2</span>Transcrever<span class="selo" id="selo2">depois de gravar</span></h2>
     <div class="row">
       <button id="trans" disabled>Gerar a transcrição</button>
       <select id="modelo">
@@ -355,7 +400,7 @@
   </div>
 
   <div class="card hide" id="telasCard">
-    <h2><span class="step">3</span>Telas compartilhadas</h2>
+    <h2><span class="step">3</span>Telas compartilhadas<span class="selo" id="selo3">opcional</span></h2>
     <div class="row">
       <button id="varrer">Procurar as telas mostradas</button>
       <button class="ghost hide" id="pararVarre">Parar</button>
@@ -369,13 +414,20 @@
   </div>
 
   <div class="card hide" id="ataCard">
-    <h2><span class="step">4</span>Ata</h2>
+    <h2><span class="step">4</span>Ata<span class="selo" id="selo4">sai pronta</span></h2>
+
+    <div class="infoReuniao" id="infoReuniao">
+      <label class="campo">Título da reunião
+        <input type="text" id="tituloReuniao" maxlength="90" autocomplete="off">
+      </label>
+      <div class="grade" id="infoGrade"></div>
+    </div>
+
     <div class="row">
       <button id="baixarPdf">Baixar a ata em PDF</button>
       <button id="baixarGrav" class="ghost sm">Baixar a gravação</button>
       <button id="baixarTxt" class="ghost sm">Baixar .txt</button>
       <button id="baixarVtt" class="ghost sm">Baixar .vtt</button>
-      <button id="enviarEmail" class="ghost sm hide">Enviar por e-mail</button>
       <span class="status" id="ataMsg"></span>
     </div>
 
@@ -385,30 +437,31 @@
       <label>Você é <input id="nomeVoce" placeholder="Você" maxlength="28" autocomplete="off"></label>
       <label>Do outro lado <input id="nomeGrupo" placeholder="Participantes" maxlength="28" autocomplete="off"></label>
       <label>Mais alguém <input id="nomeNovo" placeholder="nome e Enter" maxlength="28" autocomplete="off"></label>
-      <span id="chips"></span>
+      <span id="chips" data-usuario></span>
     </div>
     <p class="status" id="dicaNomes">Clique no nome em qualquer fala para trocar quem falou. Os nomes entram
     na ata, no PDF, no texto e na legenda.</p>
 
-    <div id="ata"></div>
+    <div id="ata" data-usuario></div>
   </div>
 
   <div class="card hide" id="iaCard">
-    <h2><span class="step">5</span>Resumo, decisões e pendências</h2>
+    <h2><span class="step">5</span>Resumo, decisões e pendências<span class="selo" id="selo5">com conta</span></h2>
 
     <div class="status" id="iaEstado"></div>
 
     <div id="iaAcoes" class="hide">
       <div class="row">
-        <button id="iaResumo">Resumo executivo</button>
-        <button class="ghost" id="iaPendencias">Decisões e pendências</button>
-        <button class="ghost" id="iaEmail">E-mail de acompanhamento</button>
+        <button id="iaOrganizar">Organizar a ata</button>
         <select id="iaModeloSalavox">
           <option value="rapido" selected>Rápido — 30 por mês</option>
           <option value="preciso">Preciso — 5 por mês</option>
         </select>
         <span class="status" id="iaMotorMsg"></span>
       </div>
+      <p class="status">Uma passada só, e sai tudo: <b>resumo da reunião</b>, <b>decisões</b>,
+      <b>pendências com responsável e prazo</b>, <b>próximos passos</b> e o <b>e-mail pronto</b>
+      para os participantes. Conta como um resumo, não como quatro.</p>
       <div class="row" style="margin-top:10px">
         <input type="text" id="iaPergunta" placeholder="Perguntar à ata: em quanto ficou o imposto?" autocomplete="off">
         <button class="ghost sm" id="iaPerguntar">Perguntar</button>
@@ -417,7 +470,25 @@
 
     <div class="bar hide" id="iaBarWrap"><i id="iaBar"></i></div>
     <div class="status" id="iaMsg"></div>
-    <div id="iaSaida"></div>
+    <div id="iaSaida" data-usuario></div>
+
+    <div class="emailBox hide" id="emailBox">
+      <h3>E-mail para os participantes</h3>
+      <label class="campo">Para
+        <input type="text" id="emailPara" placeholder="joao@empresa.com.br, maria@empresa.com.br" autocomplete="off">
+      </label>
+      <label class="campo">Assunto
+        <input type="text" id="emailAssunto" autocomplete="off" data-usuario>
+      </label>
+      <div class="corpo" id="emailCorpo" contenteditable="true" data-usuario></div>
+      <div class="row">
+        <button id="enviarEmail" class="hide">Enviar agora</button>
+        <button class="ghost sm" id="copiarEmail">Copiar o e-mail</button>
+        <span class="status" id="emailMsg"></span>
+      </div>
+      <p class="status" id="emailNota">A ata inteira vai junto, embaixo do texto do e-mail. Você pode
+      corrigir o texto aqui antes de enviar.</p>
+    </div>
 
     <p class="note"><b>O que sai daqui:</b> o texto da ata, e só quando você clica. O áudio e o vídeo
     continuam no seu computador, sempre. O texto é usado para gerar o resumo e descartado — não fica
@@ -429,9 +500,366 @@
 </div>
 
 <footer class="rodape">
-  Salavox versão <code>2026-08-13.992e1b2</code> — tudo roda neste computador.
+  Salavox versão <code>2026-08-13.760c292</code> — tudo roda neste computador.
   <a href="/privacidade">privacidade</a><a href="/termos">termos</a><a href="/">site</a>
 </footer>
+<script>/* ============================================================
+   Português e inglês, sem duplicar a ferramenta.
+
+   A saída óbvia seria manter dois `app.html` — um por idioma — e
+   é a saída errada: no dia seguinte um dos dois está velho, e o
+   defeito só aparece para quem fala a língua que ninguém do
+   escritório fala.
+
+   Aqui há um arquivo só, escrito em português, e um dicionário.
+   A tradução acontece no navegador, sobre o texto já montado: uma
+   varredura dos nós de texto na abertura e um observador para o
+   que a ferramenta escreve depois. Como a chave do dicionário é o
+   próprio texto em português, não existe "chave que ninguém usa"
+   nem marcação espalhada pelo HTML — o que está escrito na tela é
+   o que se procura.
+
+   Duas consequências que valem dizer em voz alta:
+
+   1. Trocar de idioma recarrega a página. É mais honesto do que
+      tentar desfazer a tradução nó por nó, e recarregar é barato:
+      a ferramenta guarda a gravação no disco, não na memória da
+      aba. Durante uma gravação o seletor fica desligado.
+
+   2. Nada que a pessoa escreveu é traduzido. A ata, o resumo, o
+      e-mail e os campos de nome ficam de fora da varredura por
+      `data-usuario` — traduzir a fala de um cliente seria o pior
+      defeito possível neste produto.
+
+   O que garante que não fica texto para trás não é a boa vontade:
+   é `testes/t-idioma.mjs`, que percorre a ferramenta inteira em
+   inglês e reprova a corrida listando cada pedaço de português
+   que ainda aparecer na tela.
+   ============================================================ */
+
+(function () {
+  'use strict';
+
+  const CHAVE = 'salavox.idioma';
+  const IDIOMAS = ['pt', 'en'];
+
+  /* ---------- o dicionário ----------
+     Chave: o texto exato em português, com os espaços já normalizados.
+     Valor: o texto em inglês. */
+  const DIC = {
+    ", e não na memória da aba: não há limite prático de duração, e o que já foi gravado sobrevive se o navegador fechar sozinho.": ", not in the tab's memory: there is no practical limit on length, and whatever was already recorded survives if the browser closes on its own.",
+    ", que aparece durante a gravação.": ", which appears while recording.",
+    ". Ele também não sai daqui.": ". It does not leave here either.",
+    ". É só isso.": ". That is all.",
+    "A ata inteira vai junto, embaixo do texto do e-mail. Você pode corrigir o texto aqui antes de enviar.": "The full minutes travel with it, below the e-mail text. You can fix the wording here before sending.",
+    "A conta serve para o resumo por IA e o envio da ata.": "The account is for the AI summary and for sending the minutes.",
+    "A reunião é gravada": "The meeting is recorded",
+    "Antes de gravar": "Before you record",
+    "Ao começar, o navegador pergunta qual janela compartilhar — escolha a da reunião e": "When you start, the browser asks which window to share — pick the meeting window and",
+    "Apagar": "Delete",
+    "Arraste aqui um arquivo de áudio ou vídeo — ou": "Drag an audio or video file here — or",
+    "Assunto": "Subject",
+    "Ata": "Minutes",
+    "Ata organizada.": "Minutes organised.",
+    "Ata pronta": "Minutes ready",
+    "Baixar .txt": "Download .txt",
+    "Baixar .vtt": "Download .vtt",
+    "Baixar a ata em PDF": "Download the minutes as PDF",
+    "Baixar a gravação": "Download the recording",
+    "Clique em qualquer tela para tirá-la da ata.": "Click any screen to take it out of the minutes.",
+    "Clique no nome em qualquer fala para trocar quem falou. Os nomes entram na ata, no PDF, no texto e na legenda.": "Click the name on any line to change who spoke. The names go into the minutes, the PDF, the text and the subtitles.",
+    "Começar a gravar": "Start recording",
+    "Como funciona, se você quiser saber": "How it works, if you want to know",
+    "Compactar o silêncio": "Compacting the silence",
+    "Confirmo que vou avisar os participantes de que a reunião está sendo gravada.": "I confirm that I will tell the participants the meeting is being recorded.",
+    "Copiar": "Copy",
+    "Copiar o aviso para colar no chat": "Copy the notice to paste in the chat",
+    "Copiar o e-mail": "Copy the e-mail",
+    "Diagnóstico": "Diagnostics",
+    "Diga para quem enviar.": "Say who to send it to.",
+    "Do outro lado": "On the other side",
+    "Duração:": "Duration:",
+    "E-mail para os participantes": "E-mail to the participants",
+    "Encerrar": "Stop",
+    "Enviando…": "Sending…",
+    "Enviar agora": "Send now",
+    "Este registro é a declaração de quem gravou, não uma verificação feita pelo Salavox — ele não entra na chamada e não tem como conferir o que foi dito.": "This record is the statement of the person who recorded, not a check made by Salavox — it does not join the call and has no way to verify what was said.",
+    "Ficar mudo na reunião não fecha o microfone aqui.": "Muting yourself in the meeting does not close the microphone here.",
+    "Gerar a transcrição": "Generate the transcript",
+    "Grave a reunião, receba a ata": "Record the meeting, get the minutes",
+    "Mais alguém": "Anyone else",
+    "Manter todas": "Keep all",
+    "Marcar este momento": "Flag this moment",
+    "Momentos marcados:": "Flagged moments:",
+    "Nenhum robô entra na chamada e nada sai do seu computador — a gravação e a transcrição acontecem aqui, no seu navegador.": "No bot joins the call and nothing leaves your computer — recording and transcription happen right here, in your browser.",
+    "Nomes de clientes, siglas e termos que a transcrição costuma errar. Um por linha. Depois de transcrever, o Salavox troca o que ficou parecido pelo termo certo.": "Client names, acronyms and terms the transcript usually gets wrong. One per line. After transcribing, Salavox swaps what came out close for the right term.",
+    "O botão de silenciar do Meet, do Teams ou do Zoom cala você para os outros; o Salavox continua ouvindo por conta própria — é até desejável, porque assim a sua fala entra na ata mesmo quando você esquece de reabrir. Para parar mesmo, use o botão": "The mute button in Meet, Teams or Zoom silences you for the others; Salavox keeps listening on its own — which is a good thing, because your words still reach the minutes when you forget to unmute. To really stop, use the button",
+    "O modelo é baixado na primeira transcrição e fica guardado no navegador para as próximas.": "The model is downloaded on the first transcription and kept in the browser for the next ones.",
+    "O que sai daqui:": "What leaves this page:",
+    "Organizar a ata": "Organise the minutes",
+    "PARTICIPANTES, VOCÊ": "PARTICIPANTS, YOU",
+    "Para": "To",
+    "Participantes": "Participants",
+    "Participantes:": "Participants:",
+    "Perguntar": "Ask",
+    "Perguntar à ata: em quanto ficou o imposto?": "Ask the minutes: how much was the tax in the end?",
+    "Preciso — 5 por mês": "Precise — 5 per month",
+    "Preparando o modelo para transcrever durante a reunião…": "Getting the model ready to transcribe during the meeting…",
+    "Quando:": "When:",
+    "Quem gravou confirmou às": "The person recording confirmed at",
+    "Registro de consentimento": "Consent record",
+    "Resumo, decisões e pendências": "Summary, decisions and open items",
+    "Resumo, decisões, pendências e próximos passos entram no PDF e no texto — e o e-mail já está pronto abaixo.": "Summary, decisions, open items and next steps go into the PDF and the text — and the e-mail is ready below.",
+    "Resumo, decisões, pendências e próximos passos entram no PDF e no texto.": "Summary, decisions, open items and next steps go into the PDF and the text.",
+    "Reunião on-line": "Online meeting",
+    "Reunião presencial": "In-person meeting",
+    "Rápido — 30 por mês": "Fast — 30 per month",
+    "Salavox versão": "Salavox version",
+    "Seu microfone entra por um caminho separado do áudio da chamada, e é isso que permite saber depois quem falou o quê — sem robô, sem nuvem, sem separação de voz por inteligência artificial.": "Your microphone comes in on a separate path from the call audio, and that is what makes it possible to tell afterwards who said what — no bot, no cloud, no AI voice separation.",
+    "Simples Nacional DIRF Construtora Andrade pró-labore": "Acme Holdings\nEBITDA\nquarterly close",
+    "Só há 0.4 GB livres para o navegador.": "Only 0.4 GB free for the browser.",
+    "Telas compartilhadas": "Shared screens",
+    "Telas:": "Screens:",
+    "Texto do aviso oferecido:": "Text of the notice offered:",
+    "Tirar": "Remove",
+    "Transcrever durante a reunião": "Transcribing during the meeting",
+    "Trechos:": "Passages:",
+    "Título da reunião": "Meeting title",
+    "Uma passada só, e sai tudo:": "One pass, and out comes everything:",
+    "Usar": "Use",
+    "Use uma gravação que você já tem": "Use a recording you already have",
+    "VOCÊ, PARTICIPANTES": "YOU, PARTICIPANTS",
+    "Vocabulário do escritório": "Your practice's vocabulary",
+    "Você": "You",
+    "Você não está em nenhuma conta —": "You are not signed in to any account —",
+    "Você tem": "You have",
+    "Você é": "You are",
+    "adianta o trabalho: a cada trinta segundos gravados, aquele trecho já vira texto. Ao encerrar, quase tudo está pronto. O modelo roda numa linha separada do navegador, para não atrapalhar a gravação. Se o computador for modesto, desmarque.": "gets the work done ahead: every thirty seconds recorded, that stretch already becomes text. By the time you stop, almost everything is ready. The model runs on a separate browser thread so it does not disturb the recording. On a modest computer, untick it.",
+    "com conta": "with an account",
+    "comece aqui": "start here",
+    "compactar o silêncio antes de transcrever": "compact the silence before transcribing",
+    "compartilha a tela e capta o áudio da chamada": "shares the screen and captures the call audio",
+    "copiado": "copied",
+    "costura a fala de cada lado, tirando os vãos, e manda ao modelo conversa em vez de espera. O Whisper processa sempre trinta segundos, com ou sem fala dentro — então numa reunião normal isso corta o tempo pela metade ou mais. O corte só acontece em silêncio de pelo menos 0,4 s, com folga em volta das palavras, e os instantes voltam para o minuto certo da reunião. Se algum trecho sair no lugar errado, desmarque e refaça: a ata sai igual, só demora mais.": "stitches each side's speech together, dropping the gaps, and sends the model conversation instead of waiting. Whisper always processes thirty seconds, with or without speech inside — so in a normal meeting this cuts the time in half or better. Cuts happen only in silences of at least 0.4 s, with slack around the words, and the timestamps go back to the right minute of the meeting. If any stretch lands in the wrong place, untick it and run again: the minutes come out the same, it just takes longer.",
+    "decisões": "decisions",
+    "disponível": "available",
+    "e o": "and the",
+    "e-mail pronto": "e-mail ready to send",
+    "em pedaços, direto no disco": "in chunks, straight to disk",
+    "entra no PDF e no texto da ata": "goes into the PDF and the text of the minutes",
+    "entrar": "sign in",
+    "escolha do computador": "pick one from your computer",
+    "gravação pronta": "recording ready",
+    "marque a opção de compartilhar o áudio": "tick the option to share the audio",
+    "nome e Enter": "name, then Enter",
+    "o Whisper traduz para inglês sem custo extra de tempo": "Whisper translates to English at no extra time cost",
+    "o texto da ata, e só quando você clica. O áudio e o vídeo continuam no seu computador, sempre. O texto é usado para gerar o resumo e descartado — não fica guardado em servidor nenhum, nem no nosso.": "the text of the minutes, and only when you click. The audio and the video stay on your computer, always. The text is used to produce the summary and then discarded — it is not kept on any server, not even ours.",
+    "para experimentar a IA do Salavox. Depois, o plano profissional tem 30 por mês por R$ 19,90.": "to try out the Salavox AI. After that, the professional plan has 30 a month for R$ 19.90.",
+    "para os participantes. Conta como um resumo, não como quatro.": "to the participants. It counts as one summary, not four.",
+    "participantes (áudio da reunião)": "participants (meeting audio)",
+    "pendências com responsável e prazo": "open items with owner and due date",
+    "placa de vídeo": "graphics card",
+    "privacidade": "privacy",
+    "próximos passos": "next steps",
+    "que avisaria os participantes e iniciou a gravação às": "that they would tell the participants, and started recording at",
+    "resumo da reunião": "a meeting summary",
+    "resumo de cortesia": "complimentary summary",
+    "resumos de cortesia": "complimentary summaries",
+    "sai pronta": "comes out ready",
+    "site": "site",
+    "sua conta": "your account",
+    "sua vez": "your turn",
+    "só o microfone — é o modo que funciona no celular": "microphone only — this is the mode that works on a phone",
+    "termos": "terms",
+    "transcrever durante a reunião": "transcribe during the meeting",
+    "tudo funciona assim mesmo": "everything works anyway",
+    "você (microfone)": "you (microphone)",
+    "voltar ao site": "back to the site",
+    "— tudo roda neste computador.": "— everything runs on this computer.",
+    "“Aviso a todos: estou gravando esta reunião para gerar a ata. A gravação e a transcrição ficam no meu computador e não são enviadas a nenhum serviço externo. Quem preferir que não seja gravado, por favor diga agora.”": "“A note to everyone: I am recording this meeting to produce the minutes. The recording and the transcript stay on my computer and are not sent to any outside service. If you would rather not be recorded, please say so now.”",
+    "← voltar ao site": "← back to the site"
+  };
+
+  /* ---------- o que carrega número no meio ----------
+     "Gravação de 00:11 pronta" não cabe num dicionário de texto exato: o
+     relógio muda a cada reunião. Estes são os poucos casos em que a frase é
+     um molde, e por isso vêm como padrão em vez de chave. A ordem importa:
+     o primeiro que casar vence. */
+  const PADROES = [
+    [/^Gravando em pedaços no disco — ([\d.,]+) MB até agora\. Pode minimizar esta aba, mas não feche\.$/,
+     'Recording to disk in chunks — $1 MB so far. You can minimise this tab, but do not close it.'],
+    [/^Gravação de ([\d:]+) pronta$/, 'Recording of $1 ready'],
+    [/^Gravação recuperada de ([\d:]+)$/, 'Recovered recording of $1'],
+    [/^— ([\d.,]+) MB em disco \(mais ([\d.,]+) MB de áudio separado para a transcrição\), com áudio da reunião, com microfone\.$/,
+     '— $1 MB on disk (plus $2 MB of separate audio for the transcript), with meeting audio, with microphone.'],
+    [/^— ([\d.,]+) MB em disco \(mais ([\d.,]+) MB de áudio separado para a transcrição\), com áudio da reunião\.$/,
+     '— $1 MB on disk (plus $2 MB of separate audio for the transcript), with meeting audio.'],
+    [/^— ([\d.,]+) MB em disco \(mais ([\d.,]+) MB de áudio separado para a transcrição\), com microfone\.$/,
+     '— $1 MB on disk (plus $2 MB of separate audio for the transcript), with microphone.'],
+    [/^— (\d+) marcas? nesta reunião$/, '— $1 flagged moment(s) in this meeting'],
+    [/^Só há ([\d.,]+) GB livres para o navegador\.$/, 'Only $1 GB free for the browser.'],
+    [/^: ([\d.,]+) s de áudio em ([\d.,]+) s —$/, ': $1 s of audio in $2 s —'],
+    [/^(\d+) de (\d+) na ata$/, '$1 of $2 in the minutes'],
+    [/^Reunião de (.+)$/, 'Meeting of $1'],
+    [/^restam <b>(\d+)<\/b>/, 'left: <b>$1</b>'],
+    [/^(\d+) trechos?$/, '$1 passages'],
+    [/^Transcrito na (.+)$/, 'Transcribed on the $1'],
+    [/^Perguntar à ata: (.+)$/, 'Ask the minutes: $1']
+  ];
+
+  function porPadrao(n) {
+    for (const [re, en] of PADROES) if (re.test(n)) return n.replace(re, en);
+    return null;
+  }
+
+  /* Palavras e sinais que denunciam português na tela. Serve ao teste,
+     não ao produto — mas mora aqui porque é aqui que a regra vive. */
+  const SINAIS = /[ãõçáàâéêíóôúÁÀÂÃÉÊÍÓÔÕÚÇ]/;
+  const PALAVRAS = new RegExp('\\b(' + [
+    'não', 'nao', 'você', 'voce', 'sua', 'seu', 'suas', 'seus', 'com', 'sem',
+    'para', 'pelo', 'pela', 'uma', 'como', 'quando', 'que', 'dos', 'das', 'aqui',
+    'reunião', 'gravação', 'arquivo', 'ata', 'texto', 'nome', 'conta', 'plano',
+    'já', 'ele', 'ela', 'isso', 'todos', 'todas', 'este', 'esta', 'aparece',
+    'entre', 'digite', 'clique', 'salvar', 'baixar', 'enviar', 'agora'
+  ].join('|') + ')\\b', 'i');
+
+  const norma = s => String(s).replace(/\s+/g, ' ').trim();
+
+  /* Endereço de e-mail, URL e nome de arquivo não são texto de interface — e
+     "example.com" tem um "com" dentro que faria o detector gritar português
+     para sempre. Some com eles antes de procurar. */
+  const semEnderecos = s => s
+    .replace(/[\w.+-]+@[\w.-]+/g, ' ')
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/\b[\w-]+\.(com|br|co|io|json|js|html|svg|txt|pdf|webm|mp4|vtt)\b/gi, ' ');
+
+  function guardado() {
+    try { return localStorage.getItem(CHAVE); } catch (e) { return null; }
+  }
+
+  /* Sem escolha guardada, vale o idioma do navegador — e só o inglês tem
+     tradução, então qualquer outra língua cai no português, que é o
+     original e não uma tradução de segunda mão. */
+  function idiomaAtual() {
+    const g = guardado();
+    if (IDIOMAS.indexOf(g) >= 0) return g;
+    const nav = (navigator.language || 'pt').toLowerCase();
+    return nav.indexOf('pt') === 0 ? 'pt' : 'en';
+  }
+
+  const FORA = 'script,style,textarea,code,[data-usuario],[contenteditable="true"]';
+
+  function podeMexer(no) {
+    const p = no.parentElement;
+    return !!p && !p.closest(FORA);
+  }
+
+  function traduzirNo(no) {
+    const bruto = no.data;
+    const n = norma(bruto);
+    if (!n) return;
+    const en = DIC[n] != null ? DIC[n] : porPadrao(n);
+    if (en == null || en === n) return;
+    const antes = /^\s*/.exec(bruto)[0];
+    const depois = /\s*$/.exec(bruto)[0];
+    no.data = antes + en + depois;
+  }
+
+  const ATRIBUTOS = ['placeholder', 'title', 'aria-label', 'alt'];
+
+  function traduzirAtributos(el) {
+    if (el.closest && el.closest('[data-usuario]')) return;
+    for (const a of ATRIBUTOS) {
+      if (!el.hasAttribute || !el.hasAttribute(a)) continue;
+      const alvo = norma(el.getAttribute(a));
+      const en = DIC[alvo] != null ? DIC[alvo] : porPadrao(alvo);
+      if (en != null) el.setAttribute(a, en);
+    }
+  }
+
+  function varrer(raiz) {
+    if (raiz.nodeType === 3) { if (podeMexer(raiz)) traduzirNo(raiz); return; }
+    if (raiz.nodeType !== 1) return;
+    if (raiz.closest && raiz.closest(FORA)) return;
+    const cam = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, {
+      acceptNode: no => podeMexer(no) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+    });
+    const achados = [];
+    for (let no = cam.nextNode(); no; no = cam.nextNode()) achados.push(no);
+    achados.forEach(traduzirNo);
+    traduzirAtributos(raiz);
+    if (raiz.querySelectorAll) raiz.querySelectorAll('*').forEach(traduzirAtributos);
+  }
+
+  /* O que a ferramenta escreve depois da abertura — mensagens de estado,
+     avisos, contadores — passa por aqui pelo mesmo caminho. Não há laço:
+     o texto já traduzido não está no dicionário, então a segunda passada
+     não muda nada e o observador silencia. */
+  function observar() {
+    const obs = new MutationObserver(lista => {
+      for (const m of lista) {
+        if (m.type === 'characterData') { if (podeMexer(m.target)) traduzirNo(m.target); }
+        else m.addedNodes.forEach(varrer);
+      }
+    });
+    obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+
+  /* ---------- o que o teste usa ---------- */
+  function vazamentos() {
+    const fora = [];
+    const cam = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode: no => podeMexer(no) && no.parentElement.offsetParent !== null
+        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+    });
+    for (let no = cam.nextNode(); no; no = cam.nextNode()) {
+      const t = norma(no.data);
+      const alvo = semEnderecos(t);
+      if (t && (SINAIS.test(alvo) || PALAVRAS.test(alvo))) fora.push(t);
+    }
+    document.querySelectorAll('[placeholder],[title],[aria-label]').forEach(el => {
+      if (el.closest('[data-usuario]')) return;
+      for (const a of ATRIBUTOS) {
+        const v = el.hasAttribute(a) ? norma(el.getAttribute(a)) : '';
+        const alvoA = semEnderecos(v);
+        if (v && (SINAIS.test(alvoA) || PALAVRAS.test(alvoA))) fora.push(v);
+      }
+    });
+    return Array.from(new Set(fora));
+  }
+
+  /* `lingua`, e não `idioma`: a ferramenta já tinha um `#idioma` — o do
+     Whisper, que escolhe a língua da transcrição. Dois seletores com o mesmo
+     id fizeram o teste de arquivo importado escolher a opção errada, num
+     campo que nem sabia da existência do outro. */
+  function ligarSeletor() {
+    const s = document.getElementById('lingua');
+    if (!s) return;
+    s.value = idiomaAtual();
+    s.onchange = () => {
+      try { localStorage.setItem(CHAVE, s.value); } catch (e) {}
+      location.reload();
+    };
+  }
+
+  function iniciar() {
+    const id = idiomaAtual();
+    document.documentElement.lang = id === 'en' ? 'en' : 'pt-BR';
+    ligarSeletor();
+    if (id === 'en') { varrer(document.body); observar(); }
+  }
+
+  window.SalavoxIdioma = {
+    atual: idiomaAtual,
+    texto: s => (idiomaAtual() === 'en' && (DIC[norma(s)] || porPadrao(norma(s)))) || s,
+    vazamentos,
+    dicionario: () => DIC
+  };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);
+  else iniciar();
+})();
+</script>
 <script>/** @license
  *
  * jsPDF - PDF Document creation from JavaScript
@@ -850,6 +1278,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   let marcoInicio = 0, marcoFim = 0;          // instantes reais de início e fim, para conferência
   let momentos = [], nomes = [], importado = false, presencial = false;
 
+  /* ---------- português e inglês, do lado do código ----------
+     A varredura de `idiomas.js` traduz o que está na TELA. O que sai da
+     ferramenta — o PDF, o .txt, a legenda, o pedido ao modelo — nunca passa
+     pelo DOM e ficaria em português numa ata em inglês. Estes três ajudantes
+     existem para isso, e o par pt/en fica no lugar onde a frase é escrita, e
+     não num dicionário longe dela. */
+  const EN = () => !!(window.SalavoxIdioma && window.SalavoxIdioma.atual() === 'en');
+  const T = (pt, en) => EN() ? en : pt;
+  const LOCAL = () => EN() ? 'en-GB' : 'pt-BR';
+
   /* Registro de consentimento. Para contador e advogado isto vale mais que
      qualquer resumo por IA: não é o consentimento em si — que é dado na
      conversa, entre pessoas — é a prova de que o aviso foi dado, com hora,
@@ -1107,6 +1545,66 @@ registerProcessor('toca', Toca);`;
   }
 
   /* ============================================================
+     De que passo é a vez.
+
+     A queixa que originou isto: "não dá para saber quando passar de um passo
+     para o outro". Os cinco cartões apareciam iguais, todos com a mesma cor de
+     número, e quem abria a página tinha de adivinhar onde clicar — inclusive nos
+     que ainda não faziam nada.
+
+     Agora existe um estado só, calculado num lugar só, e os cartões o vestem:
+
+       dormindo  a vez ainda não chegou — cinza, recuado
+       agora     é aqui que se clica — borda verde, número cheio
+       feito     já passou — número claro com o rótulo de concluído
+
+     A regra é lida de cima para baixo: o primeiro passo não concluído é o da
+     vez. Nada de máquina de estados; a ordem dos passos É a máquina de estados.
+     ============================================================ */
+
+  const PASSOS = [
+    { cartao: 'gravarCard', selo: 'selo1' },
+    { cartao: 'transCard',  selo: 'selo2' },
+    { cartao: 'telasCard',  selo: 'selo3' },
+    { cartao: 'ataCard',    selo: 'selo4' },
+    { cartao: 'iaCard',     selo: 'selo5' }
+  ];
+
+  function passos() {
+    const temGravacao = !!(blobPcm && blobPcm.size) || !!blobGravacao;
+    const temAta = falas.length > 0;
+    const temTelas = telas.length > 0;
+    return [
+      { feito: temGravacao, rotulo: temGravacao ? 'gravação pronta' : 'comece aqui' },
+      { feito: temAta, rotulo: temAta ? 'transcrita' : (temGravacao ? 'sua vez' : 'depois de gravar') },
+      { feito: temTelas, rotulo: temTelas ? `${telas.length} telas` : 'opcional' },
+      { feito: temAta, rotulo: temAta ? 'pronta' : 'sai pronta' },
+      { feito: false, rotulo: cfg ? (temPlano() || (cortesia && cortesia > 0) ? 'disponível' : 'com o plano') : 'com conta' }
+    ];
+  }
+
+  function desenharPassos() {
+    const estados = passos();
+    /* O primeiro não concluído é o da vez — e a etapa 3 não conta, porque é
+       opcional: quem não compartilhou tela nunca a completaria, e o foco ficaria
+       preso ali para sempre. */
+    let daVez = estados.findIndex((e, i) => !e.feito && i !== 2);
+    if (daVez < 0) daVez = PASSOS.length - 1;
+
+    PASSOS.forEach((p, i) => {
+      const el = $(p.cartao);
+      if (!el) return;
+      el.classList.remove('dormindo', 'agora', 'feito');
+      const escondido = el.classList.contains('hide');
+      if (estados[i].feito) el.classList.add('feito');
+      else if (i === daVez && !escondido) el.classList.add('agora');
+      else if (i > daVez) el.classList.add('dormindo');
+      const selo = $(p.selo);
+      if (selo) selo.textContent = estados[i].rotulo;
+    });
+  }
+
+  /* ============================================================
      Consentimento. A responsabilidade de avisar os participantes é
      de quem grava — a ferramenta não tem como verificar isso, então
      ao menos obriga a confirmação explícita e oferece o texto pronto.
@@ -1289,6 +1787,7 @@ registerProcessor('toca', Toca);`;
 
     const meta = { inicio: Date.now(), mime: tipo || 'video/webm', mic: !!micFluxo,
                    sistema: temSistema, tela: gravaVideo, segundos: 0, consentimento };
+    inicioReuniao = meta.inicio;      // a data que vai no cabeçalho da ata
     const salvarMeta = async () => {
       if (!TEM_OPFS) return;
       try {
@@ -1353,6 +1852,7 @@ registerProcessor('toca', Toca);`;
       }
       $('trans').disabled = false;
       if (gravaVideo) $('telasCard').classList.remove('hide'); else $('telasCard').classList.add('hide');
+      desenharPassos();
     };
 
     if (telaFluxo && telaFluxo.getVideoTracks().length) {
@@ -1555,11 +2055,14 @@ registerProcessor('toca', Toca);`;
       marcoInicio = 0; marcoFim = segundos * 1000;
       janelas = { voce: false, outros: true };
       importado = true;
+      /* Arquivo trazido de fora: a reunião é da data do arquivo, não de hoje. */
+      inicioReuniao = arquivo.lastModified || Date.now();
       consentimento = null; mostrarConsentimento();
 
       const temVideo = /^video\//.test(arquivo.type) || /\.(mp4|webm|mkv|mov|m4v|avi)$/i.test(arquivo.name);
       if (temVideo) $('telasCard').classList.remove('hide');
 
+      desenharPassos();
       aviso(`<span class="ok">${arquivo.name} pronto</span> — ${fmt(segundos)} de áudio` +
             (temVideo ? ', com vídeo para procurar telas' : '') +
             '. Agora gere a transcrição no passo 2.');
@@ -2554,8 +3057,9 @@ registerProcessor('toca', Toca);`;
      ============================================================ */
 
   const rotuloPadrao = f => f.quem === 'voce'
-    ? ($('nomeVoce').value.trim() || (presencial ? 'SALA' : 'VOCÊ'))
-    : ($('nomeGrupo').value.trim() || (importado ? 'TRANSCRIÇÃO' : 'PARTICIPANTES'));
+    ? ($('nomeVoce').value.trim() || (presencial ? T('SALA', 'ROOM') : T('VOCÊ', 'YOU')))
+    : ($('nomeGrupo').value.trim() ||
+       (importado ? T('TRANSCRIÇÃO', 'TRANSCRIPT') : T('PARTICIPANTES', 'PARTICIPANTS')));
   const rotulo = f => f.nome || rotuloPadrao(f);
 
   function desenharChips() {
@@ -2621,11 +3125,60 @@ registerProcessor('toca', Toca);`;
     return itens;
   }
 
+  /* ============================================================
+     As informações da reunião, num lugar só.
+
+     Estavam espalhadas: a data existia só dentro do PDF, a duração
+     só no relógio da gravação, os participantes só nos campos de
+     nome do passo 4, e título não existia — a ata chegava ao
+     cliente chamada "Ata de reunião", sem dizer qual.
+
+     Agora há um bloco no alto do passo 4 com título editável e o
+     resto contado a partir do que foi gravado. O que está aqui é o
+     que vira cabeçalho do PDF, do texto, do e-mail, do nome do
+     arquivo e do que o modelo lê antes de resumir.
+     ============================================================ */
+
+  let inicioReuniao = null;      // quando a gravação começou, de verdade
+
+  const dataDaReuniao = () => inicioReuniao ? new Date(inicioReuniao) : new Date();
+
+  const tituloPadrao = () => T('Reunião de ', 'Meeting of ') +
+    dataDaReuniao().toLocaleDateString(LOCAL(), { day: '2-digit', month: 'long', year: 'numeric' });
+
+  const tituloReuniao = () => ($('tituloReuniao').value || '').trim() || tituloPadrao();
+
+  /* Quem esteve na reunião, na ordem em que aparece na ata. Sai dos rótulos
+     realmente usados nas falas — não da lista de nomes digitados, que pode ter
+     gente que no fim não falou. */
+  function participantes() {
+    const vistos = [];
+    falas.forEach(f => { const r = rotulo(f); if (vistos.indexOf(r) < 0) vistos.push(r); });
+    return vistos;
+  }
+
+  function desenharInfo() {
+    $('tituloReuniao').placeholder = tituloPadrao();
+    const nTelas = telas.filter(t => t.manter).length;
+    const pares = [
+      [T('Quando', 'When'), dataDaReuniao().toLocaleString(LOCAL())],
+      [T('Duração', 'Duration'), fmt(segundos)],
+      [T('Participantes', 'Participants'), participantes().join(', ') || '—'],
+      [T('Trechos', 'Passages'), String(falas.length)]
+    ];
+    if (nTelas) pares.push([T('Telas', 'Screens'), String(nTelas)]);
+    if (momentos.length) pares.push([T('Momentos marcados', 'Flagged moments'), String(momentos.length)]);
+    $('infoGrade').innerHTML = pares.map(([k, v]) =>
+      `<span>${escapar(k)}: <b>${escapar(v)}</b></span>`).join('');
+  }
+
   function mostrarAta() {
     $('ataCard').classList.remove('hide');
     ataNaTela = true;
     desenharIa();
+    desenharPassos();
     mostrarConsentimento();
+    desenharInfo();
     $('ata').innerHTML = linhaDoTempo().map(i => {
       if (i.tipo === 'fala')
         return `<div class="fala ${i.f.quem}"><span class="t">${fmt(i.f.a)}</span>` +
@@ -2786,6 +3339,7 @@ registerProcessor('toca', Toca);`;
   };
 
   function desenharTelas() {
+    desenharPassos();
     const cx = $('telas');
     cx.innerHTML = '';
     telas.forEach((tl, i) => {
@@ -2844,7 +3398,7 @@ registerProcessor('toca', Toca);`;
   $('baixarGrav').onclick = async () => {
     if (!blobGravacao || ocupado) return;
     const ext = (blobGravacao.type.indexOf('mp4') >= 0) ? 'mp4' : 'webm';
-    const nome = nomeArquivo().replace('ata-', 'gravacao-') + '.' + ext;
+    const nome = 'salavox-gravacao-' + sufixoArquivo() + '.' + ext;
     const aviso = m => { $('ataMsg').innerHTML = m; };
 
     if (!podeSalvarEmFluxo()) {
@@ -2893,7 +3447,14 @@ registerProcessor('toca', Toca);`;
   /* ================= saídas ================= */
   /* A marca viaja com o arquivo. A ata é encaminhada para gente que nunca ouviu
      falar do produto, e o nome do arquivo é a primeira coisa que ela lê. */
-  const nomeArquivo = () => 'salavox-ata-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  /* O nome do arquivo carrega o título: quem recebe cinco atas por semana
+     precisa distinguir uma da outra sem abrir. */
+  const apelido = t => semAcento(t).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
+
+  const sufixoArquivo = () => (apelido(tituloReuniao()) || 'ata') + '-' +
+    dataDaReuniao().toISOString().slice(0, 10);
+
+  const nomeArquivo = () => 'salavox-' + sufixoArquivo();
 
   function baixar(texto, ext) {
     const a = document.createElement('a');
@@ -2904,19 +3465,42 @@ registerProcessor('toca', Toca);`;
   }
 
   const cabecalhoConsentimento = () => (consentimento && consentimento.iniciado)
-    ? `REGISTRO DE CONSENTIMENTO\nConfirmado às ${consentimento.confirmado}` +
-      (consentimento.copiado ? `, aviso copiado às ${consentimento.copiado}` : '') +
-      `, gravação iniciada às ${consentimento.iniciado}.\nTexto oferecido: "${consentimento.texto}"\n` +
-      'Declaração de quem gravou, não verificação feita pelo Salavox.\n\n'
+    ? T('REGISTRO DE CONSENTIMENTO\nConfirmado às ', 'CONSENT RECORD\nConfirmed at ') +
+      consentimento.confirmado +
+      (consentimento.copiado
+        ? T(', aviso copiado às ', ', notice copied at ') + consentimento.copiado : '') +
+      T(', gravação iniciada às ', ', recording started at ') + consentimento.iniciado + '.\n' +
+      T('Texto oferecido: "', 'Text offered: "') + consentimento.texto + '"\n' +
+      T('Declaração de quem gravou, não verificação feita pelo Salavox.\n\n',
+        'Statement by the person recording, not a check made by Salavox.\n\n')
     : '';
 
   const blocosResumo = () => resumos
     .map(r => r.titulo.toUpperCase() + '\n' + r.texto + '\n').join('\n');
 
-  const RODAPE_MARCA = '\n---\nAta gerada pelo Salavox (salavox.com) — a gravação e a transcrição ' +
-    'aconteceram no computador de quem gravou, sem passar por servidor nenhum.\n';
+  const RODAPE_MARCA = () => T(
+    '\n---\nAta gerada pelo Salavox (salavox.com) — a gravação e a transcrição ' +
+    'aconteceram no computador de quem gravou, sem passar por servidor nenhum.\n',
+    '\n---\nMinutes generated by Salavox (salavox.com) — the recording and the transcript ' +
+    'happened on the computer of the person who recorded, without passing through any server.\n');
 
-  const comoTexto = () => cabecalhoConsentimento() +
+  /* O cabeçalho do texto exportado. Antes o .txt começava direto no primeiro
+     "[00:12] VOCÊ:" — quem recebia não sabia de que reunião era. */
+  const cabecalhoReuniao = () => {
+    const nTelas = telas.filter(t => t.manter).length;
+    return tituloReuniao().toUpperCase() + '\n' +
+      dataDaReuniao().toLocaleString(LOCAL()) + T(' — duração ', ' — duration ') + fmt(segundos) + '\n' +
+      T('Participantes: ', 'Participants: ') +
+      (participantes().join(', ') || T('não informados', 'not stated')) + '\n' +
+      falas.length + (falas.length === 1 ? T(' trecho', ' passage') : T(' trechos', ' passages')) +
+      (nTelas ? ', ' + nTelas + (nTelas === 1 ? T(' tela compartilhada', ' shared screen')
+                                              : T(' telas compartilhadas', ' shared screens')) : '') +
+      (momentos.length ? ', ' + momentos.length +
+        (momentos.length === 1 ? T(' momento marcado', ' flagged moment')
+                               : T(' momentos marcados', ' flagged moments')) : '') + '\n\n';
+  };
+
+  const comoTexto = () => cabecalhoReuniao() + cabecalhoConsentimento() +
     (blocosResumo() ? blocosResumo() + '\n---\n\n' : '') + linhaDoTempo().map(i =>
     i.tipo === 'fala'    ? `[${fmt(i.f.a)}] ${rotulo(i.f)}: ${i.f.texto}` :
     i.tipo === 'momento' ? `[${fmt(i.t)}] *** momento marcado durante a reunião ***`
@@ -2927,7 +3511,8 @@ registerProcessor('toca', Toca);`;
       const h = Math.floor(s/3600), m = Math.floor(s%3600/60), sc = s%60;
       return `${pad2(h)}:${pad2(m)}:${sc.toFixed(3).padStart(6,'0')}`;
     };
-    return 'WEBVTT\nNOTE gerado pelo Salavox — salavox.com\n\n' + falas.map((f, i) => {
+    return 'WEBVTT\nNOTE ' + T('gerado pelo Salavox', 'generated by Salavox') +
+           ' — salavox.com\n\n' + falas.map((f, i) => {
       const fim = i + 1 < falas.length ? Math.min(falas[i+1].a, f.a + 12) : f.a + 5;
       return `${t(f.a)} --> ${t(Math.max(fim, f.a + 0.5))}\n` +
              `<v ${rotulo(f)}>${f.texto}`;
@@ -2940,48 +3525,69 @@ registerProcessor('toca', Toca);`;
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     const PW = 210, PH = 297, M = 18, CW = PW - M * 2;
-    const quando = new Date();
-    const dataTxt = quando.toLocaleString('pt-BR');
     let pagina = 0;
 
     const rodape = () => {
       pagina++;
       doc.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(150);
-      doc.text('Gerado pelo Salavox — a gravação não saiu deste computador', M, PH - 10);
+      doc.text(T('Gerado pelo Salavox — a gravação não saiu deste computador',
+                 'Generated by Salavox — the recording never left this computer'), M, PH - 10);
       doc.text(String(pagina), PW - M, PH - 10, { align: 'right' });
       doc.setTextColor(30);
     };
 
-    doc.setFont('helvetica', 'bold').setFontSize(19).text('Ata de reunião', M, 30);
+    /* O título da reunião no lugar de "Ata de reunião": cinco atas na caixa de
+       entrada do cliente, todas com o mesmo nome, não ajudam ninguém. */
+    const tituloLinhas = doc.setFont('helvetica', 'bold').setFontSize(19)
+      .splitTextToSize(tituloReuniao(), CW);
+    doc.text(tituloLinhas.slice(0, 2), M, 30);
+    const desce = (tituloLinhas.length > 1 ? 8 : 0);
     doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(110);
     const nTelas = telas.filter(t => t.manter).length;
-    doc.text(dataTxt + '   |   duração ' + fmt(segundos) + '   |   ' + falas.length +
-             (falas.length === 1 ? ' trecho' : ' trechos') +
-             (nTelas ? '   |   ' + nTelas + (nTelas === 1 ? ' tela' : ' telas') : '') +
+    doc.text(dataDaReuniao().toLocaleString(LOCAL()) + T('   |   duração ', '   |   duration ') +
+             fmt(segundos) + '   |   ' + falas.length +
+             (falas.length === 1 ? T(' trecho', ' passage') : T(' trechos', ' passages')) +
+             (nTelas ? '   |   ' + nTelas + (nTelas === 1 ? T(' tela', ' screen')
+                                                          : T(' telas', ' screens')) : '') +
              (momentos.length ? '   |   ' + momentos.length +
-               (momentos.length === 1 ? ' momento marcado' : ' momentos marcados') : ''), M, 38);
-    doc.setDrawColor(215).line(M, 44, PW - M, 44);
+               (momentos.length === 1 ? T(' momento marcado', ' flagged moment')
+                                      : T(' momentos marcados', ' flagged moments')) : ''), M, 38 + desce);
+    const quem = participantes();
+    if (quem.length) doc.text(doc.splitTextToSize(T('Participantes: ', 'Participants: ') +
+                              quem.join(', '), CW).slice(0, 1), M, 43.5 + desce);
+    doc.setDrawColor(215).line(M, 49 + desce, PW - M, 49 + desce);
 
     doc.setFontSize(8.6).setTextColor(130);
     doc.text(doc.splitTextToSize(importado
-      ? 'Transcrição automática de um arquivo já existente, gerada no próprio computador. Como o áudio ' +
-        'não foi captado em canais separados, as falas não são atribuídas a pessoas diferentes. O texto ' +
-        'pode conter erros de reconhecimento.'
-      : 'Transcrição automática, gerada no próprio computador. A primeira coluna diz quem falou: o ' +
-        'microfone de quem gravou de um lado, e as demais vozes, captadas pelo áudio da chamada, do ' +
-        'outro — estas não são separadas individualmente. O texto pode conter erros de reconhecimento.',
-      CW), M, 51);
+      ? T('Transcrição automática de um arquivo já existente, gerada no próprio computador. Como o áudio ' +
+          'não foi captado em canais separados, as falas não são atribuídas a pessoas diferentes. O texto ' +
+          'pode conter erros de reconhecimento.',
+          'Automatic transcript of an existing file, produced on this computer. Because the audio was not ' +
+          'captured on separate channels, the lines are not attributed to different people. The text may ' +
+          'contain recognition errors.')
+      : T('Transcrição automática, gerada no próprio computador. A primeira coluna diz quem falou: o ' +
+          'microfone de quem gravou de um lado, e as demais vozes, captadas pelo áudio da chamada, do ' +
+          'outro — estas não são separadas individualmente. O texto pode conter erros de reconhecimento.',
+          'Automatic transcript, produced on this computer. The first column says who spoke: the microphone ' +
+          'of the person recording on one side, and the other voices, captured from the call audio, on the ' +
+          'other — these are not separated individually. The text may contain recognition errors.'),
+      CW), M, 56 + desce);
     doc.setTextColor(30);
 
-    let y = 68;
+    let y = 73 + desce;
     if (consentimento && consentimento.iniciado) {
       const linhas = doc.setFontSize(8.4).splitTextToSize(
-        'REGISTRO DE CONSENTIMENTO — quem gravou confirmou às ' + consentimento.confirmado +
-        ' que avisaria os participantes' +
-        (consentimento.copiado ? ', copiou o texto do aviso às ' + consentimento.copiado : '') +
-        ' e iniciou a gravação às ' + consentimento.iniciado + '. Texto oferecido: "' +
-        consentimento.texto + '" Este registro é a declaração de quem gravou, não uma verificação ' +
-        'feita pelo Salavox.', CW - 12);
+        T('REGISTRO DE CONSENTIMENTO — quem gravou confirmou às ',
+          'CONSENT RECORD — the person recording confirmed at ') + consentimento.confirmado +
+        T(' que avisaria os participantes', ' that they would tell the participants') +
+        (consentimento.copiado
+          ? T(', copiou o texto do aviso às ', ', copied the text of the notice at ') +
+            consentimento.copiado : '') +
+        T(' e iniciou a gravação às ', ' and started recording at ') + consentimento.iniciado +
+        T('. Texto oferecido: "', '. Text offered: "') + consentimento.texto +
+        T('" Este registro é a declaração de quem gravou, não uma verificação feita pelo Salavox.',
+          '" This record is the statement of the person who recorded, not a check made by Salavox.'),
+        CW - 12);
       const alt = linhas.length * 3.6 + 8;
       doc.setFillColor(244, 246, 246).setDrawColor(200);
       doc.roundedRect(M, y - 4, CW, alt, 2, 2, 'FD');
@@ -3064,7 +3670,7 @@ registerProcessor('toca', Toca);`;
     doc.save(nomeArquivo() + '.pdf');
   };
 
-  $('baixarTxt').onclick = () => baixar(comoTexto() + '\n' + RODAPE_MARCA, 'txt');
+  $('baixarTxt').onclick = () => baixar(comoTexto() + '\n' + RODAPE_MARCA(), 'txt');
   $('baixarVtt').onclick = () => baixar(comoVtt(), 'vtt');
 
   /* ============================================================
@@ -3090,23 +3696,68 @@ registerProcessor('toca', Toca);`;
 
   let resumos = [];
 
+  /* Eram três botões — resumo, decisões e pendências, e-mail — e cada um
+     gastava uma chamada. Quem usa clicava nos três, sempre, porque os três
+     são a mesma pergunta feita de ângulos diferentes: o que aconteceu, o que
+     ficou combinado, o que mando para os outros. Virou um pedido só.
+
+     Três ganhos de uma vez: custa um terço, sai coerente entre as partes (o
+     e-mail fala das mesmas pendências que a lista) e o cartão tem um botão
+     em vez de um menu. */
+  const SECOES = () => [
+    ['resumo',     T('Resumo da reunião', 'Meeting summary')],
+    ['decisoes',   T('Decisões', 'Decisions')],
+    ['pendencias', T('Pendências', 'Open items')],
+    ['passos',     T('Próximos passos', 'Next steps')]
+  ];
+
+  const PEDIDO_ATA =
+    'Organize a reunião. Responda em português e devolva EXATAMENTE estas cinco seções, cada título\n' +
+    'em uma linha própria começando com "## ", nesta ordem, sem nada antes da primeira nem depois da última.\n\n' +
+    '## RESUMO\n' +
+    'Até 10 linhas dizendo do que se tratou e onde a reunião chegou, com o instante (mm:ss) que sustenta\n' +
+    'cada ponto.\n\n' +
+    '## DECISÕES\n' +
+    'Uma linha por decisão, começando com "- " e terminando com o instante (mm:ss). Se nada foi fechado,\n' +
+    'escreva "- nenhuma decisão foi fechada nesta reunião".\n\n' +
+    '## PENDÊNCIAS\n' +
+    'Uma linha por pendência, começando com "- ", no formato: o que fazer — responsável — prazo (mm:ss).\n' +
+    'Quando o responsável ou o prazo não tiverem sido ditos, escreva "não ficou claro na reunião" no lugar,\n' +
+    'em vez de deduzir.\n\n' +
+    '## PRÓXIMOS PASSOS\n' +
+    'Uma linha por passo, começando com "- ". Só o que foi combinado.\n\n' +
+    '## E-MAIL\n' +
+    'A primeira linha é "Assunto: ...". Depois, uma linha em branco e o corpo de um e-mail de\n' +
+    'acompanhamento para os participantes: cordial, curto, confirmando o combinado e o que cada lado vai\n' +
+    'entregar. Trate as pessoas pelos nomes que aparecem na transcrição. Sem despedida de mais de uma\n' +
+    'linha e sem prazo que não foi dito.';
+
+  const PEDIDO_ATA_EN =
+    'Organise this meeting. Answer in English and return EXACTLY these five sections, each title on a\n' +
+    'line of its own starting with "## ", in this order, with nothing before the first and nothing after\n' +
+    'the last.\n\n' +
+    '## SUMMARY\n' +
+    'Up to 10 lines saying what the meeting was about and where it landed, with the timestamp (mm:ss)\n' +
+    'that supports each point.\n\n' +
+    '## DECISIONS\n' +
+    'One line per decision, starting with "- " and ending with the timestamp (mm:ss). If nothing was\n' +
+    'settled, write "- no decision was closed in this meeting".\n\n' +
+    '## OPEN ITEMS\n' +
+    'One line per open item, starting with "- ", in the format: what to do — owner — due date (mm:ss).\n' +
+    'When the owner or the due date were not stated, write "not clear from the meeting" instead of\n' +
+    'inferring one.\n\n' +
+    '## NEXT STEPS\n' +
+    'One line per step, starting with "- ". Only what was agreed.\n\n' +
+    '## E-MAIL\n' +
+    'The first line is "Subject: ...". Then a blank line and the body of a follow-up e-mail to the\n' +
+    'participants: warm, short, confirming what was agreed and what each side will deliver. Address\n' +
+    'people by the names that appear in the transcript. No sign-off longer than one line and no due\n' +
+    'date that was not said.';
+
   const TAREFAS = {
-    resumo: {
-      titulo: 'Resumo executivo',
-      instrucao: 'Escreva um resumo executivo da reunião em até 12 linhas, em português, citando o ' +
-        'instante (mm:ss) de cada ponto relevante. Não invente nada que não esteja na transcrição.'
-    },
-    pendencias: {
-      titulo: 'Decisões e pendências',
-      instrucao: 'Liste, em português: 1) as decisões tomadas; 2) as pendências, com responsável e prazo ' +
-        'quando aparecerem; 3) os próximos passos. Cite o instante (mm:ss) de cada item. Se algo não ' +
-        'estiver claro na transcrição, escreva "não ficou claro na reunião" em vez de deduzir.'
-    },
-    email: {
-      titulo: 'E-mail de acompanhamento',
-      instrucao: 'Escreva um e-mail curto e cordial de acompanhamento para os participantes, em ' +
-        'português, confirmando o que ficou combinado e o que cada lado vai entregar. Sem saudação ' +
-        'genérica de mais de uma linha e sem inventar prazo que não foi dito.'
+    ata: {
+      titulo: 'Ata organizada',
+      get instrucao() { return T(PEDIDO_ATA, PEDIDO_ATA_EN); }
     },
     pergunta: {
       titulo: 'Pergunta à ata',
@@ -3116,19 +3767,33 @@ registerProcessor('toca', Toca);`;
 
   const CONTEXTO =
     'Abaixo está a transcrição automática de uma reunião, gerada no computador de quem participou.\n' +
-    'Cada linha traz o instante e quem falou. As linhas "(nova tela compartilhada)" marcam quando a tela\n' +
+    'As primeiras linhas são o título, a data, a duração e os participantes — use esses nomes ao\n' +
+    'escrever, em vez de "o participante" ou "a outra parte".\n' +
+    'Depois delas, cada linha traz o instante e quem falou. As linhas "(nova tela compartilhada)" marcam quando a tela\n' +
     'apresentada mudou. As linhas "*** momento marcado ***" foram marcadas à mão por quem estava lá:\n' +
     'trate o que está em volta delas como importante.\n' +
     'A transcrição é automática e contém erros: se um trecho parecer incoerente, sinalize em vez de\n' +
     'interpretar. Quando a informação não estiver na transcrição, diga que não é possível saber.\n';
 
+  const CONTEXTO_EN =
+    'Below is the automatic transcript of a meeting, produced on the computer of one of the participants.\n' +
+    'The first lines are the title, the date, the duration and the participants — use those names when you\n' +
+    'write, instead of "the participant" or "the other side".\n' +
+    'After them, each line carries the timestamp and who spoke. Lines reading "(nova tela compartilhada)"\n' +
+    'mark when the shared screen changed. Lines reading "*** momento marcado ***" were flagged by hand by\n' +
+    'someone who was there: treat what surrounds them as important.\n' +
+    'The transcript is automatic and contains errors: if a passage seems incoherent, flag it instead of\n' +
+    'interpreting it. When the information is not in the transcript, say that it cannot be known.\n';
+
   function montarPrompt(chave, pergunta) {
     const t = TAREFAS[chave];
     const tarefa = chave === 'pergunta'
-      ? 'Responda à pergunta abaixo usando apenas a transcrição, citando os instantes que sustentam a ' +
-        'resposta.\n\nPergunta: ' + pergunta
+      ? T('Responda à pergunta abaixo usando apenas a transcrição, citando os instantes que sustentam a ' +
+          'resposta.\n\nPergunta: ',
+          'Answer the question below using only the transcript, citing the timestamps that support the ' +
+          'answer.\n\nQuestion: ') + pergunta
       : t.instrucao;
-    return CONTEXTO + '\n' + tarefa + '\n\n---\n' + comoTexto();
+    return T(CONTEXTO, CONTEXTO_EN) + '\n' + tarefa + '\n\n---\n' + comoTexto();
   }
 
   /* ---------- o estado do cartão, que é o estado da conta ----------
@@ -3176,7 +3841,7 @@ registerProcessor('toca', Toca);`;
        Antes, plano grátis via um cartão sem botão nenhum e o preço escrito —
        e o primeiro a esbarrar nisso foi o dono do produto, tentando testar a
        própria IA. O problema é maior que o incômodo: ninguém assina um resumo
-       por IA sem ver o resumo. A porta agora tem três voltas de cortesia; a
+       por IA sem ver o resumo. A porta agora tem sete voltas de cortesia; a
        recusa vem do servidor, na quarta, com o convite para assinar junto. */
     $('iaAcoes').classList.toggle('hide', !sessao);
     /* O modelo preciso não entra na degustação: custa cerca de dez vezes mais
@@ -3189,19 +3854,114 @@ registerProcessor('toca', Toca);`;
       $('iaEstado').innerHTML = 'A <b>IA do Salavox</b> lê o texto da ata e devolve o resumo, ' +
         'as decisões e as pendências. O texto sai daqui só quando você clica.';
     } else if (!sessao) {
-      $('iaEstado').innerHTML = 'Entre na sua conta no cartão acima e ganhe <b>3 resumos para ' +
+      $('iaEstado').innerHTML = 'Entre na <a class="link" href="/conta">sua conta</a> e ganhe <b>7 resumos para ' +
         'experimentar</b>. Gravar, transcrever e exportar continua de graça, com ou sem conta.';
     } else if (cortesia === 0) {
       $('iaEstado').innerHTML = 'Seus <b>resumos de cortesia acabaram</b>. O plano profissional ' +
         'tem 30 por mês, mais o modelo preciso e o envio da ata por e-mail, por R$ 19,90.';
     } else {
-      const q = typeof cortesia === 'number' && cortesia > 0 ? cortesia : 3;
+      const q = typeof cortesia === 'number' && cortesia > 0 ? cortesia : 7;
       $('iaEstado').innerHTML = `Você tem <b>${q} ${q === 1 ? 'resumo' : 'resumos'} de cortesia</b> ` +
         'para experimentar a IA do Salavox. Depois, o plano profissional tem 30 por mês por R$ 19,90.';
     }
   }
 
   /* ---------- execução ---------- */
+
+  /* A chamada ao nosso servidor. Vai o texto da ata e o token de quem pediu;
+     nunca a chave do modelo, que não existe neste lado. */
+  async function pedirSalavox(prompt, aviso) {
+    if (!sessao) throw new Error('entre na sua conta para usar a IA do Salavox.');
+    const modelo = $('iaModeloSalavox') ? $('iaModeloSalavox').value : 'rapido';
+    aviso('Resumindo com a IA do Salavox…');
+    const r = await fetch('/api/resumo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
+      body: JSON.stringify({ prompt, modelo })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      /* recusa por cota: a tela tem de refletir isso na hora, não só na mensagem */
+      if (r.status === 402 && !temPlano()) { cortesia = 0; desenharIa(); }
+      throw new Error(d.erro || ('o servidor respondeu ' + r.status));
+    }
+    if (typeof d.restante === 'number') {
+      if (!temPlano()) cortesia = d.restante;
+      $('iaMotorMsg').innerHTML = temPlano()
+        ? `restam <b>${d.restante}</b> resumos neste mês`
+        : `restam <b>${d.restante}</b> ${d.restante === 1 ? 'resumo' : 'resumos'} de cortesia`;
+      desenharIa();
+    }
+    return (d.texto || '').trim();
+  }
+
+  /* Corta a resposta nas seções pedidas.
+
+     O modelo obedece ao formato quase sempre — mas "quase" não é sempre, e o
+     jeito de errar aqui seria jogar fora um texto bom porque o título veio com
+     um "#" a menos. Por isso o corte é tolerante (um a três "#", com ou sem
+     acento) e, quando não acha seção nenhuma, o texto inteiro vira o resumo em
+     vez de virar erro. */
+  function fatiar(bruto) {
+    const achado = {};
+    let atual = null, linhas = [];
+    const fechar = () => { if (atual) achado[atual] = linhas.join('\n').trim(); };
+    const NOMES = { resumo: 'resumo', summary: 'resumo',
+                    decisoes: 'decisoes', decisions: 'decisoes',
+                    pendencias: 'pendencias', 'open items': 'pendencias', 'pending items': 'pendencias',
+                    'proximos passos': 'passos', 'next steps': 'passos',
+                    'e-mail': 'email', email: 'email' };
+    for (const l of String(bruto).split(/\r?\n/)) {
+      const m = /^\s*#{1,3}\s*(.+?)\s*:?\s*$/.exec(l);
+      const chave = m ? NOMES[semAcento(m[1]).replace(/\s+/g, ' ').trim()] : null;
+      if (chave) { fechar(); atual = chave; linhas = []; continue; }
+      if (atual) linhas.push(l);
+    }
+    fechar();
+    return achado;
+  }
+
+  /* Põe o e-mail na caixa dele: assunto na primeira linha, corpo no resto. */
+  function porEmail(txt) {
+    const linhas = String(txt).split(/\r?\n/);
+    let i = 0;
+    while (i < linhas.length && !linhas[i].trim()) i++;
+    const m = /^\s*assunto\s*:\s*(.+)$/i.exec(linhas[i] || '');
+    const assunto = m ? m[1].trim() : tituloReuniao();
+    if (m) i++;
+    $('emailAssunto').value = assunto;
+    $('emailCorpo').textContent = linhas.slice(i).join('\n').trim();
+    $('emailBox').classList.remove('hide');
+    desenharConta();          // é ela que decide se o botão de enviar aparece
+  }
+
+  async function organizarAta() {
+    if (!falas.length) return;
+    const aviso = m => { $('iaMsg').innerHTML = m; };
+
+    ocupado = true;
+    $('iaBarWrap').classList.remove('hide');
+    $('iaBar').style.width = '35%';
+    try {
+      const bruto = await pedirSalavox(montarPrompt('ata'), aviso);
+      $('iaBar').style.width = '100%';
+      const partes = fatiar(bruto);
+      const temSecao = SECOES().some(([c]) => partes[c]);
+      if (!temSecao) {
+        guardarResumo('resumo', T('Ata organizada', 'Organised minutes'), bruto);
+      } else {
+        for (const [chave, titulo] of SECOES()) if (partes[chave]) guardarResumo(chave, titulo, partes[chave]);
+      }
+      if (partes.email) porEmail(partes.email);
+      aviso('<span class="ok">Ata organizada.</span> Resumo, decisões, pendências e próximos passos ' +
+            'entram no PDF e no texto' + (partes.email ? ' — e o e-mail já está pronto abaixo.' : '.'));
+    } catch (e) {
+      aviso(`<span class="err">Não consegui: ${(e && e.message) || e}</span>`);
+    } finally {
+      ocupado = false;
+      setTimeout(() => { $('iaBarWrap').classList.add('hide'); $('iaBar').style.width = '0%'; }, 600);
+    }
+  }
 
   async function rodarTarefa(chave, pergunta) {
     if (!falas.length) return;
@@ -3259,9 +4019,12 @@ registerProcessor('toca', Toca);`;
     if (b.dataset.tirar != null) { resumos.splice(+b.dataset.tirar, 1); desenharResumos(); }
   };
 
-  $('iaResumo').onclick = () => rodarTarefa('resumo');
-  $('iaPendencias').onclick = () => rodarTarefa('pendencias');
-  $('iaEmail').onclick = () => rodarTarefa('email');
+  $('iaOrganizar').onclick = () => organizarAta();
+  $('copiarEmail').onclick = async () => {
+    const t = $('emailAssunto').value.trim() + '\n\n' + $('emailCorpo').textContent.trim();
+    try { await navigator.clipboard.writeText(t); } catch (e) {}
+    $('emailMsg').innerHTML = '<span class="ok">copiado</span>';
+  };
   $('iaPerguntar').onclick = () => {
     const q = $('iaPergunta').value.trim();
     if (q) rodarTarefa('pergunta', q);
@@ -3320,7 +4083,7 @@ registerProcessor('toca', Toca);`;
       $('contaEstado').innerHTML = `<span class="err">Camada paga não configurada:</span> ${problema}. ` +
         'Corrija <code>public/config.json</code> e publique de novo — ' +
         'enquanto isso, tudo o mais continua funcionando normalmente.';
-      $('contaEntrar').classList.add('hide');
+      $('irConta').classList.add('hide');
       $('diagnostico').classList.remove('hide');
       return;
     }
@@ -3364,7 +4127,7 @@ registerProcessor('toca', Toca);`;
   async function carregarPerfil() {
     if (!cfg || !sessao) { desenharConta(); return; }
     try {
-      const r = await fetch(cfg.supabaseUrl + '/rest/v1/perfis?select=email,plano,assinante_ate', {
+      const r = await fetch(cfg.supabaseUrl + '/rest/v1/perfis?select=email,nome,plano,assinante_ate', {
         headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + sessao.access_token }
       });
       if (r.status === 401) { guardarSessao(null); perfil = null; desenharConta(); return; }
@@ -3372,253 +4135,72 @@ registerProcessor('toca', Toca);`;
       perfil = Array.isArray(d) ? d[0] : null;
     } catch (e) { perfil = null; }
     await lerCortesia();
-    await lerCobranca();
     desenharConta();
   }
 
   function desenharConta() {
     if (!cfg) return;
     desenharIa();
+    desenharPassos();
+    const nome = perfil && (perfil.nome || perfil.email);
     if (!sessao || !perfil) {
-      $('contaEstado').innerHTML = 'Entre para usar a <b>IA do Salavox</b> e o envio da ata por e-mail. ' +
-        'Gravar, transcrever e gerar a ata continua funcionando sem conta.';
-      $('contaEntrar').classList.remove('hide');
-      $('contaSair').classList.add('hide');
+      $('contaEstado').innerHTML = 'Você não está em nenhuma conta — <b>tudo funciona assim mesmo</b>. ' +
+        'A conta serve para o resumo por IA e o envio da ata.';
       $('enviarEmail').classList.add('hide');
-      $('assinar').classList.add('hide');
-      $('cancelar').classList.add('hide');
-      $('dadosCobranca').classList.add('hide');
+      $('irConta').textContent = 'entrar';
       return;
     }
     const pago = temPlano();
-    $('contaEstado').innerHTML = `<b>${escapar(perfil.email)}</b> — plano ` +
-      (pago ? `<span class="ok">${escapar(perfil.plano)}</span>, ativo até ` +
+    $('contaEstado').innerHTML = `<b>${escapar(nome)}</b> — ` +
+      (pago ? `plano <span class="ok">${escapar(perfil.plano)}</span> até ` +
               new Date(perfil.assinante_ate).toLocaleDateString('pt-BR')
-            : 'grátis. A IA do Salavox e o envio por e-mail são do plano profissional.');
-    $('contaEntrar').classList.add('hide');
-    $('contaSair').classList.remove('hide');
+            : (typeof cortesia === 'number' && cortesia > 0
+                 ? `<b>${cortesia}</b> ${cortesia === 1 ? 'resumo' : 'resumos'} de cortesia`
+                 : 'plano grátis'));
+    $('irConta').textContent = 'sua conta';
     $('enviarEmail').classList.toggle('hide', !pago);
-    /* O botão de assinar aparece para quem não tem plano ativo — inclusive para
-       quem já teve e deixou vencer, que é justamente quem se quer de volta. O de
-       cancelar só existe se houver assinatura viva no meio de pagamento. */
-    const pedindoDados = !$('dadosCobranca').classList.contains('hide');
-    $('assinar').classList.toggle('hide', pago || pedindoDados);
-    $('cancelar').classList.toggle('hide', !(cobranca && cobranca.assinatura));
   }
 
-  /* ============================================================
-     Assinar, cancelar e o que o navegador NÃO decide.
+  /* Assinar e cancelar moraram aqui e mudaram para /conta. O que ficou nesta
+     página é só a leitura: quem está logado, qual o plano, quanto resta. */
 
-     Nada aqui libera plano nenhum. O botão cria a cobrança e abre a tela de
-     pagamento; quem escreve a data de validade é o webhook do Asaas, do lado
-     do servidor, quando o pagamento é confirmado. Se esta parte do código
-     pudesse liberar acesso, bastaria abrir o inspetor para assinar de graça.
-     ============================================================ */
+  /* ---- enviar o e-mail que a IA escreveu, com a ata junto ----
 
-  let cobranca = null;
-
-  async function lerCobranca() {
-    cobranca = null;
-    if (!cfg || !sessao) return;
-    try {
-      const r = await fetch(cfg.supabaseUrl + '/rest/v1/rpc/minha_cobranca', {
-        method: 'POST',
-        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + sessao.access_token,
-                   'Content-Type': 'application/json' },
-        body: '{}'
-      });
-      if (r.ok) cobranca = await r.json();
-    } catch (e) {}
-  }
-
-  $('assinar').onclick = () => {
-    $('dadosCobranca').classList.remove('hide');
-    $('assinar').classList.add('hide');
-    $('cobNome').focus();
-  };
-
-  $('cobCancelar').onclick = () => {
-    $('dadosCobranca').classList.add('hide');
-    $('contaMsg').textContent = '';
-    desenharConta();
-  };
-
-  $('cobConfirmar').onclick = async () => {
-    const nome = ($('cobNome').value || '').trim();
-    const documento = ($('cobDoc').value || '').trim();
-    if (nome.length < 3) { $('contaMsg').innerHTML = '<span class="err">informe o nome</span>'; return; }
-    if (documento.replace(/\D/g, '').length !== 11 && documento.replace(/\D/g, '').length !== 14) {
-      $('contaMsg').innerHTML = '<span class="err">CPF tem 11 dígitos e CNPJ tem 14</span>';
+     Antes isto era um `prompt()` do navegador pedindo endereços e mandava a
+     ata crua, sem uma linha de conversa em cima. Agora o que sai é o e-mail
+     que a IA escreveu — conferido e corrigido na tela por quem assina — e a
+     ata vai embaixo, depois de um traço. */
+  $('enviarEmail').onclick = async () => {
+    const para = $('emailPara').value.trim();
+    if (!para) {
+      $('emailMsg').innerHTML = '<span class="err">Diga para quem enviar.</span>';
+      $('emailPara').focus();
       return;
     }
-    $('cobConfirmar').disabled = true;
-    $('contaMsg').textContent = 'Criando a cobrança…';
-    try {
-      const r = await fetch('/api/assinar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
-        body: JSON.stringify({ acao: 'assinar', nome, documento, telefone: ($('cobFone').value || '').trim() })
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.erro || ('o servidor respondeu ' + r.status));
-      $('dadosCobranca').classList.add('hide');
-      await lerCobranca();
-      if (d.pagar) {
-        /* Abre em outra aba de propósito: esta aqui pode ter uma gravação em
-           andamento, e trocar de página no meio da reunião perderia o que
-           ainda não foi escrito no disco. */
-        window.open(d.pagar, '_blank', 'noopener');
-        $('contaMsg').innerHTML = '<span class="ok">Cobrança criada</span> — a tela de pagamento abriu em ' +
-          'outra aba. O plano é liberado assim que o pagamento for confirmado.';
-      } else {
-        $('contaMsg').innerHTML = `<span class="ok">Cobrança criada</span> — ${escapar(d.aviso || '')}`;
-      }
-      desenharConta();
-    } catch (e) {
-      $('contaMsg').innerHTML = `<span class="err">${escapar((e && e.message) || e)}</span>`;
-    } finally {
-      $('cobConfirmar').disabled = false;
-    }
-  };
-
-  $('cancelar').onclick = async () => {
-    if (!confirm('Cancelar a assinatura? O plano continua valendo até o fim do período já pago.')) return;
-    $('cancelar').disabled = true;
-    $('contaMsg').textContent = 'Cancelando…';
-    try {
-      const r = await fetch('/api/assinar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
-        body: JSON.stringify({ acao: 'cancelar' })
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.erro || ('o servidor respondeu ' + r.status));
-      await lerCobranca();
-      $('contaMsg').innerHTML = '<span class="ok">Assinatura cancelada</span> — não haverá nova cobrança, ' +
-        'e o plano segue valendo até o fim do período já pago.';
-      desenharConta();
-    } catch (e) {
-      $('contaMsg').innerHTML = `<span class="err">${escapar((e && e.message) || e)}</span>`;
-    } finally {
-      $('cancelar').disabled = false;
-    }
-  };
-
-  $('contaEntrar').onclick = async () => {
-    const email = ($('contaEmail').value || '').trim();
-    if (!/.+@.+\..+/.test(email)) { $('contaMsg').innerHTML = '<span class="err">e-mail inválido</span>'; return; }
-    $('contaMsg').textContent = 'Enviando o link…';
-    try {
-      const r = await fetch(cfg.supabaseUrl + '/auth/v1/otp', {
-        method: 'POST',
-        headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, create_user: true })
-      });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      $('contaMsg').innerHTML = '<span class="ok">Link enviado</span> — abra o e-mail e clique. ' +
-        'Não há senha para lembrar.';
-    } catch (e) {
-      $('contaMsg').innerHTML = '<span class="err">não consegui enviar o link agora</span>';
-    }
-  };
-
-  /* Diagnóstico da camada paga.
-
-     Existe porque a primeira instalação falhou em silêncio: o arquivo de
-     configuração não estava lá, o cartão de conta não apareceu e não havia como
-     saber por quê. Isto responde as quatro perguntas de uma vez. */
-  $('diagnostico').onclick = async () => {
-    const linhas = [];
-    const diz = (o, ok, extra) => linhas.push(`${ok ? '✓' : '✗'} ${o}${extra ? ' — ' + extra : ''}`);
-
-    try {
-      const r = await fetch('/config.json', { cache: 'no-cache' });
-      diz('config.json publicado', r.ok, r.ok ? '' : 'HTTP ' + r.status);
-      if (r.ok) {
-        const c = await r.json().catch(() => null);
-        diz('config.json é JSON válido', !!c);
-        diz('supabaseUrl preenchido', !!(c && c.supabaseUrl && c.supabaseUrl.trim()));
-        diz('supabaseAnonKey preenchido', !!(c && c.supabaseAnonKey && c.supabaseAnonKey.trim()));
-      }
-    } catch (e) { diz('config.json publicado', false, e.message); }
-
-    if (cfg) {
-      try {
-        const r = await fetch(cfg.supabaseUrl + '/auth/v1/settings', { headers: { apikey: cfg.supabaseAnonKey } });
-        diz('Supabase responde', r.ok, r.ok ? '' : 'HTTP ' + r.status + ' — confira a URL e a anon key');
-      } catch (e) { diz('Supabase responde', false, 'não consegui alcançar'); }
-    }
-
-    try {
-      const r = await fetch('/api/resumo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-      // sem token, a resposta certa é 401: significa que a função existe e está checando
-      diz('função /api/resumo publicada', r.status === 401 || r.status === 400,
-          r.status === 404 ? 'HTTP 404 — a pasta api/ não subiu com o projeto' : 'HTTP ' + r.status);
-      if (r.status === 500) {
-        const d = await r.json().catch(() => ({}));
-        diz('variáveis de ambiente da função', false, d.erro || 'servidor sem configuração');
-      } else if (r.status === 401) {
-        diz('variáveis de ambiente da função', true, 'a função respondeu como deve');
-      }
-    } catch (e) { diz('função /api/resumo publicada', false, e.message); }
-
-    $('contaMsg').innerHTML = '<pre style="white-space:pre-wrap;font:12.5px var(--mono);margin:8px 0 0">' +
-      linhas.join('\n') + '</pre>';
-  };
-
-  $('contaSair').onclick = () => { guardarSessao(null); perfil = null; desenharConta(); $('contaMsg').textContent = ''; };
-
-  async function pedirSalavox(prompt, aviso) {
-    if (!sessao) throw new Error('entre na sua conta para usar a IA do Salavox.');
-    const modelo = $('iaModeloSalavox') ? $('iaModeloSalavox').value : 'rapido';
-    aviso('Resumindo com a IA do Salavox…');
-    const r = await fetch('/api/resumo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
-      body: JSON.stringify({ prompt, modelo })
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      // recusa por cota: a tela tem de refletir isso na hora, não só na mensagem
-      if (r.status === 402 && !temPlano()) { cortesia = 0; desenharIa(); }
-      throw new Error(d.erro || ('o servidor respondeu ' + r.status));
-    }
-    if (typeof d.restante === 'number') {
-      if (!temPlano()) cortesia = d.restante;
-      $('iaMotorMsg').innerHTML = temPlano()
-        ? `restam <b>${d.restante}</b> resumos neste mês`
-        : `restam <b>${d.restante}</b> ${d.restante === 1 ? 'resumo' : 'resumos'} de cortesia`;
-      desenharIa();
-    }
-    return (d.texto || '').trim();
-  }
-
-  /* ---- enviar a ata por e-mail, com a marca junto ---- */
-  $('enviarEmail').onclick = async () => {
-    const para = prompt('Enviar a ata para quais e-mails? (separe por vírgula)');
-    if (!para) return;
-    $('ataMsg').textContent = 'Enviando…';
+    const corpo = $('emailCorpo').textContent.trim();
+    $('emailMsg').textContent = 'Enviando…';
     try {
       const r = await fetch('/api/enviar-ata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
         body: JSON.stringify({
           para,
-          assunto: 'Ata da reunião — ' + new Date().toLocaleDateString('pt-BR'),
-          corpo: comoTexto(),
+          assunto: $('emailAssunto').value.trim() || tituloReuniao(),
+          corpo: (corpo ? corpo + '\n\n———\n\n' : '') + comoTexto(),
           assinatura: perfil && perfil.email
         })
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.erro || ('erro ' + r.status));
-      $('ataMsg').innerHTML = `<span class="ok">enviada para ${d.enviados} ` +
+      $('emailMsg').innerHTML = `<span class="ok">enviado para ${d.enviados} ` +
         `${d.enviados === 1 ? 'endereço' : 'endereços'}</span>`;
     } catch (e) {
-      $('ataMsg').innerHTML = `<span class="err">${(e && e.message) || e}</span>`;
+      $('emailMsg').innerHTML = `<span class="err">${(e && e.message) || e}</span>`;
     }
   };
 
   iniciarConta();
+  desenharPassos();
 
   /* ============================================================
      Recuperação. Como cada pedaço é fechado no disco assim que
@@ -3659,6 +4241,7 @@ registerProcessor('toca', Toca);`;
       blobGravacao = await juntarPrefixo('gravacao');
       blobPcm = await juntarPrefixo('pcm');
       segundos = Math.round(dur);
+      if (meta && meta.inicio) inicioReuniao = meta.inicio;   // a reunião é daquele dia, não de agora
       janelas = { voce: !meta || meta.mic !== false, outros: !meta || meta.sistema !== false };
       if (meta && meta.consentimento) { consentimento = meta.consentimento; mostrarConsentimento(); }
       $('recMsg').innerHTML = `<span class="ok">Gravação recuperada de ${fmt(dur)}</span> — ` +
@@ -3666,6 +4249,7 @@ registerProcessor('toca', Toca);`;
       $('trans').disabled = false;
       if (!meta || meta.tela !== false) $('telasCard').classList.remove('hide');
       esconderRecuperacao();
+      desenharPassos();
       $('trans').scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
     $('recupApagar').onclick = async () => {

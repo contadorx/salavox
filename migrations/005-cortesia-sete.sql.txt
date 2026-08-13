@@ -1,0 +1,60 @@
+-- Salavox — a cortesia sobe de 3 para 7
+-- Ordem: depois de 002. Só troca duas funções; nada de tabela.
+--
+-- POR QUÊ: três resumos não convencem ninguém a pagar quando a ferramenta ao
+-- lado dá resumo de graça no plano grátis dela. Sete cobrem duas ou três
+-- reuniões de verdade — o suficiente para a pessoa ver a ata pronta mais de uma
+-- vez e sentir falta quando acabar. Continua sendo degustação, não plano.
+--
+-- O custo disso: sete chamadas ao modelo rápido por conta, uma vez na vida da
+-- conta. A menos de R$ 0,12 por resumo, são R$ 0,84 por pessoa que experimenta.
+-- Um assinante paga isso em menos de dois dias.
+
+create or replace function consumir_ia(p_perfil uuid, p_premium boolean)
+returns int language plpgsql security definer set search_path = public as $$
+declare
+  v_plano plano; v_ate timestamptz; v_mes date := date_trunc('month', now())::date;
+  v_pago boolean; v_limite int; v_usado int;
+begin
+  select plano, assinante_ate into v_plano, v_ate from perfis where id = p_perfil;
+  if not found then return -1; end if;
+
+  v_pago := (v_plano <> 'gratis' and v_ate is not null and v_ate >= now());
+
+  insert into uso_ia (perfil_id, mes) values (p_perfil, v_mes)
+    on conflict (perfil_id, mes) do nothing;
+
+  if v_pago then
+    v_limite := case when p_premium then 5 else 30 end;
+    select case when p_premium then premium else resumos end into v_usado
+      from uso_ia where perfil_id = p_perfil and mes = v_mes for update;
+  else
+    if p_premium then return -1; end if;
+    v_limite := 7;                                  -- era 3
+    perform 1 from uso_ia where perfil_id = p_perfil and mes = v_mes for update;
+    select coalesce(sum(resumos), 0) into v_usado from uso_ia where perfil_id = p_perfil;
+  end if;
+
+  if v_usado >= v_limite then return -1; end if;
+
+  if p_premium then
+    update uso_ia set premium = premium + 1 where perfil_id = p_perfil and mes = v_mes;
+  else
+    update uso_ia set resumos = resumos + 1 where perfil_id = p_perfil and mes = v_mes;
+  end if;
+
+  return v_limite - v_usado - 1;
+end $$;
+
+create or replace function cortesia_restante()
+returns int language plpgsql security definer set search_path = public as $$
+declare v_plano plano; v_ate timestamptz; v_usado int;
+begin
+  select plano, assinante_ate into v_plano, v_ate from perfis where id = auth.uid();
+  if not found then return 0; end if;
+  if v_plano <> 'gratis' and v_ate is not null and v_ate >= now() then return -1; end if;
+  select coalesce(sum(resumos), 0) into v_usado from uso_ia where perfil_id = auth.uid();
+  return greatest(0, 7 - v_usado);                  -- era 3
+end $$;
+
+grant execute on function cortesia_restante() to authenticated;

@@ -17,6 +17,16 @@
   let marcoInicio = 0, marcoFim = 0;          // instantes reais de início e fim, para conferência
   let momentos = [], nomes = [], importado = false, presencial = false;
 
+  /* ---------- português e inglês, do lado do código ----------
+     A varredura de `idiomas.js` traduz o que está na TELA. O que sai da
+     ferramenta — o PDF, o .txt, a legenda, o pedido ao modelo — nunca passa
+     pelo DOM e ficaria em português numa ata em inglês. Estes três ajudantes
+     existem para isso, e o par pt/en fica no lugar onde a frase é escrita, e
+     não num dicionário longe dela. */
+  const EN = () => !!(window.SalavoxIdioma && window.SalavoxIdioma.atual() === 'en');
+  const T = (pt, en) => EN() ? en : pt;
+  const LOCAL = () => EN() ? 'en-GB' : 'pt-BR';
+
   /* Registro de consentimento. Para contador e advogado isto vale mais que
      qualquer resumo por IA: não é o consentimento em si — que é dado na
      conversa, entre pessoas — é a prova de que o aviso foi dado, com hora,
@@ -274,6 +284,66 @@ registerProcessor('toca', Toca);`;
   }
 
   /* ============================================================
+     De que passo é a vez.
+
+     A queixa que originou isto: "não dá para saber quando passar de um passo
+     para o outro". Os cinco cartões apareciam iguais, todos com a mesma cor de
+     número, e quem abria a página tinha de adivinhar onde clicar — inclusive nos
+     que ainda não faziam nada.
+
+     Agora existe um estado só, calculado num lugar só, e os cartões o vestem:
+
+       dormindo  a vez ainda não chegou — cinza, recuado
+       agora     é aqui que se clica — borda verde, número cheio
+       feito     já passou — número claro com o rótulo de concluído
+
+     A regra é lida de cima para baixo: o primeiro passo não concluído é o da
+     vez. Nada de máquina de estados; a ordem dos passos É a máquina de estados.
+     ============================================================ */
+
+  const PASSOS = [
+    { cartao: 'gravarCard', selo: 'selo1' },
+    { cartao: 'transCard',  selo: 'selo2' },
+    { cartao: 'telasCard',  selo: 'selo3' },
+    { cartao: 'ataCard',    selo: 'selo4' },
+    { cartao: 'iaCard',     selo: 'selo5' }
+  ];
+
+  function passos() {
+    const temGravacao = !!(blobPcm && blobPcm.size) || !!blobGravacao;
+    const temAta = falas.length > 0;
+    const temTelas = telas.length > 0;
+    return [
+      { feito: temGravacao, rotulo: temGravacao ? 'gravação pronta' : 'comece aqui' },
+      { feito: temAta, rotulo: temAta ? 'transcrita' : (temGravacao ? 'sua vez' : 'depois de gravar') },
+      { feito: temTelas, rotulo: temTelas ? `${telas.length} telas` : 'opcional' },
+      { feito: temAta, rotulo: temAta ? 'pronta' : 'sai pronta' },
+      { feito: false, rotulo: cfg ? (temPlano() || (cortesia && cortesia > 0) ? 'disponível' : 'com o plano') : 'com conta' }
+    ];
+  }
+
+  function desenharPassos() {
+    const estados = passos();
+    /* O primeiro não concluído é o da vez — e a etapa 3 não conta, porque é
+       opcional: quem não compartilhou tela nunca a completaria, e o foco ficaria
+       preso ali para sempre. */
+    let daVez = estados.findIndex((e, i) => !e.feito && i !== 2);
+    if (daVez < 0) daVez = PASSOS.length - 1;
+
+    PASSOS.forEach((p, i) => {
+      const el = $(p.cartao);
+      if (!el) return;
+      el.classList.remove('dormindo', 'agora', 'feito');
+      const escondido = el.classList.contains('hide');
+      if (estados[i].feito) el.classList.add('feito');
+      else if (i === daVez && !escondido) el.classList.add('agora');
+      else if (i > daVez) el.classList.add('dormindo');
+      const selo = $(p.selo);
+      if (selo) selo.textContent = estados[i].rotulo;
+    });
+  }
+
+  /* ============================================================
      Consentimento. A responsabilidade de avisar os participantes é
      de quem grava — a ferramenta não tem como verificar isso, então
      ao menos obriga a confirmação explícita e oferece o texto pronto.
@@ -456,6 +526,7 @@ registerProcessor('toca', Toca);`;
 
     const meta = { inicio: Date.now(), mime: tipo || 'video/webm', mic: !!micFluxo,
                    sistema: temSistema, tela: gravaVideo, segundos: 0, consentimento };
+    inicioReuniao = meta.inicio;      // a data que vai no cabeçalho da ata
     const salvarMeta = async () => {
       if (!TEM_OPFS) return;
       try {
@@ -520,6 +591,7 @@ registerProcessor('toca', Toca);`;
       }
       $('trans').disabled = false;
       if (gravaVideo) $('telasCard').classList.remove('hide'); else $('telasCard').classList.add('hide');
+      desenharPassos();
     };
 
     if (telaFluxo && telaFluxo.getVideoTracks().length) {
@@ -722,11 +794,14 @@ registerProcessor('toca', Toca);`;
       marcoInicio = 0; marcoFim = segundos * 1000;
       janelas = { voce: false, outros: true };
       importado = true;
+      /* Arquivo trazido de fora: a reunião é da data do arquivo, não de hoje. */
+      inicioReuniao = arquivo.lastModified || Date.now();
       consentimento = null; mostrarConsentimento();
 
       const temVideo = /^video\//.test(arquivo.type) || /\.(mp4|webm|mkv|mov|m4v|avi)$/i.test(arquivo.name);
       if (temVideo) $('telasCard').classList.remove('hide');
 
+      desenharPassos();
       aviso(`<span class="ok">${arquivo.name} pronto</span> — ${fmt(segundos)} de áudio` +
             (temVideo ? ', com vídeo para procurar telas' : '') +
             '. Agora gere a transcrição no passo 2.');
@@ -1721,8 +1796,9 @@ registerProcessor('toca', Toca);`;
      ============================================================ */
 
   const rotuloPadrao = f => f.quem === 'voce'
-    ? ($('nomeVoce').value.trim() || (presencial ? 'SALA' : 'VOCÊ'))
-    : ($('nomeGrupo').value.trim() || (importado ? 'TRANSCRIÇÃO' : 'PARTICIPANTES'));
+    ? ($('nomeVoce').value.trim() || (presencial ? T('SALA', 'ROOM') : T('VOCÊ', 'YOU')))
+    : ($('nomeGrupo').value.trim() ||
+       (importado ? T('TRANSCRIÇÃO', 'TRANSCRIPT') : T('PARTICIPANTES', 'PARTICIPANTS')));
   const rotulo = f => f.nome || rotuloPadrao(f);
 
   function desenharChips() {
@@ -1788,11 +1864,60 @@ registerProcessor('toca', Toca);`;
     return itens;
   }
 
+  /* ============================================================
+     As informações da reunião, num lugar só.
+
+     Estavam espalhadas: a data existia só dentro do PDF, a duração
+     só no relógio da gravação, os participantes só nos campos de
+     nome do passo 4, e título não existia — a ata chegava ao
+     cliente chamada "Ata de reunião", sem dizer qual.
+
+     Agora há um bloco no alto do passo 4 com título editável e o
+     resto contado a partir do que foi gravado. O que está aqui é o
+     que vira cabeçalho do PDF, do texto, do e-mail, do nome do
+     arquivo e do que o modelo lê antes de resumir.
+     ============================================================ */
+
+  let inicioReuniao = null;      // quando a gravação começou, de verdade
+
+  const dataDaReuniao = () => inicioReuniao ? new Date(inicioReuniao) : new Date();
+
+  const tituloPadrao = () => T('Reunião de ', 'Meeting of ') +
+    dataDaReuniao().toLocaleDateString(LOCAL(), { day: '2-digit', month: 'long', year: 'numeric' });
+
+  const tituloReuniao = () => ($('tituloReuniao').value || '').trim() || tituloPadrao();
+
+  /* Quem esteve na reunião, na ordem em que aparece na ata. Sai dos rótulos
+     realmente usados nas falas — não da lista de nomes digitados, que pode ter
+     gente que no fim não falou. */
+  function participantes() {
+    const vistos = [];
+    falas.forEach(f => { const r = rotulo(f); if (vistos.indexOf(r) < 0) vistos.push(r); });
+    return vistos;
+  }
+
+  function desenharInfo() {
+    $('tituloReuniao').placeholder = tituloPadrao();
+    const nTelas = telas.filter(t => t.manter).length;
+    const pares = [
+      [T('Quando', 'When'), dataDaReuniao().toLocaleString(LOCAL())],
+      [T('Duração', 'Duration'), fmt(segundos)],
+      [T('Participantes', 'Participants'), participantes().join(', ') || '—'],
+      [T('Trechos', 'Passages'), String(falas.length)]
+    ];
+    if (nTelas) pares.push([T('Telas', 'Screens'), String(nTelas)]);
+    if (momentos.length) pares.push([T('Momentos marcados', 'Flagged moments'), String(momentos.length)]);
+    $('infoGrade').innerHTML = pares.map(([k, v]) =>
+      `<span>${escapar(k)}: <b>${escapar(v)}</b></span>`).join('');
+  }
+
   function mostrarAta() {
     $('ataCard').classList.remove('hide');
     ataNaTela = true;
     desenharIa();
+    desenharPassos();
     mostrarConsentimento();
+    desenharInfo();
     $('ata').innerHTML = linhaDoTempo().map(i => {
       if (i.tipo === 'fala')
         return `<div class="fala ${i.f.quem}"><span class="t">${fmt(i.f.a)}</span>` +
@@ -1953,6 +2078,7 @@ registerProcessor('toca', Toca);`;
   };
 
   function desenharTelas() {
+    desenharPassos();
     const cx = $('telas');
     cx.innerHTML = '';
     telas.forEach((tl, i) => {
@@ -2011,7 +2137,7 @@ registerProcessor('toca', Toca);`;
   $('baixarGrav').onclick = async () => {
     if (!blobGravacao || ocupado) return;
     const ext = (blobGravacao.type.indexOf('mp4') >= 0) ? 'mp4' : 'webm';
-    const nome = nomeArquivo().replace('ata-', 'gravacao-') + '.' + ext;
+    const nome = 'salavox-gravacao-' + sufixoArquivo() + '.' + ext;
     const aviso = m => { $('ataMsg').innerHTML = m; };
 
     if (!podeSalvarEmFluxo()) {
@@ -2060,7 +2186,14 @@ registerProcessor('toca', Toca);`;
   /* ================= saídas ================= */
   /* A marca viaja com o arquivo. A ata é encaminhada para gente que nunca ouviu
      falar do produto, e o nome do arquivo é a primeira coisa que ela lê. */
-  const nomeArquivo = () => 'salavox-ata-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  /* O nome do arquivo carrega o título: quem recebe cinco atas por semana
+     precisa distinguir uma da outra sem abrir. */
+  const apelido = t => semAcento(t).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
+
+  const sufixoArquivo = () => (apelido(tituloReuniao()) || 'ata') + '-' +
+    dataDaReuniao().toISOString().slice(0, 10);
+
+  const nomeArquivo = () => 'salavox-' + sufixoArquivo();
 
   function baixar(texto, ext) {
     const a = document.createElement('a');
@@ -2071,19 +2204,42 @@ registerProcessor('toca', Toca);`;
   }
 
   const cabecalhoConsentimento = () => (consentimento && consentimento.iniciado)
-    ? `REGISTRO DE CONSENTIMENTO\nConfirmado às ${consentimento.confirmado}` +
-      (consentimento.copiado ? `, aviso copiado às ${consentimento.copiado}` : '') +
-      `, gravação iniciada às ${consentimento.iniciado}.\nTexto oferecido: "${consentimento.texto}"\n` +
-      'Declaração de quem gravou, não verificação feita pelo Salavox.\n\n'
+    ? T('REGISTRO DE CONSENTIMENTO\nConfirmado às ', 'CONSENT RECORD\nConfirmed at ') +
+      consentimento.confirmado +
+      (consentimento.copiado
+        ? T(', aviso copiado às ', ', notice copied at ') + consentimento.copiado : '') +
+      T(', gravação iniciada às ', ', recording started at ') + consentimento.iniciado + '.\n' +
+      T('Texto oferecido: "', 'Text offered: "') + consentimento.texto + '"\n' +
+      T('Declaração de quem gravou, não verificação feita pelo Salavox.\n\n',
+        'Statement by the person recording, not a check made by Salavox.\n\n')
     : '';
 
   const blocosResumo = () => resumos
     .map(r => r.titulo.toUpperCase() + '\n' + r.texto + '\n').join('\n');
 
-  const RODAPE_MARCA = '\n---\nAta gerada pelo Salavox (salavox.com) — a gravação e a transcrição ' +
-    'aconteceram no computador de quem gravou, sem passar por servidor nenhum.\n';
+  const RODAPE_MARCA = () => T(
+    '\n---\nAta gerada pelo Salavox (salavox.com) — a gravação e a transcrição ' +
+    'aconteceram no computador de quem gravou, sem passar por servidor nenhum.\n',
+    '\n---\nMinutes generated by Salavox (salavox.com) — the recording and the transcript ' +
+    'happened on the computer of the person who recorded, without passing through any server.\n');
 
-  const comoTexto = () => cabecalhoConsentimento() +
+  /* O cabeçalho do texto exportado. Antes o .txt começava direto no primeiro
+     "[00:12] VOCÊ:" — quem recebia não sabia de que reunião era. */
+  const cabecalhoReuniao = () => {
+    const nTelas = telas.filter(t => t.manter).length;
+    return tituloReuniao().toUpperCase() + '\n' +
+      dataDaReuniao().toLocaleString(LOCAL()) + T(' — duração ', ' — duration ') + fmt(segundos) + '\n' +
+      T('Participantes: ', 'Participants: ') +
+      (participantes().join(', ') || T('não informados', 'not stated')) + '\n' +
+      falas.length + (falas.length === 1 ? T(' trecho', ' passage') : T(' trechos', ' passages')) +
+      (nTelas ? ', ' + nTelas + (nTelas === 1 ? T(' tela compartilhada', ' shared screen')
+                                              : T(' telas compartilhadas', ' shared screens')) : '') +
+      (momentos.length ? ', ' + momentos.length +
+        (momentos.length === 1 ? T(' momento marcado', ' flagged moment')
+                               : T(' momentos marcados', ' flagged moments')) : '') + '\n\n';
+  };
+
+  const comoTexto = () => cabecalhoReuniao() + cabecalhoConsentimento() +
     (blocosResumo() ? blocosResumo() + '\n---\n\n' : '') + linhaDoTempo().map(i =>
     i.tipo === 'fala'    ? `[${fmt(i.f.a)}] ${rotulo(i.f)}: ${i.f.texto}` :
     i.tipo === 'momento' ? `[${fmt(i.t)}] *** momento marcado durante a reunião ***`
@@ -2094,7 +2250,8 @@ registerProcessor('toca', Toca);`;
       const h = Math.floor(s/3600), m = Math.floor(s%3600/60), sc = s%60;
       return `${pad2(h)}:${pad2(m)}:${sc.toFixed(3).padStart(6,'0')}`;
     };
-    return 'WEBVTT\nNOTE gerado pelo Salavox — salavox.com\n\n' + falas.map((f, i) => {
+    return 'WEBVTT\nNOTE ' + T('gerado pelo Salavox', 'generated by Salavox') +
+           ' — salavox.com\n\n' + falas.map((f, i) => {
       const fim = i + 1 < falas.length ? Math.min(falas[i+1].a, f.a + 12) : f.a + 5;
       return `${t(f.a)} --> ${t(Math.max(fim, f.a + 0.5))}\n` +
              `<v ${rotulo(f)}>${f.texto}`;
@@ -2107,48 +2264,69 @@ registerProcessor('toca', Toca);`;
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     const PW = 210, PH = 297, M = 18, CW = PW - M * 2;
-    const quando = new Date();
-    const dataTxt = quando.toLocaleString('pt-BR');
     let pagina = 0;
 
     const rodape = () => {
       pagina++;
       doc.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(150);
-      doc.text('Gerado pelo Salavox — a gravação não saiu deste computador', M, PH - 10);
+      doc.text(T('Gerado pelo Salavox — a gravação não saiu deste computador',
+                 'Generated by Salavox — the recording never left this computer'), M, PH - 10);
       doc.text(String(pagina), PW - M, PH - 10, { align: 'right' });
       doc.setTextColor(30);
     };
 
-    doc.setFont('helvetica', 'bold').setFontSize(19).text('Ata de reunião', M, 30);
+    /* O título da reunião no lugar de "Ata de reunião": cinco atas na caixa de
+       entrada do cliente, todas com o mesmo nome, não ajudam ninguém. */
+    const tituloLinhas = doc.setFont('helvetica', 'bold').setFontSize(19)
+      .splitTextToSize(tituloReuniao(), CW);
+    doc.text(tituloLinhas.slice(0, 2), M, 30);
+    const desce = (tituloLinhas.length > 1 ? 8 : 0);
     doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(110);
     const nTelas = telas.filter(t => t.manter).length;
-    doc.text(dataTxt + '   |   duração ' + fmt(segundos) + '   |   ' + falas.length +
-             (falas.length === 1 ? ' trecho' : ' trechos') +
-             (nTelas ? '   |   ' + nTelas + (nTelas === 1 ? ' tela' : ' telas') : '') +
+    doc.text(dataDaReuniao().toLocaleString(LOCAL()) + T('   |   duração ', '   |   duration ') +
+             fmt(segundos) + '   |   ' + falas.length +
+             (falas.length === 1 ? T(' trecho', ' passage') : T(' trechos', ' passages')) +
+             (nTelas ? '   |   ' + nTelas + (nTelas === 1 ? T(' tela', ' screen')
+                                                          : T(' telas', ' screens')) : '') +
              (momentos.length ? '   |   ' + momentos.length +
-               (momentos.length === 1 ? ' momento marcado' : ' momentos marcados') : ''), M, 38);
-    doc.setDrawColor(215).line(M, 44, PW - M, 44);
+               (momentos.length === 1 ? T(' momento marcado', ' flagged moment')
+                                      : T(' momentos marcados', ' flagged moments')) : ''), M, 38 + desce);
+    const quem = participantes();
+    if (quem.length) doc.text(doc.splitTextToSize(T('Participantes: ', 'Participants: ') +
+                              quem.join(', '), CW).slice(0, 1), M, 43.5 + desce);
+    doc.setDrawColor(215).line(M, 49 + desce, PW - M, 49 + desce);
 
     doc.setFontSize(8.6).setTextColor(130);
     doc.text(doc.splitTextToSize(importado
-      ? 'Transcrição automática de um arquivo já existente, gerada no próprio computador. Como o áudio ' +
-        'não foi captado em canais separados, as falas não são atribuídas a pessoas diferentes. O texto ' +
-        'pode conter erros de reconhecimento.'
-      : 'Transcrição automática, gerada no próprio computador. A primeira coluna diz quem falou: o ' +
-        'microfone de quem gravou de um lado, e as demais vozes, captadas pelo áudio da chamada, do ' +
-        'outro — estas não são separadas individualmente. O texto pode conter erros de reconhecimento.',
-      CW), M, 51);
+      ? T('Transcrição automática de um arquivo já existente, gerada no próprio computador. Como o áudio ' +
+          'não foi captado em canais separados, as falas não são atribuídas a pessoas diferentes. O texto ' +
+          'pode conter erros de reconhecimento.',
+          'Automatic transcript of an existing file, produced on this computer. Because the audio was not ' +
+          'captured on separate channels, the lines are not attributed to different people. The text may ' +
+          'contain recognition errors.')
+      : T('Transcrição automática, gerada no próprio computador. A primeira coluna diz quem falou: o ' +
+          'microfone de quem gravou de um lado, e as demais vozes, captadas pelo áudio da chamada, do ' +
+          'outro — estas não são separadas individualmente. O texto pode conter erros de reconhecimento.',
+          'Automatic transcript, produced on this computer. The first column says who spoke: the microphone ' +
+          'of the person recording on one side, and the other voices, captured from the call audio, on the ' +
+          'other — these are not separated individually. The text may contain recognition errors.'),
+      CW), M, 56 + desce);
     doc.setTextColor(30);
 
-    let y = 68;
+    let y = 73 + desce;
     if (consentimento && consentimento.iniciado) {
       const linhas = doc.setFontSize(8.4).splitTextToSize(
-        'REGISTRO DE CONSENTIMENTO — quem gravou confirmou às ' + consentimento.confirmado +
-        ' que avisaria os participantes' +
-        (consentimento.copiado ? ', copiou o texto do aviso às ' + consentimento.copiado : '') +
-        ' e iniciou a gravação às ' + consentimento.iniciado + '. Texto oferecido: "' +
-        consentimento.texto + '" Este registro é a declaração de quem gravou, não uma verificação ' +
-        'feita pelo Salavox.', CW - 12);
+        T('REGISTRO DE CONSENTIMENTO — quem gravou confirmou às ',
+          'CONSENT RECORD — the person recording confirmed at ') + consentimento.confirmado +
+        T(' que avisaria os participantes', ' that they would tell the participants') +
+        (consentimento.copiado
+          ? T(', copiou o texto do aviso às ', ', copied the text of the notice at ') +
+            consentimento.copiado : '') +
+        T(' e iniciou a gravação às ', ' and started recording at ') + consentimento.iniciado +
+        T('. Texto oferecido: "', '. Text offered: "') + consentimento.texto +
+        T('" Este registro é a declaração de quem gravou, não uma verificação feita pelo Salavox.',
+          '" This record is the statement of the person who recorded, not a check made by Salavox.'),
+        CW - 12);
       const alt = linhas.length * 3.6 + 8;
       doc.setFillColor(244, 246, 246).setDrawColor(200);
       doc.roundedRect(M, y - 4, CW, alt, 2, 2, 'FD');
@@ -2231,7 +2409,7 @@ registerProcessor('toca', Toca);`;
     doc.save(nomeArquivo() + '.pdf');
   };
 
-  $('baixarTxt').onclick = () => baixar(comoTexto() + '\n' + RODAPE_MARCA, 'txt');
+  $('baixarTxt').onclick = () => baixar(comoTexto() + '\n' + RODAPE_MARCA(), 'txt');
   $('baixarVtt').onclick = () => baixar(comoVtt(), 'vtt');
 
   /* ============================================================
@@ -2257,23 +2435,68 @@ registerProcessor('toca', Toca);`;
 
   let resumos = [];
 
+  /* Eram três botões — resumo, decisões e pendências, e-mail — e cada um
+     gastava uma chamada. Quem usa clicava nos três, sempre, porque os três
+     são a mesma pergunta feita de ângulos diferentes: o que aconteceu, o que
+     ficou combinado, o que mando para os outros. Virou um pedido só.
+
+     Três ganhos de uma vez: custa um terço, sai coerente entre as partes (o
+     e-mail fala das mesmas pendências que a lista) e o cartão tem um botão
+     em vez de um menu. */
+  const SECOES = () => [
+    ['resumo',     T('Resumo da reunião', 'Meeting summary')],
+    ['decisoes',   T('Decisões', 'Decisions')],
+    ['pendencias', T('Pendências', 'Open items')],
+    ['passos',     T('Próximos passos', 'Next steps')]
+  ];
+
+  const PEDIDO_ATA =
+    'Organize a reunião. Responda em português e devolva EXATAMENTE estas cinco seções, cada título\n' +
+    'em uma linha própria começando com "## ", nesta ordem, sem nada antes da primeira nem depois da última.\n\n' +
+    '## RESUMO\n' +
+    'Até 10 linhas dizendo do que se tratou e onde a reunião chegou, com o instante (mm:ss) que sustenta\n' +
+    'cada ponto.\n\n' +
+    '## DECISÕES\n' +
+    'Uma linha por decisão, começando com "- " e terminando com o instante (mm:ss). Se nada foi fechado,\n' +
+    'escreva "- nenhuma decisão foi fechada nesta reunião".\n\n' +
+    '## PENDÊNCIAS\n' +
+    'Uma linha por pendência, começando com "- ", no formato: o que fazer — responsável — prazo (mm:ss).\n' +
+    'Quando o responsável ou o prazo não tiverem sido ditos, escreva "não ficou claro na reunião" no lugar,\n' +
+    'em vez de deduzir.\n\n' +
+    '## PRÓXIMOS PASSOS\n' +
+    'Uma linha por passo, começando com "- ". Só o que foi combinado.\n\n' +
+    '## E-MAIL\n' +
+    'A primeira linha é "Assunto: ...". Depois, uma linha em branco e o corpo de um e-mail de\n' +
+    'acompanhamento para os participantes: cordial, curto, confirmando o combinado e o que cada lado vai\n' +
+    'entregar. Trate as pessoas pelos nomes que aparecem na transcrição. Sem despedida de mais de uma\n' +
+    'linha e sem prazo que não foi dito.';
+
+  const PEDIDO_ATA_EN =
+    'Organise this meeting. Answer in English and return EXACTLY these five sections, each title on a\n' +
+    'line of its own starting with "## ", in this order, with nothing before the first and nothing after\n' +
+    'the last.\n\n' +
+    '## SUMMARY\n' +
+    'Up to 10 lines saying what the meeting was about and where it landed, with the timestamp (mm:ss)\n' +
+    'that supports each point.\n\n' +
+    '## DECISIONS\n' +
+    'One line per decision, starting with "- " and ending with the timestamp (mm:ss). If nothing was\n' +
+    'settled, write "- no decision was closed in this meeting".\n\n' +
+    '## OPEN ITEMS\n' +
+    'One line per open item, starting with "- ", in the format: what to do — owner — due date (mm:ss).\n' +
+    'When the owner or the due date were not stated, write "not clear from the meeting" instead of\n' +
+    'inferring one.\n\n' +
+    '## NEXT STEPS\n' +
+    'One line per step, starting with "- ". Only what was agreed.\n\n' +
+    '## E-MAIL\n' +
+    'The first line is "Subject: ...". Then a blank line and the body of a follow-up e-mail to the\n' +
+    'participants: warm, short, confirming what was agreed and what each side will deliver. Address\n' +
+    'people by the names that appear in the transcript. No sign-off longer than one line and no due\n' +
+    'date that was not said.';
+
   const TAREFAS = {
-    resumo: {
-      titulo: 'Resumo executivo',
-      instrucao: 'Escreva um resumo executivo da reunião em até 12 linhas, em português, citando o ' +
-        'instante (mm:ss) de cada ponto relevante. Não invente nada que não esteja na transcrição.'
-    },
-    pendencias: {
-      titulo: 'Decisões e pendências',
-      instrucao: 'Liste, em português: 1) as decisões tomadas; 2) as pendências, com responsável e prazo ' +
-        'quando aparecerem; 3) os próximos passos. Cite o instante (mm:ss) de cada item. Se algo não ' +
-        'estiver claro na transcrição, escreva "não ficou claro na reunião" em vez de deduzir.'
-    },
-    email: {
-      titulo: 'E-mail de acompanhamento',
-      instrucao: 'Escreva um e-mail curto e cordial de acompanhamento para os participantes, em ' +
-        'português, confirmando o que ficou combinado e o que cada lado vai entregar. Sem saudação ' +
-        'genérica de mais de uma linha e sem inventar prazo que não foi dito.'
+    ata: {
+      titulo: 'Ata organizada',
+      get instrucao() { return T(PEDIDO_ATA, PEDIDO_ATA_EN); }
     },
     pergunta: {
       titulo: 'Pergunta à ata',
@@ -2283,19 +2506,33 @@ registerProcessor('toca', Toca);`;
 
   const CONTEXTO =
     'Abaixo está a transcrição automática de uma reunião, gerada no computador de quem participou.\n' +
-    'Cada linha traz o instante e quem falou. As linhas "(nova tela compartilhada)" marcam quando a tela\n' +
+    'As primeiras linhas são o título, a data, a duração e os participantes — use esses nomes ao\n' +
+    'escrever, em vez de "o participante" ou "a outra parte".\n' +
+    'Depois delas, cada linha traz o instante e quem falou. As linhas "(nova tela compartilhada)" marcam quando a tela\n' +
     'apresentada mudou. As linhas "*** momento marcado ***" foram marcadas à mão por quem estava lá:\n' +
     'trate o que está em volta delas como importante.\n' +
     'A transcrição é automática e contém erros: se um trecho parecer incoerente, sinalize em vez de\n' +
     'interpretar. Quando a informação não estiver na transcrição, diga que não é possível saber.\n';
 
+  const CONTEXTO_EN =
+    'Below is the automatic transcript of a meeting, produced on the computer of one of the participants.\n' +
+    'The first lines are the title, the date, the duration and the participants — use those names when you\n' +
+    'write, instead of "the participant" or "the other side".\n' +
+    'After them, each line carries the timestamp and who spoke. Lines reading "(nova tela compartilhada)"\n' +
+    'mark when the shared screen changed. Lines reading "*** momento marcado ***" were flagged by hand by\n' +
+    'someone who was there: treat what surrounds them as important.\n' +
+    'The transcript is automatic and contains errors: if a passage seems incoherent, flag it instead of\n' +
+    'interpreting it. When the information is not in the transcript, say that it cannot be known.\n';
+
   function montarPrompt(chave, pergunta) {
     const t = TAREFAS[chave];
     const tarefa = chave === 'pergunta'
-      ? 'Responda à pergunta abaixo usando apenas a transcrição, citando os instantes que sustentam a ' +
-        'resposta.\n\nPergunta: ' + pergunta
+      ? T('Responda à pergunta abaixo usando apenas a transcrição, citando os instantes que sustentam a ' +
+          'resposta.\n\nPergunta: ',
+          'Answer the question below using only the transcript, citing the timestamps that support the ' +
+          'answer.\n\nQuestion: ') + pergunta
       : t.instrucao;
-    return CONTEXTO + '\n' + tarefa + '\n\n---\n' + comoTexto();
+    return T(CONTEXTO, CONTEXTO_EN) + '\n' + tarefa + '\n\n---\n' + comoTexto();
   }
 
   /* ---------- o estado do cartão, que é o estado da conta ----------
@@ -2343,7 +2580,7 @@ registerProcessor('toca', Toca);`;
        Antes, plano grátis via um cartão sem botão nenhum e o preço escrito —
        e o primeiro a esbarrar nisso foi o dono do produto, tentando testar a
        própria IA. O problema é maior que o incômodo: ninguém assina um resumo
-       por IA sem ver o resumo. A porta agora tem três voltas de cortesia; a
+       por IA sem ver o resumo. A porta agora tem sete voltas de cortesia; a
        recusa vem do servidor, na quarta, com o convite para assinar junto. */
     $('iaAcoes').classList.toggle('hide', !sessao);
     /* O modelo preciso não entra na degustação: custa cerca de dez vezes mais
@@ -2356,19 +2593,114 @@ registerProcessor('toca', Toca);`;
       $('iaEstado').innerHTML = 'A <b>IA do Salavox</b> lê o texto da ata e devolve o resumo, ' +
         'as decisões e as pendências. O texto sai daqui só quando você clica.';
     } else if (!sessao) {
-      $('iaEstado').innerHTML = 'Entre na sua conta no cartão acima e ganhe <b>3 resumos para ' +
+      $('iaEstado').innerHTML = 'Entre na <a class="link" href="/conta">sua conta</a> e ganhe <b>7 resumos para ' +
         'experimentar</b>. Gravar, transcrever e exportar continua de graça, com ou sem conta.';
     } else if (cortesia === 0) {
       $('iaEstado').innerHTML = 'Seus <b>resumos de cortesia acabaram</b>. O plano profissional ' +
         'tem 30 por mês, mais o modelo preciso e o envio da ata por e-mail, por R$ 19,90.';
     } else {
-      const q = typeof cortesia === 'number' && cortesia > 0 ? cortesia : 3;
+      const q = typeof cortesia === 'number' && cortesia > 0 ? cortesia : 7;
       $('iaEstado').innerHTML = `Você tem <b>${q} ${q === 1 ? 'resumo' : 'resumos'} de cortesia</b> ` +
         'para experimentar a IA do Salavox. Depois, o plano profissional tem 30 por mês por R$ 19,90.';
     }
   }
 
   /* ---------- execução ---------- */
+
+  /* A chamada ao nosso servidor. Vai o texto da ata e o token de quem pediu;
+     nunca a chave do modelo, que não existe neste lado. */
+  async function pedirSalavox(prompt, aviso) {
+    if (!sessao) throw new Error('entre na sua conta para usar a IA do Salavox.');
+    const modelo = $('iaModeloSalavox') ? $('iaModeloSalavox').value : 'rapido';
+    aviso('Resumindo com a IA do Salavox…');
+    const r = await fetch('/api/resumo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
+      body: JSON.stringify({ prompt, modelo })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      /* recusa por cota: a tela tem de refletir isso na hora, não só na mensagem */
+      if (r.status === 402 && !temPlano()) { cortesia = 0; desenharIa(); }
+      throw new Error(d.erro || ('o servidor respondeu ' + r.status));
+    }
+    if (typeof d.restante === 'number') {
+      if (!temPlano()) cortesia = d.restante;
+      $('iaMotorMsg').innerHTML = temPlano()
+        ? `restam <b>${d.restante}</b> resumos neste mês`
+        : `restam <b>${d.restante}</b> ${d.restante === 1 ? 'resumo' : 'resumos'} de cortesia`;
+      desenharIa();
+    }
+    return (d.texto || '').trim();
+  }
+
+  /* Corta a resposta nas seções pedidas.
+
+     O modelo obedece ao formato quase sempre — mas "quase" não é sempre, e o
+     jeito de errar aqui seria jogar fora um texto bom porque o título veio com
+     um "#" a menos. Por isso o corte é tolerante (um a três "#", com ou sem
+     acento) e, quando não acha seção nenhuma, o texto inteiro vira o resumo em
+     vez de virar erro. */
+  function fatiar(bruto) {
+    const achado = {};
+    let atual = null, linhas = [];
+    const fechar = () => { if (atual) achado[atual] = linhas.join('\n').trim(); };
+    const NOMES = { resumo: 'resumo', summary: 'resumo',
+                    decisoes: 'decisoes', decisions: 'decisoes',
+                    pendencias: 'pendencias', 'open items': 'pendencias', 'pending items': 'pendencias',
+                    'proximos passos': 'passos', 'next steps': 'passos',
+                    'e-mail': 'email', email: 'email' };
+    for (const l of String(bruto).split(/\r?\n/)) {
+      const m = /^\s*#{1,3}\s*(.+?)\s*:?\s*$/.exec(l);
+      const chave = m ? NOMES[semAcento(m[1]).replace(/\s+/g, ' ').trim()] : null;
+      if (chave) { fechar(); atual = chave; linhas = []; continue; }
+      if (atual) linhas.push(l);
+    }
+    fechar();
+    return achado;
+  }
+
+  /* Põe o e-mail na caixa dele: assunto na primeira linha, corpo no resto. */
+  function porEmail(txt) {
+    const linhas = String(txt).split(/\r?\n/);
+    let i = 0;
+    while (i < linhas.length && !linhas[i].trim()) i++;
+    const m = /^\s*assunto\s*:\s*(.+)$/i.exec(linhas[i] || '');
+    const assunto = m ? m[1].trim() : tituloReuniao();
+    if (m) i++;
+    $('emailAssunto').value = assunto;
+    $('emailCorpo').textContent = linhas.slice(i).join('\n').trim();
+    $('emailBox').classList.remove('hide');
+    desenharConta();          // é ela que decide se o botão de enviar aparece
+  }
+
+  async function organizarAta() {
+    if (!falas.length) return;
+    const aviso = m => { $('iaMsg').innerHTML = m; };
+
+    ocupado = true;
+    $('iaBarWrap').classList.remove('hide');
+    $('iaBar').style.width = '35%';
+    try {
+      const bruto = await pedirSalavox(montarPrompt('ata'), aviso);
+      $('iaBar').style.width = '100%';
+      const partes = fatiar(bruto);
+      const temSecao = SECOES().some(([c]) => partes[c]);
+      if (!temSecao) {
+        guardarResumo('resumo', T('Ata organizada', 'Organised minutes'), bruto);
+      } else {
+        for (const [chave, titulo] of SECOES()) if (partes[chave]) guardarResumo(chave, titulo, partes[chave]);
+      }
+      if (partes.email) porEmail(partes.email);
+      aviso('<span class="ok">Ata organizada.</span> Resumo, decisões, pendências e próximos passos ' +
+            'entram no PDF e no texto' + (partes.email ? ' — e o e-mail já está pronto abaixo.' : '.'));
+    } catch (e) {
+      aviso(`<span class="err">Não consegui: ${(e && e.message) || e}</span>`);
+    } finally {
+      ocupado = false;
+      setTimeout(() => { $('iaBarWrap').classList.add('hide'); $('iaBar').style.width = '0%'; }, 600);
+    }
+  }
 
   async function rodarTarefa(chave, pergunta) {
     if (!falas.length) return;
@@ -2426,9 +2758,12 @@ registerProcessor('toca', Toca);`;
     if (b.dataset.tirar != null) { resumos.splice(+b.dataset.tirar, 1); desenharResumos(); }
   };
 
-  $('iaResumo').onclick = () => rodarTarefa('resumo');
-  $('iaPendencias').onclick = () => rodarTarefa('pendencias');
-  $('iaEmail').onclick = () => rodarTarefa('email');
+  $('iaOrganizar').onclick = () => organizarAta();
+  $('copiarEmail').onclick = async () => {
+    const t = $('emailAssunto').value.trim() + '\n\n' + $('emailCorpo').textContent.trim();
+    try { await navigator.clipboard.writeText(t); } catch (e) {}
+    $('emailMsg').innerHTML = '<span class="ok">copiado</span>';
+  };
   $('iaPerguntar').onclick = () => {
     const q = $('iaPergunta').value.trim();
     if (q) rodarTarefa('pergunta', q);
@@ -2487,7 +2822,7 @@ registerProcessor('toca', Toca);`;
       $('contaEstado').innerHTML = `<span class="err">Camada paga não configurada:</span> ${problema}. ` +
         'Corrija <code>public/config.json</code> e publique de novo — ' +
         'enquanto isso, tudo o mais continua funcionando normalmente.';
-      $('contaEntrar').classList.add('hide');
+      $('irConta').classList.add('hide');
       $('diagnostico').classList.remove('hide');
       return;
     }
@@ -2531,7 +2866,7 @@ registerProcessor('toca', Toca);`;
   async function carregarPerfil() {
     if (!cfg || !sessao) { desenharConta(); return; }
     try {
-      const r = await fetch(cfg.supabaseUrl + '/rest/v1/perfis?select=email,plano,assinante_ate', {
+      const r = await fetch(cfg.supabaseUrl + '/rest/v1/perfis?select=email,nome,plano,assinante_ate', {
         headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + sessao.access_token }
       });
       if (r.status === 401) { guardarSessao(null); perfil = null; desenharConta(); return; }
@@ -2539,253 +2874,72 @@ registerProcessor('toca', Toca);`;
       perfil = Array.isArray(d) ? d[0] : null;
     } catch (e) { perfil = null; }
     await lerCortesia();
-    await lerCobranca();
     desenharConta();
   }
 
   function desenharConta() {
     if (!cfg) return;
     desenharIa();
+    desenharPassos();
+    const nome = perfil && (perfil.nome || perfil.email);
     if (!sessao || !perfil) {
-      $('contaEstado').innerHTML = 'Entre para usar a <b>IA do Salavox</b> e o envio da ata por e-mail. ' +
-        'Gravar, transcrever e gerar a ata continua funcionando sem conta.';
-      $('contaEntrar').classList.remove('hide');
-      $('contaSair').classList.add('hide');
+      $('contaEstado').innerHTML = 'Você não está em nenhuma conta — <b>tudo funciona assim mesmo</b>. ' +
+        'A conta serve para o resumo por IA e o envio da ata.';
       $('enviarEmail').classList.add('hide');
-      $('assinar').classList.add('hide');
-      $('cancelar').classList.add('hide');
-      $('dadosCobranca').classList.add('hide');
+      $('irConta').textContent = 'entrar';
       return;
     }
     const pago = temPlano();
-    $('contaEstado').innerHTML = `<b>${escapar(perfil.email)}</b> — plano ` +
-      (pago ? `<span class="ok">${escapar(perfil.plano)}</span>, ativo até ` +
+    $('contaEstado').innerHTML = `<b>${escapar(nome)}</b> — ` +
+      (pago ? `plano <span class="ok">${escapar(perfil.plano)}</span> até ` +
               new Date(perfil.assinante_ate).toLocaleDateString('pt-BR')
-            : 'grátis. A IA do Salavox e o envio por e-mail são do plano profissional.');
-    $('contaEntrar').classList.add('hide');
-    $('contaSair').classList.remove('hide');
+            : (typeof cortesia === 'number' && cortesia > 0
+                 ? `<b>${cortesia}</b> ${cortesia === 1 ? 'resumo' : 'resumos'} de cortesia`
+                 : 'plano grátis'));
+    $('irConta').textContent = 'sua conta';
     $('enviarEmail').classList.toggle('hide', !pago);
-    /* O botão de assinar aparece para quem não tem plano ativo — inclusive para
-       quem já teve e deixou vencer, que é justamente quem se quer de volta. O de
-       cancelar só existe se houver assinatura viva no meio de pagamento. */
-    const pedindoDados = !$('dadosCobranca').classList.contains('hide');
-    $('assinar').classList.toggle('hide', pago || pedindoDados);
-    $('cancelar').classList.toggle('hide', !(cobranca && cobranca.assinatura));
   }
 
-  /* ============================================================
-     Assinar, cancelar e o que o navegador NÃO decide.
+  /* Assinar e cancelar moraram aqui e mudaram para /conta. O que ficou nesta
+     página é só a leitura: quem está logado, qual o plano, quanto resta. */
 
-     Nada aqui libera plano nenhum. O botão cria a cobrança e abre a tela de
-     pagamento; quem escreve a data de validade é o webhook do Asaas, do lado
-     do servidor, quando o pagamento é confirmado. Se esta parte do código
-     pudesse liberar acesso, bastaria abrir o inspetor para assinar de graça.
-     ============================================================ */
+  /* ---- enviar o e-mail que a IA escreveu, com a ata junto ----
 
-  let cobranca = null;
-
-  async function lerCobranca() {
-    cobranca = null;
-    if (!cfg || !sessao) return;
-    try {
-      const r = await fetch(cfg.supabaseUrl + '/rest/v1/rpc/minha_cobranca', {
-        method: 'POST',
-        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + sessao.access_token,
-                   'Content-Type': 'application/json' },
-        body: '{}'
-      });
-      if (r.ok) cobranca = await r.json();
-    } catch (e) {}
-  }
-
-  $('assinar').onclick = () => {
-    $('dadosCobranca').classList.remove('hide');
-    $('assinar').classList.add('hide');
-    $('cobNome').focus();
-  };
-
-  $('cobCancelar').onclick = () => {
-    $('dadosCobranca').classList.add('hide');
-    $('contaMsg').textContent = '';
-    desenharConta();
-  };
-
-  $('cobConfirmar').onclick = async () => {
-    const nome = ($('cobNome').value || '').trim();
-    const documento = ($('cobDoc').value || '').trim();
-    if (nome.length < 3) { $('contaMsg').innerHTML = '<span class="err">informe o nome</span>'; return; }
-    if (documento.replace(/\D/g, '').length !== 11 && documento.replace(/\D/g, '').length !== 14) {
-      $('contaMsg').innerHTML = '<span class="err">CPF tem 11 dígitos e CNPJ tem 14</span>';
+     Antes isto era um `prompt()` do navegador pedindo endereços e mandava a
+     ata crua, sem uma linha de conversa em cima. Agora o que sai é o e-mail
+     que a IA escreveu — conferido e corrigido na tela por quem assina — e a
+     ata vai embaixo, depois de um traço. */
+  $('enviarEmail').onclick = async () => {
+    const para = $('emailPara').value.trim();
+    if (!para) {
+      $('emailMsg').innerHTML = '<span class="err">Diga para quem enviar.</span>';
+      $('emailPara').focus();
       return;
     }
-    $('cobConfirmar').disabled = true;
-    $('contaMsg').textContent = 'Criando a cobrança…';
-    try {
-      const r = await fetch('/api/assinar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
-        body: JSON.stringify({ acao: 'assinar', nome, documento, telefone: ($('cobFone').value || '').trim() })
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.erro || ('o servidor respondeu ' + r.status));
-      $('dadosCobranca').classList.add('hide');
-      await lerCobranca();
-      if (d.pagar) {
-        /* Abre em outra aba de propósito: esta aqui pode ter uma gravação em
-           andamento, e trocar de página no meio da reunião perderia o que
-           ainda não foi escrito no disco. */
-        window.open(d.pagar, '_blank', 'noopener');
-        $('contaMsg').innerHTML = '<span class="ok">Cobrança criada</span> — a tela de pagamento abriu em ' +
-          'outra aba. O plano é liberado assim que o pagamento for confirmado.';
-      } else {
-        $('contaMsg').innerHTML = `<span class="ok">Cobrança criada</span> — ${escapar(d.aviso || '')}`;
-      }
-      desenharConta();
-    } catch (e) {
-      $('contaMsg').innerHTML = `<span class="err">${escapar((e && e.message) || e)}</span>`;
-    } finally {
-      $('cobConfirmar').disabled = false;
-    }
-  };
-
-  $('cancelar').onclick = async () => {
-    if (!confirm('Cancelar a assinatura? O plano continua valendo até o fim do período já pago.')) return;
-    $('cancelar').disabled = true;
-    $('contaMsg').textContent = 'Cancelando…';
-    try {
-      const r = await fetch('/api/assinar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
-        body: JSON.stringify({ acao: 'cancelar' })
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.erro || ('o servidor respondeu ' + r.status));
-      await lerCobranca();
-      $('contaMsg').innerHTML = '<span class="ok">Assinatura cancelada</span> — não haverá nova cobrança, ' +
-        'e o plano segue valendo até o fim do período já pago.';
-      desenharConta();
-    } catch (e) {
-      $('contaMsg').innerHTML = `<span class="err">${escapar((e && e.message) || e)}</span>`;
-    } finally {
-      $('cancelar').disabled = false;
-    }
-  };
-
-  $('contaEntrar').onclick = async () => {
-    const email = ($('contaEmail').value || '').trim();
-    if (!/.+@.+\..+/.test(email)) { $('contaMsg').innerHTML = '<span class="err">e-mail inválido</span>'; return; }
-    $('contaMsg').textContent = 'Enviando o link…';
-    try {
-      const r = await fetch(cfg.supabaseUrl + '/auth/v1/otp', {
-        method: 'POST',
-        headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, create_user: true })
-      });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      $('contaMsg').innerHTML = '<span class="ok">Link enviado</span> — abra o e-mail e clique. ' +
-        'Não há senha para lembrar.';
-    } catch (e) {
-      $('contaMsg').innerHTML = '<span class="err">não consegui enviar o link agora</span>';
-    }
-  };
-
-  /* Diagnóstico da camada paga.
-
-     Existe porque a primeira instalação falhou em silêncio: o arquivo de
-     configuração não estava lá, o cartão de conta não apareceu e não havia como
-     saber por quê. Isto responde as quatro perguntas de uma vez. */
-  $('diagnostico').onclick = async () => {
-    const linhas = [];
-    const diz = (o, ok, extra) => linhas.push(`${ok ? '✓' : '✗'} ${o}${extra ? ' — ' + extra : ''}`);
-
-    try {
-      const r = await fetch('/config.json', { cache: 'no-cache' });
-      diz('config.json publicado', r.ok, r.ok ? '' : 'HTTP ' + r.status);
-      if (r.ok) {
-        const c = await r.json().catch(() => null);
-        diz('config.json é JSON válido', !!c);
-        diz('supabaseUrl preenchido', !!(c && c.supabaseUrl && c.supabaseUrl.trim()));
-        diz('supabaseAnonKey preenchido', !!(c && c.supabaseAnonKey && c.supabaseAnonKey.trim()));
-      }
-    } catch (e) { diz('config.json publicado', false, e.message); }
-
-    if (cfg) {
-      try {
-        const r = await fetch(cfg.supabaseUrl + '/auth/v1/settings', { headers: { apikey: cfg.supabaseAnonKey } });
-        diz('Supabase responde', r.ok, r.ok ? '' : 'HTTP ' + r.status + ' — confira a URL e a anon key');
-      } catch (e) { diz('Supabase responde', false, 'não consegui alcançar'); }
-    }
-
-    try {
-      const r = await fetch('/api/resumo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-      // sem token, a resposta certa é 401: significa que a função existe e está checando
-      diz('função /api/resumo publicada', r.status === 401 || r.status === 400,
-          r.status === 404 ? 'HTTP 404 — a pasta api/ não subiu com o projeto' : 'HTTP ' + r.status);
-      if (r.status === 500) {
-        const d = await r.json().catch(() => ({}));
-        diz('variáveis de ambiente da função', false, d.erro || 'servidor sem configuração');
-      } else if (r.status === 401) {
-        diz('variáveis de ambiente da função', true, 'a função respondeu como deve');
-      }
-    } catch (e) { diz('função /api/resumo publicada', false, e.message); }
-
-    $('contaMsg').innerHTML = '<pre style="white-space:pre-wrap;font:12.5px var(--mono);margin:8px 0 0">' +
-      linhas.join('\n') + '</pre>';
-  };
-
-  $('contaSair').onclick = () => { guardarSessao(null); perfil = null; desenharConta(); $('contaMsg').textContent = ''; };
-
-  async function pedirSalavox(prompt, aviso) {
-    if (!sessao) throw new Error('entre na sua conta para usar a IA do Salavox.');
-    const modelo = $('iaModeloSalavox') ? $('iaModeloSalavox').value : 'rapido';
-    aviso('Resumindo com a IA do Salavox…');
-    const r = await fetch('/api/resumo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
-      body: JSON.stringify({ prompt, modelo })
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      // recusa por cota: a tela tem de refletir isso na hora, não só na mensagem
-      if (r.status === 402 && !temPlano()) { cortesia = 0; desenharIa(); }
-      throw new Error(d.erro || ('o servidor respondeu ' + r.status));
-    }
-    if (typeof d.restante === 'number') {
-      if (!temPlano()) cortesia = d.restante;
-      $('iaMotorMsg').innerHTML = temPlano()
-        ? `restam <b>${d.restante}</b> resumos neste mês`
-        : `restam <b>${d.restante}</b> ${d.restante === 1 ? 'resumo' : 'resumos'} de cortesia`;
-      desenharIa();
-    }
-    return (d.texto || '').trim();
-  }
-
-  /* ---- enviar a ata por e-mail, com a marca junto ---- */
-  $('enviarEmail').onclick = async () => {
-    const para = prompt('Enviar a ata para quais e-mails? (separe por vírgula)');
-    if (!para) return;
-    $('ataMsg').textContent = 'Enviando…';
+    const corpo = $('emailCorpo').textContent.trim();
+    $('emailMsg').textContent = 'Enviando…';
     try {
       const r = await fetch('/api/enviar-ata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
         body: JSON.stringify({
           para,
-          assunto: 'Ata da reunião — ' + new Date().toLocaleDateString('pt-BR'),
-          corpo: comoTexto(),
+          assunto: $('emailAssunto').value.trim() || tituloReuniao(),
+          corpo: (corpo ? corpo + '\n\n———\n\n' : '') + comoTexto(),
           assinatura: perfil && perfil.email
         })
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.erro || ('erro ' + r.status));
-      $('ataMsg').innerHTML = `<span class="ok">enviada para ${d.enviados} ` +
+      $('emailMsg').innerHTML = `<span class="ok">enviado para ${d.enviados} ` +
         `${d.enviados === 1 ? 'endereço' : 'endereços'}</span>`;
     } catch (e) {
-      $('ataMsg').innerHTML = `<span class="err">${(e && e.message) || e}</span>`;
+      $('emailMsg').innerHTML = `<span class="err">${(e && e.message) || e}</span>`;
     }
   };
 
   iniciarConta();
+  desenharPassos();
 
   /* ============================================================
      Recuperação. Como cada pedaço é fechado no disco assim que
@@ -2826,6 +2980,7 @@ registerProcessor('toca', Toca);`;
       blobGravacao = await juntarPrefixo('gravacao');
       blobPcm = await juntarPrefixo('pcm');
       segundos = Math.round(dur);
+      if (meta && meta.inicio) inicioReuniao = meta.inicio;   // a reunião é daquele dia, não de agora
       janelas = { voce: !meta || meta.mic !== false, outros: !meta || meta.sistema !== false };
       if (meta && meta.consentimento) { consentimento = meta.consentimento; mostrarConsentimento(); }
       $('recMsg').innerHTML = `<span class="ok">Gravação recuperada de ${fmt(dur)}</span> — ` +
@@ -2833,6 +2988,7 @@ registerProcessor('toca', Toca);`;
       $('trans').disabled = false;
       if (!meta || meta.tela !== false) $('telasCard').classList.remove('hide');
       esconderRecuperacao();
+      desenharPassos();
       $('trans').scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
     $('recupApagar').onclick = async () => {

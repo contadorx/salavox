@@ -58,7 +58,7 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
   Sem `config.json` o cartão nem aparece — a instalação local continua inteira e sem cadastro.
 - **Conta por link no e-mail, sem senha** (Supabase Auth por REST, sem biblioteca), com plano, validade e
   cota de resumos do mês. A sessão fica no `localStorage`; o texto da reunião, nunca.
-- **3 resumos de cortesia por conta**, sem cartão: criar a conta já dá para experimentar a IA. A conta é da
+- **7 resumos de cortesia por conta**, sem cartão: criar a conta já dá para experimentar a IA. A conta é da
   vida inteira da conta, não do mês — degustação, não plano grátis disfarçado. O modelo preciso fica fora.
 - **Salva a gravação em fluxo**, pedaço por pedaço direto do disco do navegador para o arquivo escolhido.
   O caminho antigo montava tudo num Blob e passava por `createObjectURL` — duas cópias de centenas de

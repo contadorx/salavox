@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sua conta — Salavox</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site.css">
+<style>
+/* A conta saiu de dentro da ferramenta.
+
+   Ela morava num cartão no topo do aplicativo, acima do passo 1 — e era a
+   primeira coisa que alguém via ao abrir para gravar uma reunião. Cadastro,
+   plano e cobrança não são passo de gravar ata; ficavam no caminho todos os
+   dias para resolver algo que se resolve uma vez. Aqui é o lugar deles. */
+body{background:var(--superficie)}
+.topo{background:var(--branco);border-bottom:1px solid var(--linha)}
+.pag{max-width:760px;margin:0 auto;padding:32px 24px 90px}
+h1{font-size:30px;font-weight:800;letter-spacing:-.6px;margin-bottom:6px}
+.sub{color:var(--tinta-media);font-size:14.5px;margin-bottom:26px}
+.cartao{background:var(--branco);border:1px solid var(--linha);border-radius:14px;padding:20px 22px;
+        box-shadow:var(--sombra);margin-bottom:14px}
+.cartao h2{font-size:16.5px;font-weight:800;letter-spacing:-.3px;margin-bottom:3px}
+.cartao .dica{font-size:12.5px;color:var(--tinta-media);margin-bottom:15px}
+.linha{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+input,select{font-family:var(--f);font-size:14.5px;padding:10px 13px;border:1.5px solid var(--linha);
+             border-radius:10px;background:#fff;color:var(--tinta)}
+input:focus,select:focus{outline:none;border-color:var(--verde)}
+button{font-family:var(--f);font-size:14.5px;font-weight:700;padding:10px 18px;border-radius:10px;
+       border:none;background:var(--verde);color:#fff;cursor:pointer}
+button:hover{background:var(--verde-escuro)}
+button.ghost{background:#fff;color:var(--tinta);border:1.5px solid var(--linha)}
+button:disabled{opacity:.5;cursor:default}
+.msg{font-size:13.5px;margin-top:11px;min-height:20px}
+.ok{color:#1C6B5E;font-weight:700}
+.err{color:#A3352B;font-weight:700}
+.hide{display:none}
+.campo{display:grid;grid-template-columns:150px 1fr;gap:10px 16px;font-size:14.5px;align-items:center}
+.campo dt{color:var(--tinta-suave);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.campo dd{margin:0;font-weight:600}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:99px}
+.pill.pago{background:var(--verde-claro);color:#1C4F48}
+.pill.free{background:var(--superficie);color:var(--tinta-media)}
+.medidor{height:8px;border-radius:99px;background:var(--superficie);overflow:hidden;margin-top:10px}
+.medidor i{display:block;height:100%;background:var(--verde);border-radius:99px}
+.nota{font-size:12.5px;color:var(--tinta-suave);line-height:1.55;margin-top:12px}
+</style>
+</head>
+<body>
+
+<nav class="nav topo">
+  <div class="wrap nav-inner">
+    <a class="marca" href="/"><img src="/logo.svg" alt=""><span>Sala<b>vox</b></span></a>
+    <div class="nav-links"><a href="/app">Gravar uma reunião</a><a href="/">Site</a></div>
+  </div>
+</nav>
+
+<div class="pag">
+  <h1>Sua conta</h1>
+  <p class="sub" id="sub">Quem você é, qual é o seu plano e quanto você já usou.</p>
+
+  <div class="cartao" id="entrar">
+    <h2>Entrar</h2>
+    <p class="dica">Sem senha: você recebe um link no e-mail e clica. Gravar, transcrever e exportar
+    funcionam sem conta nenhuma — a conta serve para o resumo por IA e para o envio da ata.</p>
+    <div class="linha">
+      <input type="email" id="email" placeholder="seu@email.com" autocomplete="email" style="min-width:250px">
+      <button id="pedirLink">Receber o link</button>
+    </div>
+    <div class="msg" id="entrarMsg"></div>
+  </div>
+
+  <div id="dentro" class="hide">
+    <div class="cartao">
+      <h2>Quem você é</h2>
+      <p class="dica">O nome aparece na assinatura do e-mail de acompanhamento que você envia aos
+      participantes. Fica só na sua conta.</p>
+      <dl class="campo">
+        <dt>E-mail</dt><dd id="vEmail">—</dd>
+        <dt>Nome</dt>
+        <dd><span class="linha"><input type="text" id="nome" maxlength="80" placeholder="Como você assina"
+             style="min-width:230px"><button id="salvarNome">Salvar</button></span></dd>
+        <dt>Conta criada em</dt><dd id="vCriada">—</dd>
+      </dl>
+      <div class="msg" id="nomeMsg"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Seu plano</h2>
+      <p class="dica" id="planoDica">—</p>
+      <dl class="campo">
+        <dt>Plano</dt><dd id="vPlano">—</dd>
+        <dt>Válido até</dt><dd id="vAte">—</dd>
+      </dl>
+      <div id="usoBloco" style="margin-top:16px">
+        <div style="font-size:13.5px;color:var(--tinta-media)" id="usoTexto">—</div>
+        <div class="medidor"><i id="usoBarra" style="width:0%"></i></div>
+      </div>
+      <div class="linha" style="margin-top:16px">
+        <button id="assinar" class="hide">Assinar por R$ 19,90/mês</button>
+        <button id="cancelar" class="ghost hide">Cancelar assinatura</button>
+        <button id="sair" class="ghost">Sair desta conta</button>
+      </div>
+
+      <div class="hide" id="dadosCobranca" style="margin-top:16px">
+        <div class="linha">
+          <input type="text" id="cobNome" placeholder="Nome ou razão social" maxlength="80" style="min-width:230px">
+          <input type="text" id="cobDoc" placeholder="CPF ou CNPJ" maxlength="18" autocomplete="off" style="min-width:170px">
+          <input type="text" id="cobFone" placeholder="Celular (opcional)" maxlength="16" autocomplete="off" style="min-width:150px">
+          <button id="cobConfirmar">Gerar a cobrança</button>
+          <button class="ghost" id="cobCancelar">Deixa pra lá</button>
+        </div>
+        <p class="nota">O meio de pagamento exige nome e CPF/CNPJ para emitir a cobrança — e você vai
+        precisar deles na nota. Esses dados vão para o <b>Asaas</b>, que processa o pagamento; do nosso lado
+        fica só o identificador que ele devolve. Você escolhe <b>Pix, boleto ou cartão</b> na tela dele.</p>
+      </div>
+      <div class="msg" id="planoMsg"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>O que fica guardado aqui</h2>
+      <p class="dica">A lista completa, sem meias palavras.</p>
+      <dl class="campo">
+        <dt>Guardado</dt><dd>seu e-mail, seu nome, o plano e quantos resumos você pediu no mês</dd>
+        <dt>Nunca guardado</dt><dd>áudio, vídeo, transcrição ou ata — nada disso chega ao nosso servidor</dd>
+      </dl>
+      <p class="nota">Para apagar a conta, escreva para o endereço de contato e ela sai junto com a
+      contagem de uso. Não há gravação para apagar, porque nunca houve gravação nossa.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = i => document.getElementById(i);
+  const CHAVE = 'salavox.sessao';
+  let cfg = null, sessao = null, perfil = null, cobranca = null, cortesia = null;
+
+  const escapar = t => String(t == null ? '' : t).replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const dia = d => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
+  const pago = () => !!(perfil && perfil.plano !== 'gratis' && perfil.assinante_ate &&
+                        new Date(perfil.assinante_ate) > new Date());
+
+  async function comecar() {
+    try { cfg = await (await fetch('/config.json', { cache: 'no-cache' })).json(); } catch (e) {}
+    if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey) {
+      $('entrarMsg').innerHTML = '<span class="err">Esta instalação não tem conta.</span> ' +
+        'A ferramenta funciona inteira e local em <a href="/app">/app</a>, sem cadastro.';
+      return;
+    }
+    cfg.supabaseUrl = String(cfg.supabaseUrl).replace(/\/+$/, '');
+    if (location.hash.indexOf('access_token=') >= 0) {
+      const h = new URLSearchParams(location.hash.slice(1));
+      sessao = { access_token: h.get('access_token'), refresh_token: h.get('refresh_token') };
+      localStorage.setItem(CHAVE, JSON.stringify(sessao));
+      history.replaceState(null, '', location.pathname);
+    } else {
+      try { sessao = JSON.parse(localStorage.getItem(CHAVE) || 'null'); } catch (e) {}
+    }
+    window.addEventListener('hashchange', () => location.reload());
+    if (sessao && sessao.access_token) await carregar();
+  }
+
+  const rpc = async (nome, corpo) => {
+    const r = await fetch(cfg.supabaseUrl + '/rest/v1/rpc/' + nome, {
+      method: 'POST',
+      headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + sessao.access_token,
+                 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo || {})
+    });
+    if (!r.ok) throw new Error(nome + ' respondeu ' + r.status);
+    return r.json();
+  };
+
+  async function carregar() {
+    try {
+      const r = await fetch(cfg.supabaseUrl + '/rest/v1/perfis?select=email,nome,plano,assinante_ate,criado_em', {
+        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + sessao.access_token }
+      });
+      if (r.status === 401) { localStorage.removeItem(CHAVE); sessao = null; return; }
+      const d = await r.json();
+      perfil = Array.isArray(d) ? d[0] : null;
+    } catch (e) { perfil = null; }
+    if (!perfil) return;
+    try { cortesia = await rpc('cortesia_restante'); } catch (e) { cortesia = null; }
+    try { cobranca = await rpc('minha_cobranca'); } catch (e) { cobranca = null; }
+    desenhar();
+  }
+
+  function desenhar() {
+    $('entrar').classList.add('hide');
+    $('dentro').classList.remove('hide');
+    $('vEmail').textContent = perfil.email || '—';
+    $('nome').value = perfil.nome || '';
+    $('vCriada').textContent = dia(perfil.criado_em);
+
+    const p = pago();
+    $('vPlano').innerHTML = `<span class="pill ${p ? 'pago' : 'free'}">${escapar(perfil.plano)}</span>`;
+    $('vAte').textContent = p ? dia(perfil.assinante_ate) : '—';
+    $('planoDica').innerHTML = p
+      ? 'Resumo por IA, modelo preciso e envio da ata por e-mail estão liberados.'
+      : 'Gravar, transcrever e exportar são de graça e sem limite. O resumo por IA é do plano profissional.';
+
+    if (p) {
+      $('usoTexto').textContent = 'Cota do plano: 30 resumos rápidos e 5 precisos por mês.';
+      $('usoBarra').style.width = '100%';
+    } else if (typeof cortesia === 'number' && cortesia >= 0) {
+      const usados = 7 - cortesia;
+      $('usoTexto').innerHTML = `<b>${cortesia}</b> de 7 resumos de cortesia disponíveis` +
+        (cortesia === 0 ? ' — assine para continuar' : '');
+      $('usoBarra').style.width = (cortesia / 7 * 100).toFixed(0) + '%';
+    } else {
+      $('usoTexto').textContent = 'Não consegui ler a sua cota agora.';
+      $('usoBarra').style.width = '0%';
+    }
+
+    const pedindo = !$('dadosCobranca').classList.contains('hide');
+    $('assinar').classList.toggle('hide', p || pedindo);
+    $('cancelar').classList.toggle('hide', !(cobranca && cobranca.assinatura));
+  }
+
+  $('pedirLink').onclick = async () => {
+    const email = ($('email').value || '').trim();
+    if (!/.+@.+\..+/.test(email)) { $('entrarMsg').innerHTML = '<span class="err">e-mail inválido</span>'; return; }
+    $('entrarMsg').textContent = 'Enviando…';
+    try {
+      const r = await fetch(cfg.supabaseUrl + '/auth/v1/otp', {
+        method: 'POST',
+        headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, create_user: true })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      $('entrarMsg').innerHTML = '<span class="ok">Link enviado</span> — abra o e-mail e clique. ' +
+        'Não há senha para lembrar.';
+    } catch (e) { $('entrarMsg').innerHTML = '<span class="err">não consegui enviar o link agora</span>'; }
+  };
+
+  $('salvarNome').onclick = async () => {
+    $('salvarNome').disabled = true;
+    $('nomeMsg').textContent = 'Salvando…';
+    try {
+      const d = await rpc('salvar_nome', { p_nome: $('nome').value });
+      perfil.nome = d && d.nome;
+      $('nomeMsg').innerHTML = '<span class="ok">Nome salvo.</span>';
+    } catch (e) {
+      $('nomeMsg').innerHTML = '<span class="err">não consegui salvar — a migration 006 já foi aplicada?</span>';
+    } finally { $('salvarNome').disabled = false; }
+  };
+
+  $('sair').onclick = () => { localStorage.removeItem(CHAVE); location.reload(); };
+
+  /* ---- assinar e cancelar: o navegador nunca libera plano, só cria a cobrança ---- */
+  $('assinar').onclick = () => {
+    $('dadosCobranca').classList.remove('hide');
+    $('assinar').classList.add('hide');
+    $('cobNome').value = perfil.nome || '';
+    $('cobNome').focus();
+  };
+  $('cobCancelar').onclick = () => { $('dadosCobranca').classList.add('hide'); $('planoMsg').textContent = ''; desenhar(); };
+
+  const pedirApi = async corpo => {
+    const r = await fetch('/api/assinar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
+      body: JSON.stringify(corpo)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.erro || ('o servidor respondeu ' + r.status));
+    return d;
+  };
+
+  $('cobConfirmar').onclick = async () => {
+    const nome = ($('cobNome').value || '').trim();
+    const documento = ($('cobDoc').value || '').trim();
+    if (nome.length < 3) { $('planoMsg').innerHTML = '<span class="err">informe o nome</span>'; return; }
+    const so = documento.replace(/\D/g, '');
+    if (so.length !== 11 && so.length !== 14) {
+      $('planoMsg').innerHTML = '<span class="err">CPF tem 11 dígitos e CNPJ tem 14</span>'; return;
+    }
+    $('cobConfirmar').disabled = true;
+    $('planoMsg').textContent = 'Criando a cobrança…';
+    try {
+      const d = await pedirApi({ acao: 'assinar', nome, documento, telefone: ($('cobFone').value || '').trim() });
+      $('dadosCobranca').classList.add('hide');
+      if (d.pagar) {
+        window.open(d.pagar, '_blank', 'noopener');
+        $('planoMsg').innerHTML = '<span class="ok">Cobrança criada</span> — a tela de pagamento abriu em ' +
+          'outra aba. O plano é liberado assim que o pagamento for confirmado.';
+      } else {
+        $('planoMsg').innerHTML = `<span class="ok">Cobrança criada</span> — ${escapar(d.aviso || '')}`;
+      }
+      await carregar();
+    } catch (e) {
+      $('planoMsg').innerHTML = `<span class="err">${escapar((e && e.message) || e)}</span>`;
+    } finally { $('cobConfirmar').disabled = false; }
+  };
+
+  $('cancelar').onclick = async () => {
+    if (!confirm('Cancelar a assinatura? O plano continua valendo até o fim do período já pago.')) return;
+    $('cancelar').disabled = true;
+    $('planoMsg').textContent = 'Cancelando…';
+    try {
+      await pedirApi({ acao: 'cancelar' });
+      $('planoMsg').innerHTML = '<span class="ok">Assinatura cancelada</span> — não haverá nova cobrança, ' +
+        'e o plano segue valendo até o fim do período já pago.';
+      await carregar();
+    } catch (e) {
+      $('planoMsg').innerHTML = `<span class="err">${escapar((e && e.message) || e)}</span>`;
+    } finally { $('cancelar').disabled = false; }
+  };
+
+  window.__conta = { desenhar, perfil: () => perfil };   // usado pelos testes
+  comecar();
+})();
+</script>
+</body>
+</html>

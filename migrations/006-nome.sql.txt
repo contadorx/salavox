@@ -1,0 +1,23 @@
+-- Salavox — nome de quem usa
+-- Ordem: depois de 004. Uma coluna e uma função.
+--
+-- POR QUÊ: até aqui a conta era um e-mail. Para uma tela de conta que se
+-- pareça com uma tela de conta — e para o e-mail de acompanhamento sair
+-- assinado por uma pessoa e não por um endereço — falta o nome.
+--
+-- Ele é escrito pelo próprio dono, do navegador, e por isso a função é a única
+-- da camada paga liberada para `authenticated`: ela só toca na linha de quem
+-- está logado, e `auth.uid()` não se falsifica do lado do cliente.
+
+alter table perfis add column if not exists nome text;
+
+create or replace function salvar_nome(p_nome text)
+returns json language plpgsql security definer set search_path = public as $$
+declare v_nome text := nullif(btrim(p_nome), '');
+begin
+  if v_nome is not null and length(v_nome) > 80 then v_nome := left(v_nome, 80); end if;
+  update perfis set nome = v_nome where id = auth.uid();
+  return json_build_object('nome', v_nome);
+end $$;
+
+grant execute on function salvar_nome(text) to authenticated;

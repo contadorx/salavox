@@ -40,6 +40,9 @@
   .marca img{width:30px;height:30px;display:block}
   .marca span{font-weight:800;font-size:17px;letter-spacing:-.2px;color:var(--tinta)}
   .marca b{color:var(--verde);font-weight:800}
+  .nav-fim{display:flex;align-items:center;gap:14px}
+  .selIdioma{padding:6px 8px;font-size:13px;border-radius:8px;border:1.5px solid var(--linha);
+             background:#fff;color:var(--muted)}
   .nav a.voltar{color:var(--muted);font-size:14px;font-weight:600}
   .nav a.voltar:hover{color:var(--verde-escuro)}
 
@@ -49,12 +52,35 @@
   .abertura p{color:var(--muted);font-size:16px;max-width:640px}
 
   /* ---------- cartões ---------- */
+  /* Faixa fina no topo, no lugar do antigo cartão de conta. */
+  .faixaConta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;
+              border:1px solid var(--linha);border-radius:12px;padding:11px 16px;margin-bottom:18px;
+              font-size:13.5px;color:var(--tinta-media)}
+  .faixaConta .link{color:var(--verde-escuro);font-weight:700;text-decoration:none;margin-left:auto}
+  .faixaConta .link:hover{text-decoration:underline}
+
   .card{background:#fff;border:1px solid var(--linha);border-radius:16px;padding:24px;
         margin-bottom:18px;box-shadow:var(--sombra)}
   .card h2{display:flex;align-items:center;gap:11px;font-size:19px;font-weight:800;
            letter-spacing:-.35px;color:var(--tinta);margin-bottom:16px}
   .step{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;
-        background:var(--verde-claro);color:var(--verde-escuro);font-size:14px;font-weight:800;flex:none}
+        background:var(--verde-claro);color:var(--verde-escuro);font-size:14px;font-weight:800;flex:none;
+        transition:background .25s,color .25s}
+
+  /* Passo cuja vez ainda não chegou fica cinza, e o cartão inteiro recua. Antes
+     todos pareciam disponíveis ao mesmo tempo e não havia como saber quando
+     passar de um para o outro: a pessoa procurava o que clicar num cartão que
+     ainda não fazia nada. */
+  .card.dormindo{opacity:.5}
+  .card.dormindo .step{background:var(--linha);color:var(--tinta-suave)}
+  .card.dormindo h2{color:var(--tinta-suave)}
+  .card.agora{border-color:var(--verde);box-shadow:0 0 0 1px var(--verde),var(--sombra)}
+  .card.agora .step{background:var(--verde);color:#fff}
+  .card.feito .step{background:var(--verde-claro);color:var(--verde-escuro)}
+  .selo{margin-left:auto;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+        color:var(--tinta-suave)}
+  .card.agora .selo{color:var(--verde-escuro)}
+  .card.feito .selo{color:var(--verde-escuro)}
 
   /* ---------- botões ---------- */
   button{font-family:var(--f);font-weight:700;font-size:14.5px;border:0;border-radius:11px;
@@ -170,6 +196,11 @@
   .vocab{margin-top:16px;border:1px solid var(--linha);border-radius:12px;padding:13px 16px;background:#fff}
   .vocab summary{cursor:pointer;font-size:14px;font-weight:700;color:var(--muted)}
   .vocab textarea{width:100%;margin-top:8px;resize:vertical;font-size:13.5px}
+  /* Mesmo desenho da lista de vocabulário, classe própria de propósito: `.vocab`
+     é o nome do bloco de vocabulário, e um teste que procurava "o primeiro
+     .vocab da página" passou a abrir a caixa errada quando esta apareceu. */
+  .explica{margin-top:10px;border:1px solid var(--linha);border-radius:12px;padding:13px 16px;background:#fff}
+  .explica summary{cursor:pointer;font-size:14px;font-weight:700;color:var(--muted)}
   .alerta{border:1.5px solid var(--err);border-radius:12px;padding:14px 16px;margin-top:14px;
           background:#FDF1EE;font-size:13.5px;line-height:1.6;color:var(--tinta)}
   .alerta b{color:var(--err);font-weight:800}
@@ -181,6 +212,30 @@
   .resumo .corpo{font-size:14px;line-height:1.75;white-space:pre-wrap;outline:0}
   .resumo .corpo:focus{background:#fff;border-radius:6px}
   .resumo .pe{display:flex;gap:10px;margin-top:13px;align-items:center;flex-wrap:wrap}
+
+  /* as informações da reunião, juntas e no alto — é o que vira cabeçalho do PDF,
+     do texto e do e-mail */
+  .infoReuniao{border:1px solid var(--linha);border-radius:12px;padding:14px 16px;margin-bottom:16px;
+               background:var(--verde-50)}
+  .infoReuniao .campo{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;
+                      letter-spacing:.4px;text-transform:uppercase;color:var(--verde-escuro)}
+  .infoReuniao .campo input{flex:1;min-width:200px;font-size:15px;font-weight:600;
+                            text-transform:none;letter-spacing:0}
+  .infoReuniao .grade{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:11px;font-size:13px;
+                      color:var(--muted)}
+  .infoReuniao .grade b{color:var(--tinta);font-weight:700}
+
+  /* o e-mail sai da IA já endereçado; esta caixa é onde ele é conferido e enviado */
+  .emailBox{margin-top:18px;border:1px solid var(--linha);border-radius:12px;padding:16px 18px;
+            background:#fff}
+  .emailBox h3{font-size:11.5px;letter-spacing:1.3px;text-transform:uppercase;
+               color:var(--verde-escuro);margin-bottom:12px;font-weight:800}
+  .emailBox .campo{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px;
+                   color:var(--muted)}
+  .emailBox .campo input{flex:1;min-width:200px}
+  .emailBox .corpo{font-size:14px;line-height:1.75;white-space:pre-wrap;outline:0;
+                   border:1px solid var(--linha);border-radius:8px;padding:12px 14px;margin:10px 0 13px}
+  .emailBox .corpo:focus{border-color:var(--verde)}
 
   /* ---------- rodapé ---------- */
   .rodape{background:var(--trilho-2);color:rgba(255,255,255,.45);text-align:center;
@@ -200,7 +255,13 @@
 <nav class="nav">
   <div class="nav-inner">
     <a class="marca" href="/"><img src="/logo.svg" alt=""><span>Sala<b>vox</b></span></a>
-    <a class="voltar" href="/">&larr; voltar ao site</a>
+    <div class="nav-fim">
+      <select id="lingua" class="selIdioma" data-usuario aria-label="Idioma / Language">
+        <option value="pt">Português</option>
+        <option value="en">English</option>
+      </select>
+      <a class="voltar" href="/">&larr; voltar ao site</a>
+    </div>
   </div>
 </nav>
 
@@ -212,34 +273,15 @@
     aqui, no seu navegador.</p>
   </div>
 
-  <div class="card hide" id="contaCard">
-    <h2><span class="step">✦</span>Sua conta</h2>
-    <div class="status" id="contaEstado"></div>
-    <div class="row" style="margin-top:12px">
-      <input type="text" id="contaEmail" placeholder="seu@email.com" autocomplete="email" style="min-width:230px">
-      <button id="contaEntrar" class="hide">Entrar sem senha</button>
-      <button id="contaSair" class="ghost sm hide">Sair</button>
-      <button id="diagnostico" class="ghost sm hide">Diagnóstico</button>
-      <button id="assinar" class="hide">Assinar por R$ 19,90/mês</button>
-      <button id="cancelar" class="ghost sm hide">Cancelar assinatura</button>
-      <span class="status" id="contaMsg"></span>
-    </div>
-
-    <div class="hide" id="dadosCobranca" style="margin-top:12px">
-      <div class="row">
-        <input type="text" id="cobNome" placeholder="Nome ou razão social" maxlength="80" style="min-width:230px">
-        <input type="text" id="cobDoc" placeholder="CPF ou CNPJ" maxlength="18" autocomplete="off" style="min-width:170px">
-        <input type="text" id="cobFone" placeholder="Celular (opcional)" maxlength="16" autocomplete="off" style="min-width:150px">
-        <button id="cobConfirmar">Gerar a cobrança</button>
-        <button class="ghost sm" id="cobCancelar">Deixa pra lá</button>
-      </div>
-      <p class="note">O meio de pagamento exige nome e CPF/CNPJ para emitir a cobrança — e você vai
-      precisar deles na nota. Esses dados vão para o <b>Asaas</b>, que processa o pagamento; do nosso lado
-      fica só o identificador que ele devolve. Você escolhe <b>Pix, boleto ou cartão</b> na tela dele.</p>
-    </div>
-
-    <p class="note">A conta guarda o seu e-mail, o plano e quantos resumos você usou no mês.
-    <b>Nunca</b> guarda áudio, vídeo, transcrição ou ata — nada disso chega ao nosso servidor.</p>
+  <!-- A conta virou página própria (/conta). Aqui fica só a faixa que diz quem
+       está logado e quanto resta — cadastro e cobrança não são passo de gravar
+       ata, e ficavam no caminho todos os dias para resolver algo que se resolve
+       uma vez. -->
+  <div class="faixaConta hide" id="contaCard">
+    <span id="contaEstado">—</span>
+    <a class="link" href="/conta" id="irConta">sua conta</a>
+    <button id="diagnostico" class="ghost sm hide">Diagnóstico</button>
+    <span class="status" id="contaMsg"></span>
   </div>
 
   <div class="card hide" id="recupCard" style="border-color:var(--warn)">
@@ -251,8 +293,8 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2><span class="step">1</span>Gravar</h2>
+  <div class="card" id="gravarCard">
+    <h2><span class="step">1</span>Gravar<span class="selo" id="selo1">comece aqui</span></h2>
     <div class="consent" id="consent">
       <label class="chk"><input type="checkbox" id="okConsent">
         <span>Confirmo que vou avisar os participantes de que a reunião está sendo gravada.</span></label>
@@ -284,21 +326,24 @@
     </div>
     <div class="status" id="vivoMsg"></div>
     <div class="status" id="recMsg" style="margin-top:10px"></div>
-    <p class="note"><b>Como funciona:</b> ao começar, o navegador pergunta qual janela ou tela compartilhar —
-    escolha a da reunião e marque a opção de compartilhar o áudio. Seu microfone entra por um caminho
-    separado, e é isso que permite saber depois quem falou o quê.</p>
-    <p class="note"><b>Ficar mudo na reunião não fecha o microfone aqui.</b> O botão de silenciar do Meet, do
-    Teams ou do Zoom cala você para os outros; o Salavox continua ouvindo o microfone por conta própria — é
-    até desejável, porque assim a sua fala entra na ata mesmo quando você esquece de reabrir. Se quiser
-    mesmo parar de captar, use o botão <b>Fechar meu microfone</b> acima, que aparece durante a gravação.</p>
-    <p class="note">A reunião é gravada <b>em pedaços, direto no disco</b>, e não na memória da aba: não há
-    limite prático de duração, e o que já foi gravado sobrevive se o navegador fechar sozinho. Continua tudo
-    no seu computador — o navegador guarda esses pedaços numa área privada do próprio site.</p>
-    <p class="note"><b>Transcrever durante a reunião</b> adianta o trabalho: a cada trinta segundos gravados,
-    esse trecho já vira texto enquanto a conversa continua. Ao encerrar, quase tudo está pronto. O modelo roda
-    numa linha separada do navegador, para não atrapalhar a gravação — e no fim o áudio é medido por inteiro
-    e o que foi adiantado é conferido de novo. Se o computador for modesto, desmarque: a ata sai igual, só
-    demora mais depois.</p>
+    <p class="note" style="margin-top:14px">Ao começar, o navegador pergunta qual janela compartilhar —
+    escolha a da reunião e <b>marque a opção de compartilhar o áudio</b>. É só isso.</p>
+
+    <details class="explica">
+      <summary>Como funciona, se você quiser saber</summary>
+      <p class="note" style="margin-top:10px">Seu microfone entra por um caminho separado do áudio da
+      chamada, e é isso que permite saber depois quem falou o quê — sem robô, sem nuvem, sem separação de
+      voz por inteligência artificial.</p>
+      <p class="note"><b>Ficar mudo na reunião não fecha o microfone aqui.</b> O botão de silenciar do
+      Meet, do Teams ou do Zoom cala você para os outros; o Salavox continua ouvindo por conta própria — é
+      até desejável, porque assim a sua fala entra na ata mesmo quando você esquece de reabrir. Para parar
+      mesmo, use o botão <b>Fechar meu microfone</b>, que aparece durante a gravação.</p>
+      <p class="note">A reunião é gravada <b>em pedaços, direto no disco</b>, e não na memória da aba: não
+      há limite prático de duração, e o que já foi gravado sobrevive se o navegador fechar sozinho.</p>
+      <p class="note"><b>Transcrever durante a reunião</b> adianta o trabalho: a cada trinta segundos
+      gravados, aquele trecho já vira texto. Ao encerrar, quase tudo está pronto. O modelo roda numa linha
+      separada do navegador, para não atrapalhar a gravação. Se o computador for modesto, desmarque.</p>
+    </details>
 
     <div class="ou"><span>ou</span></div>
     <div class="solta" id="solta">
@@ -312,8 +357,8 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2><span class="step">2</span>Transcrever</h2>
+  <div class="card" id="transCard">
+    <h2><span class="step">2</span>Transcrever<span class="selo" id="selo2">depois de gravar</span></h2>
     <div class="row">
       <button id="trans" disabled>Gerar a transcrição</button>
       <select id="modelo">
@@ -355,7 +400,7 @@
   </div>
 
   <div class="card hide" id="telasCard">
-    <h2><span class="step">3</span>Telas compartilhadas</h2>
+    <h2><span class="step">3</span>Telas compartilhadas<span class="selo" id="selo3">opcional</span></h2>
     <div class="row">
       <button id="varrer">Procurar as telas mostradas</button>
       <button class="ghost hide" id="pararVarre">Parar</button>
@@ -369,13 +414,20 @@
   </div>
 
   <div class="card hide" id="ataCard">
-    <h2><span class="step">4</span>Ata</h2>
+    <h2><span class="step">4</span>Ata<span class="selo" id="selo4">sai pronta</span></h2>
+
+    <div class="infoReuniao" id="infoReuniao">
+      <label class="campo">Título da reunião
+        <input type="text" id="tituloReuniao" maxlength="90" autocomplete="off">
+      </label>
+      <div class="grade" id="infoGrade"></div>
+    </div>
+
     <div class="row">
       <button id="baixarPdf">Baixar a ata em PDF</button>
       <button id="baixarGrav" class="ghost sm">Baixar a gravação</button>
       <button id="baixarTxt" class="ghost sm">Baixar .txt</button>
       <button id="baixarVtt" class="ghost sm">Baixar .vtt</button>
-      <button id="enviarEmail" class="ghost sm hide">Enviar por e-mail</button>
       <span class="status" id="ataMsg"></span>
     </div>
 
@@ -385,30 +437,31 @@
       <label>Você é <input id="nomeVoce" placeholder="Você" maxlength="28" autocomplete="off"></label>
       <label>Do outro lado <input id="nomeGrupo" placeholder="Participantes" maxlength="28" autocomplete="off"></label>
       <label>Mais alguém <input id="nomeNovo" placeholder="nome e Enter" maxlength="28" autocomplete="off"></label>
-      <span id="chips"></span>
+      <span id="chips" data-usuario></span>
     </div>
     <p class="status" id="dicaNomes">Clique no nome em qualquer fala para trocar quem falou. Os nomes entram
     na ata, no PDF, no texto e na legenda.</p>
 
-    <div id="ata"></div>
+    <div id="ata" data-usuario></div>
   </div>
 
   <div class="card hide" id="iaCard">
-    <h2><span class="step">5</span>Resumo, decisões e pendências</h2>
+    <h2><span class="step">5</span>Resumo, decisões e pendências<span class="selo" id="selo5">com conta</span></h2>
 
     <div class="status" id="iaEstado"></div>
 
     <div id="iaAcoes" class="hide">
       <div class="row">
-        <button id="iaResumo">Resumo executivo</button>
-        <button class="ghost" id="iaPendencias">Decisões e pendências</button>
-        <button class="ghost" id="iaEmail">E-mail de acompanhamento</button>
+        <button id="iaOrganizar">Organizar a ata</button>
         <select id="iaModeloSalavox">
           <option value="rapido" selected>Rápido — 30 por mês</option>
           <option value="preciso">Preciso — 5 por mês</option>
         </select>
         <span class="status" id="iaMotorMsg"></span>
       </div>
+      <p class="status">Uma passada só, e sai tudo: <b>resumo da reunião</b>, <b>decisões</b>,
+      <b>pendências com responsável e prazo</b>, <b>próximos passos</b> e o <b>e-mail pronto</b>
+      para os participantes. Conta como um resumo, não como quatro.</p>
       <div class="row" style="margin-top:10px">
         <input type="text" id="iaPergunta" placeholder="Perguntar à ata: em quanto ficou o imposto?" autocomplete="off">
         <button class="ghost sm" id="iaPerguntar">Perguntar</button>
@@ -417,7 +470,25 @@
 
     <div class="bar hide" id="iaBarWrap"><i id="iaBar"></i></div>
     <div class="status" id="iaMsg"></div>
-    <div id="iaSaida"></div>
+    <div id="iaSaida" data-usuario></div>
+
+    <div class="emailBox hide" id="emailBox">
+      <h3>E-mail para os participantes</h3>
+      <label class="campo">Para
+        <input type="text" id="emailPara" placeholder="joao@empresa.com.br, maria@empresa.com.br" autocomplete="off">
+      </label>
+      <label class="campo">Assunto
+        <input type="text" id="emailAssunto" autocomplete="off" data-usuario>
+      </label>
+      <div class="corpo" id="emailCorpo" contenteditable="true" data-usuario></div>
+      <div class="row">
+        <button id="enviarEmail" class="hide">Enviar agora</button>
+        <button class="ghost sm" id="copiarEmail">Copiar o e-mail</button>
+        <span class="status" id="emailMsg"></span>
+      </div>
+      <p class="status" id="emailNota">A ata inteira vai junto, embaixo do texto do e-mail. Você pode
+      corrigir o texto aqui antes de enviar.</p>
+    </div>
 
     <p class="note"><b>O que sai daqui:</b> o texto da ata, e só quando você clica. O áudio e o vídeo
     continuam no seu computador, sempre. O texto é usado para gerar o resumo e descartado — não fica
@@ -432,6 +503,7 @@
   Salavox versão <code>__VERSAO__</code> — tudo roda neste computador.
   <a href="/privacidade">privacidade</a><a href="/termos">termos</a><a href="/">site</a>
 </footer>
+<script>/*__IDIOMAS__*/</script>
 <script>/*__JSPDF__*/</script>
 <script>/*__APP__*/</script>
 </body>

@@ -34,6 +34,7 @@ import silencio from './t-silencio.mjs';
 import painel from './t-painel.mjs';
 import funcoes from './t-funcoes.mjs';
 import compactacao from './t-compactacao.mjs';
+import idioma from './t-idioma.mjs';
 
 const TODOS = [
   ['telas', telas],
@@ -45,13 +46,14 @@ const TODOS = [
   ['silencio', silencio],
   ['painel', painel],
   ['funcoes', funcoes],
-  ['compactacao', compactacao]
+  ['compactacao', compactacao],
+  ['idioma', idioma]
 ];
 
 const pedidos = process.argv.slice(2).filter(a => !a.startsWith('--'));
 // o mais demorado entra primeiro: senão ele começa por último e todo mundo espera
 const DEMORA = { pedacos: 70, conta: 45, recuperacao: 31, silencio: 25, telas: 18, extras: 18,
-                 conformidade: 16, painel: 10, funcoes: 2, compactacao: 20 };
+                 conformidade: 16, painel: 10, funcoes: 2, compactacao: 20, idioma: 30 };
 const TESTES = (pedidos.length ? TODOS.filter(([n]) => pedidos.includes(n)) : TODOS.slice())
   .sort((a, b) => (DEMORA[b[0]] || 0) - (DEMORA[a[0]] || 0));
 const PORTA = Number(process.env.PORTA || 8131);
@@ -59,15 +61,27 @@ const UM_DE_CADA = process.env.JUNTOS === '1';
 
 console.log(execFileSync('python3', ['build.py'], { cwd: RAIZ }).toString().trim());
 
-const nav = await chromium.launch({
-  args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']
-});
+/* `--disable-dev-shm-usage` não é enfeite: com onze blocos, o Chromium desta
+   máquina passou a morrer no meio da faixa paralela e a corrida terminava com
+   "Target page, context or browser has been closed" — que parece defeito do
+   produto e é falta de memória compartilhada. */
+const ARGS = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
+              '--disable-dev-shm-usage', '--disable-gpu'];
 
 const comeco = Date.now();
 const resultado = [];
 
-async function rodar([nome, teste], i) {
+/* Um navegador por bloco, e não um só para a corrida inteira.
+
+   Com onze blocos o Chromium compartilhado passou a morrer no meio da faixa
+   paralela, e a corrida terminava com "Target page, context or browser has
+   been closed" — uma linha que parece defeito do produto e é o instrumento
+   caindo. Abrir um navegador por bloco custa ~200 ms e faz a queda de um
+   bloco ficar dentro dele. Fechar também vai dentro de try: navegador que já
+   morreu não pode derrubar o relatório de quem passou. */
+async function rodar([nome, teste], i, repetido = false) {
   const servidor = await servir(PORTA + i);
+  const nav = await chromium.launch({ args: ARGS });
   const ctx = await nav.newContext({ permissions: ['microphone'], viewport: { width: 1100, height: 900 } });
   const erros = [];
   const t0 = Date.now();
@@ -76,9 +90,25 @@ async function rodar([nome, teste], i) {
     b = await teste(ctx, servidor.url, erros);
   } catch (e) {
     quebrou = e.message.split('\n')[0];
+    if (process.env.PILHA) console.log(e.stack);
   }
-  await ctx.close();
+  try { await ctx.close(); } catch (e) {}
+  try { await nav.close(); } catch (e) {}
   await servidor.fechar();
+
+  /* Uma segunda chance, e só para o navegador morrendo.
+
+     Nesta máquina de dois núcleos o Chromium às vezes cai inteiro no meio de
+     um bloco de mídia, e a mensagem que sobra — "Target page, context or
+     browser has been closed" — não fala do produto, fala do instrumento.
+     Repetir uma vez separa uma coisa da outra: se cair de novo, é vermelho.
+     Nada mais é repetido: teste que passa na segunda tentativa por outro
+     motivo é teste instável, e esconder isso seria pior que a falha. */
+  const morreuONavegador = quebrou && /Target page, context or browser has been closed/.test(quebrou);
+  if (morreuONavegador && !repetido) {
+    console.log(`  (o navegador caiu em "${nome}" — repetindo uma vez)`);
+    return rodar([nome, teste], i, true);
+  }
   resultado.push({ nome, b, erros, quebrou, seg: (Date.now() - t0) / 1000 });
 }
 
@@ -118,7 +148,6 @@ if (UM_DE_CADA) {
   for (const [t, i] of sos) await rodar(t, i);
 }
 
-await nav.close();
 
 let falhou = false;
 const ordem = TESTES.map(([n]) => n);

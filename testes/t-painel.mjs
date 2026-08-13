@@ -162,7 +162,7 @@ export default async function (ctx, url, erros) {
                           null, { timeout: 15000 });
   b.verdade('a conta procurada mostra plano, validade e cortesia usada',
             /profissional/.test(await p.textContent('#conta')) &&
-            /3 de 3 cortesias usadas/.test(await p.textContent('#conta')));
+            /3 de 7 cortesias usadas/.test(await p.textContent('#conta')));
 
   p.on('dialog', d => d.accept());
   await p.fill('#dias', '60');

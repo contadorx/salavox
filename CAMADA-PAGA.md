@@ -15,7 +15,7 @@ ilimitados e sem cadastro.
 1. Crie o projeto. Anote a **URL** e a **anon key** (essas duas são públicas, podem ir no navegador) e a
    **service role key** (esta **nunca** vai ao navegador).
 2. Rode `migrations/001-contas.sql.txt` no editor SQL, de uma vez.
-   Depois `migrations/002-degustacao.sql.txt` — é ele que libera os **3 resumos de cortesia** por conta.
+   Depois `migrations/002-degustacao.sql.txt` — é ele que libera os **7 resumos de cortesia** por conta.
    Depois `migrations/003-painel.sql.txt` — contagem de tokens e as funções do painel.
    Depois `migrations/004-cobranca.sql.txt` — a ligação com o Asaas e a validade da assinatura.
    **Se o 001 já foi aplicado, rode só os que faltam:** nenhum dos dois cria ou apaga tabela; o 002 troca
@@ -87,11 +87,11 @@ O projeto na Vercel precisa ter `api/` e `public/` lado a lado na raiz, com `out
 | | Quem é | Cota |
 |---|---|---|
 | Sem conta | não entrou | os botões nem aparecem |
-| Conta grátis | entrou, não assina | **3 resumos rápidos, uma vez na vida da conta** |
+| Conta grátis | entrou, não assina | **7 resumos rápidos, uma vez na vida da conta** |
 | Assinante | `plano <> 'gratis'` e `assinante_ate` no futuro | 30 rápidos + 5 precisos por mês |
 
 A cortesia é contada somando a coluna `resumos` de todos os meses daquele perfil — não precisa de coluna
-nova, e quem assinou, gastou trinta e cancelou não ganha degustação de novo ao voltar. O modelo preciso
+nova, e quem assinou, gastou trinta e cancelou não ganha degustação de novo ao voltar. Subiu de 3 para 7 em 13/08/2026 (migration 005) — três não convencem quem tem alternativa grátis ao lado. O modelo preciso
 fica fora da cortesia de propósito: custa cerca de dez vezes mais por chamada.
 
 Para conferir quantas cortesias uma conta já usou:

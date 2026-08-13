@@ -271,8 +271,12 @@ const SABOTAGENS = [
     nome: 'o navegador libera o plano ao criar a cobrança',
     teste: 'conta',
     porta: 8184,
-    trocas: [["      await lerCobranca();\n      if (d.pagar) {",
-              "      await lerCobranca();\n      perfil.plano = 'profissional';\n      perfil.assinante_ate = new Date(Date.now() + 31 * 86400000).toISOString();\n      if (d.pagar) {"]],
+    /* Mudou de arquivo: a cobrança saiu da ferramenta e foi para /conta. */
+    arquivo: 'public/conta.html',
+    /* Depois do `carregar()`, senão a própria releitura do servidor desfaz o
+       defeito e o cenário mede outra coisa. */
+    trocas: [["      await carregar();\n    } catch (e) {\n      $('planoMsg').innerHTML = `<span class=\"err\">${escapar((e && e.message) || e)}</span>`;\n    } finally { $('cobConfirmar').disabled = false; }",
+              "      await carregar();\n      perfil.plano = 'profissional';\n      perfil.assinante_ate = new Date(Date.now() + 31 * 86400000).toISOString();\n      desenhar();\n    } catch (e) {\n      $('planoMsg').innerHTML = `<span class=\"err\">${escapar((e && e.message) || e)}</span>`;\n    } finally { $('cobConfirmar').disabled = false; }"]],
     pega: 'bastaria abrir o inspetor, ou nem isso, para ter o plano sem pagar'
   },
   {
@@ -375,6 +379,22 @@ const SABOTAGENS = [
     pega: 'o cartão continuaria oferecendo resumos de cortesia que já acabaram'
   },
   {
+    nome: 'a resposta do modelo deixa de ser cortada em seções',
+    teste: 'conta',
+    porta: 8194,
+    trocas: [['      const m = /^\\s*#{1,3}\\s*(.+?)\\s*:?\\s*$/.exec(l);',
+              '      const m = null;']],
+    pega: 'a ata viraria um bloco só, com os títulos "##" no meio, e o e-mail nunca apareceria'
+  },
+  {
+    nome: 'o e-mail escrito pela IA some do envio e só a ata crua sai',
+    teste: 'conta',
+    porta: 8195,
+    trocas: [["          corpo: (corpo ? corpo + '\\n\\n———\\n\\n' : '') + comoTexto(),",
+              '          corpo: comoTexto(),']],
+    pega: 'o participante receberia a transcrição sem uma linha de conversa em cima'
+  },
+  {
     nome: 'o envio da ata por e-mail fica disponível no plano grátis',
     teste: 'conta',
     porta: 8156,
@@ -443,8 +463,17 @@ function copiar(destino) {
      node testes/sabotagem.mjs ia conformidade
    Cada cenário roda numa cópia própria do projeto, então não há disputa por
    arquivo — só pela máquina, e por isso o limite de três. */
-const areas = process.argv.slice(2);
-const LISTA = areas.length ? SABOTAGENS.filter(s => areas.includes(s.teste)) : SABOTAGENS;
+/* Um bloco inteiro leva vinte minutos. Quando o que mudou foi UM cenário —
+   e isso é o caso comum ao consertar uma sabotagem que envelheceu — dá para
+   pedir só ele por um pedaço do nome:
+     node testes/sabotagem.mjs =libera o plano                              */
+const argumentos = process.argv.slice(2);
+const areas  = argumentos.filter(a => a[0] !== '=');
+const nomes  = argumentos.filter(a => a[0] === '=').map(a => a.slice(1).toLowerCase());
+const LISTA = SABOTAGENS.filter(s =>
+  (!areas.length && !nomes.length) ||
+  areas.includes(s.teste) ||
+  nomes.some(n => s.nome.toLowerCase().includes(n)));
 /* Duas faixas, não três. Aqui cada cenário roda um bloco inteiro numa cópia
    própria do projeto: é o dobro do peso da suíte normal, e com três ao mesmo
    tempo o próprio controle do experimento começou a piscar. */

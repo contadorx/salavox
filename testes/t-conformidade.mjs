@@ -75,7 +75,10 @@ export default async function (ctx, url, erros) {
   await p.click('#copiarAviso');
   await p.waitForTimeout(200);
 
-  await p.click('.vocab summary');            // a lista fica dobrada até alguém precisar dela
+  /* Seletor preso ao cartão do passo 2, e não "o primeiro .vocab da página".
+     Quando o passo 1 ganhou uma caixa dobrável parecida, este clique passou a
+     abrir a errada e o teste morreu de tempo esperando um campo escondido. */
+  await p.click('#transCard .vocab summary');   // a lista fica dobrada até alguém precisar dela
   await p.fill('#vocab', 'Simples Nacional\nconciliação bancária');
   await p.selectOption('#saida', 'translate');
 
@@ -101,6 +104,29 @@ export default async function (ctx, url, erros) {
   const texto = await p.evaluate(() => window.__salavox.comoTexto());
   b.verdade('o registro entra no texto exportado', /REGISTRO DE CONSENTIMENTO/.test(texto));
   b.verdade('o texto do aviso vai junto', texto.indexOf('estou gravando esta reunião') > 0);
+
+  /* ---------- as informações da reunião, num lugar só ----------
+     Sem isto a ata chega ao cliente chamada "Ata de reunião", sem dizer qual,
+     e o .txt começa direto no primeiro "[00:12] VOCÊ:". */
+  b.verdade('o título vem sugerido com a data da reunião',
+            /^Reunião de \d/.test(await p.getAttribute('#tituloReuniao', 'placeholder')));
+  const grade = await p.textContent('#infoGrade');
+  b.verdade('as informações da reunião ficam juntas no alto da ata',
+            /Quando:/.test(grade) && /Duração:/.test(grade) &&
+            /Participantes:/.test(grade) && /Trechos:/.test(grade));
+  b.verdade('o texto exportado começa pelo cabeçalho da reunião',
+            texto.indexOf('REUNIÃO DE') === 0 && /Participantes: /.test(texto));
+
+  await p.fill('#tituloReuniao', 'Fechamento do balanço — Construtora Andrade');
+  const comTitulo = await p.evaluate(() => window.__salavox.comoTexto());
+  b.verdade('o título digitado encabeça o texto',
+            comTitulo.indexOf('FECHAMENTO DO BALANÇO — CONSTRUTORA ANDRADE') === 0);
+
+  const esperaTxt = p.waitForEvent('download', { timeout: 30000 });
+  await p.click('#baixarTxt');
+  b.verdade('e vai no nome do arquivo, para não chegar como mais um "ata.txt"',
+            /^salavox-fechamento-do-balanco-construtora-andrade-\d{4}-\d{2}-\d{2}\.txt$/
+              .test((await esperaTxt).suggestedFilename()));
 
   /* ---------- corrigir o texto de uma fala à mão ---------- */
   const alvo = p.locator('#ata .txt').first();

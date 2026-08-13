@@ -1,42 +1,59 @@
-/* Conta, plano e a IA do Salavox — a camada paga.
+/* Conta, plano e a IA do Salavox — agora em duas telas.
 
-   O que este teste guarda:
+   O cadastro morava dentro da ferramenta, acima do passo 1, e era a primeira
+   coisa que alguém via ao abrir para gravar uma reunião. Mudou para `/conta`.
+   Sobrou no aplicativo uma faixa fina que diz quem está logado e quanto resta.
 
-   1. Sem /config.json a ferramenta continua inteira e sem cadastro. É o estado
-      de quem baixa o código e serve sozinho, e é o padrão.
-   2. Com conta, o que sai daqui é o texto da ata — e o teste inspeciona o corpo
-      da requisição para confirmar que é isso, com o token junto.
-   3. O texto da reunião nunca é gravado no navegador. A sessão, sim: é o token
-      da própria pessoa, como em qualquer site com login.
-   4. Plano grátis recebe recusa clara, não erro genérico. */
+   O que este bloco guarda:
+
+   1. Sem `/config.json` preenchido a ferramenta continua inteira e sem cadastro.
+      É o estado de quem baixa o código e serve sozinho, e é o padrão.
+   2. O que sai daqui é o texto da ata — e o teste inspeciona o corpo da
+      requisição para confirmar que é isso, com o token junto.
+   3. O texto da reunião nunca é gravado no navegador. A sessão, sim.
+   4. **O navegador não libera plano nenhum.** Criar a cobrança não muda o
+      plano; quem escreve a validade é o webhook, no servidor. */
 
 import { telaFalsa, paginaLimpa, bloco, transcrever } from './apoio.mjs';
 
 const SUPA = 'https://projeto-de-teste.supabase.co';
 
+/* A resposta que o modelo devolve numa passada só. O formato é o contrato:
+   se ele mudar sem que a leitura mude junto, o cartão fica com um bloco só,
+   cheio de "##", e o e-mail nunca aparece. */
+const RESPOSTA_ATA = [
+  '## RESUMO',
+  'RESUMO DO SALAVOX: três decisões e duas pendências. (00:12)',
+  '',
+  '## DECISÕES',
+  '- fechar o balanço na sexta (00:20)',
+  '',
+  '## PENDÊNCIAS',
+  '- mandar o extrato — Maria — 15/09 (00:31)',
+  '',
+  '## PRÓXIMOS PASSOS',
+  '- marcar a conversa do mês que vem (00:40)',
+  '',
+  '## E-MAIL',
+  'Assunto: Ata da reunião de hoje',
+  '',
+  'Olá, Maria. Seguem os pontos combinados hoje.'
+].join('\n');
+
 export default async function (ctx, url, erros) {
   const b = bloco('conta, plano e IA do Salavox');
 
-  /* ---------- 1. config.json em branco: o produto local ----------
-     Vazio tem de ser igual a não existir: nada de conta, nada de camada paga.
-     É o estado de quem baixa o código e serve sozinho.
-
-     Este bloco conferia, antes, que o arquivo publicado estava em branco. Não
-     está mais — o projeto tem um Supabase de verdade, e os dois valores que vão
-     ali são públicos por natureza. O que substituiu essa conferência está em
-     `t-funcoes.mjs`, e é mais forte: o arquivo publicado não pode conter chave
-     que não seja a `anon`. */
+  /* ---------- 1. config em branco: o produto local ---------- */
   const semConta = await paginaLimpa(ctx, erros);
   await semConta.addInitScript(telaFalsa(4));
   await semConta.goto(url + '/app');
   await semConta.waitForTimeout(500);
-  b.verdade('com o config em branco o cartão de conta não aparece', await semConta.isHidden('#contaCard'));
+  b.verdade('com o config em branco a faixa de conta não aparece', await semConta.isHidden('#contaCard'));
   b.verdade('e nada é pedido ao servidor de contas',
             await semConta.evaluate(() => !window.__salavox.cfg()));
   await semConta.close();
 
-  /* ---------- 1b. config pela metade: falar alto, não ficar mudo ----------
-     A primeira instalação de verdade falhou exatamente assim, em silêncio. */
+  /* ---------- 1b. config pela metade: falar alto, não ficar mudo ---------- */
   const meio = await paginaLimpa(ctx, erros);
   await meio.route('**/config.json', r => r.fulfill({
     contentType: 'application/json',
@@ -51,204 +68,163 @@ export default async function (ctx, url, erros) {
   b.verdade('e o botão de diagnóstico fica à mão', !(await meio.isHidden('#diagnostico')));
   await meio.close();
 
-  /* ---------- 2. com configuração ---------- */
-  const p = await paginaLimpa(ctx, erros);
+  /* ---------- 2. o mundo com configuração ---------- */
   const enviados = [];
   const pedidos = [];
-  let plano = 'gratis', ate = null, cortesia = 3, restante = 2, assinaturaViva = null;
+  let plano = 'gratis', ate = null, cortesia = 7, restante = 6, assinaturaViva = null, nome = null;
 
-  p.on('request', r => {
-    const u = r.url();
-    if (!u.startsWith(url) && !u.startsWith('data:') && !u.startsWith('blob:') &&
-        !/cdn\.jsdelivr|huggingface/.test(u)) pedidos.push(u);
-  });
-
-  await p.route('**/config.json', r => r.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ supabaseUrl: SUPA, supabaseAnonKey: 'anon-de-teste' })
-  }));
-  await p.route(SUPA + '/auth/v1/otp', r => {
-    enviados.push({ tipo: 'otp', corpo: r.request().postDataJSON() });
-    return r.fulfill({ contentType: 'application/json', body: '{}' });
-  });
-  await p.route(SUPA + '/rest/v1/perfis**', r => r.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify([{ email: 'contador@exemplo.com.br', plano, assinante_ate: ate }])
-  }));
-  await p.route(SUPA + '/rest/v1/rpc/cortesia_restante', r => r.fulfill({
-    contentType: 'application/json', body: String(cortesia)
-  }));
-  await p.route(SUPA + '/rest/v1/rpc/minha_cobranca', r => r.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ assinatura: assinaturaViva, plano, assinante_ate: ate })
-  }));
-  await p.route('**/api/assinar', r => {
-    const corpo = r.request().postDataJSON();
-    enviados.push({ tipo: 'assinar', corpo, auth: r.request().headers()['authorization'] });
-    if (corpo.acao === 'cancelar') {
-      assinaturaViva = null;
+  const montar = async p => {
+    p.on('request', r => {
+      const u = r.url();
+      if (!u.startsWith(url) && !u.startsWith('data:') && !u.startsWith('blob:') &&
+          !/cdn\.jsdelivr|huggingface/.test(u)) pedidos.push(u);
+    });
+    await p.route('**/config.json', r => r.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ supabaseUrl: SUPA, supabaseAnonKey: 'anon-de-teste' })
+    }));
+    await p.route(SUPA + '/auth/v1/otp', r => {
+      enviados.push({ tipo: 'otp', corpo: r.request().postDataJSON() });
+      return r.fulfill({ contentType: 'application/json', body: '{}' });
+    });
+    await p.route(SUPA + '/rest/v1/perfis**', r => r.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify([{ email: 'contador@exemplo.com.br', nome, plano,
+                              assinante_ate: ate, criado_em: '2026-08-01T10:00:00Z' }])
+    }));
+    await p.route(SUPA + '/rest/v1/rpc/cortesia_restante', r => r.fulfill({
+      contentType: 'application/json', body: String(cortesia) }));
+    await p.route(SUPA + '/rest/v1/rpc/minha_cobranca', r => r.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ assinatura: assinaturaViva, plano, assinante_ate: ate }) }));
+    await p.route(SUPA + '/rest/v1/rpc/salvar_nome', r => {
+      nome = r.request().postDataJSON().p_nome;
+      enviados.push({ tipo: 'nome', corpo: r.request().postDataJSON() });
+      return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ nome }) });
+    });
+    await p.route('**/api/assinar', r => {
+      const corpo = r.request().postDataJSON();
+      enviados.push({ tipo: 'assinar', corpo, auth: r.request().headers()['authorization'] });
+      if (corpo.acao === 'cancelar') {
+        assinaturaViva = null;
+        return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ cancelada: true }) });
+      }
+      assinaturaViva = 'sub_9';
       return r.fulfill({ contentType: 'application/json',
-        body: JSON.stringify({ cancelada: true, vale_ate: ate }) });
-    }
-    assinaturaViva = 'sub_9';
-    return r.fulfill({ contentType: 'application/json',
-      /* O endereço de pagamento aponta para o próprio servidor de teste: uma
-         URL externa de mentira vira `chrome-error://` quando o DNS falha, e o
-         teste passaria a conferir a mensagem de erro do navegador em vez do
-         que interessa — que a tela abriu em OUTRA aba. */
-      body: JSON.stringify({ assinatura: 'sub_9', pagar: url + '/pagar-de-mentira', valor: 19.90 }) });
-  });
-  await p.route('**/api/resumo', r => {
-    const req = r.request();
-    enviados.push({ tipo: 'resumo', corpo: req.postDataJSON(), auth: req.headers()['authorization'] });
-    if (plano === 'gratis' && cortesia <= 0) {
-      return r.fulfill({ status: 402, contentType: 'application/json',
-        body: JSON.stringify({ assinar: true,
-          erro: 'seus resumos de cortesia acabaram — o plano profissional tem 30 por mês, R$ 19,90' }) });
-    }
-    return r.fulfill({ contentType: 'application/json',
-      body: JSON.stringify({ texto: 'RESUMO DO SALAVOX: três decisões e duas pendências.',
-                             restante: plano === 'gratis' ? restante : 29 }) });
-  });
-  await p.route('**/api/enviar-ata', r => {
-    enviados.push({ tipo: 'email', corpo: r.request().postDataJSON() });
-    return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ enviados: 2 }) });
-  });
+        body: JSON.stringify({ assinatura: 'sub_9', pagar: url + '/pagar-de-mentira', valor: 19.90 }) });
+    });
+    await p.route('**/api/resumo', r => {
+      const req = r.request();
+      enviados.push({ tipo: 'resumo', corpo: req.postDataJSON(), auth: req.headers()['authorization'] });
+      if (plano === 'gratis' && cortesia <= 0) {
+        return r.fulfill({ status: 402, contentType: 'application/json',
+          body: JSON.stringify({ assinar: true,
+            erro: 'seus resumos de cortesia acabaram — o plano profissional tem 30 por mês, R$ 19,90' }) });
+      }
+      return r.fulfill({ contentType: 'application/json',
+        body: JSON.stringify({ texto: RESPOSTA_ATA,
+                               restante: plano === 'gratis' ? restante : 29 }) });
+    });
+    await p.route('**/api/enviar-ata', r => {
+      enviados.push({ tipo: 'email', corpo: r.request().postDataJSON() });
+      return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ enviados: 2 }) });
+    });
+  };
 
-  await p.addInitScript(telaFalsa(4));
-  await p.goto(url + '/app');
-  await p.waitForFunction(() => !document.getElementById('contaCard').classList.contains('hide'), null, { timeout: 15000 });
-  b.verdade('com configuração o cartão de conta aparece', true);
-  b.verdade('a IA do Salavox é o único caminho — não há mais lista de motores',
-            await p.evaluate(() => !document.getElementById('iaMotor')));
+  /* ---------- 3. a página de conta ---------- */
+  const c = await paginaLimpa(ctx, erros);
+  await montar(c);
+  await c.goto(url + '/conta');
+  await c.waitForFunction(() => !!window.__conta, null, { timeout: 15000 });
+  b.verdade('sem sessão, a página de conta oferece entrar', !(await c.isHidden('#entrar')));
+  b.verdade('e não mostra dado nenhum', await c.isHidden('#dentro'));
 
-  await p.fill('#contaEmail', 'contador@exemplo.com.br');
-  await p.click('#contaEntrar');
-  await p.waitForFunction(() => /Link enviado|não consegui/.test(document.getElementById('contaMsg').textContent), null, { timeout: 15000 });
+  await c.fill('#email', 'contador@exemplo.com.br');
+  await c.click('#pedirLink');
+  await c.waitForFunction(() => /Link enviado|não consegui/.test(document.getElementById('entrarMsg').textContent),
+                          null, { timeout: 15000 });
   b.verdade('pedir o link não pede senha nenhuma',
-            /Link enviado/.test(await p.textContent('#contaMsg')) &&
+            /Link enviado/.test(await c.textContent('#entrarMsg')) &&
             enviados.some(e => e.tipo === 'otp' && e.corpo.email === 'contador@exemplo.com.br' && !e.corpo.password));
 
-  /* volta do link do e-mail, com os tokens no pedaço depois do # */
-  await p.goto(url + '/app#access_token=token-de-teste&refresh_token=renova');
-  // tolerante de propósito: se o login não acontecer, o teste tem de falhar com
-  // nome, não estourar o tempo esperando um texto que nunca vem
-  await p.waitForFunction(() => /plano/.test(document.getElementById('contaEstado').textContent),
-                          null, { timeout: 15000 }).catch(() => {});
-  b.verdade('o link do e-mail entra na conta mesmo com a aba já aberta',
-            /plano/.test(await p.textContent('#contaEstado')));
-  b.verdade('o token some da barra de endereço depois de entrar', !(await p.evaluate(() => location.hash)));
-  b.verdade('quem está no grátis vê que a IA do Salavox é do pago',
-            /plano grátis/.test(await p.textContent('#contaEstado')));
+  await c.goto(url + '/conta#access_token=token-de-teste&refresh_token=renova');
+  await c.waitForFunction(() => !document.getElementById('dentro').classList.contains('hide'),
+                          null, { timeout: 15000 });
+  b.verdade('o link do e-mail entra na conta', /contador@exemplo/.test(await c.textContent('#vEmail')));
+  b.verdade('o token some da barra de endereço', !(await c.evaluate(() => location.hash)));
+  b.verdade('a cortesia aparece contada', /7 de 7/.test(await c.textContent('#usoTexto')));
 
-  /* ---------- 3. grava, transcreve e pede o resumo ---------- */
-  await p.check('#okConsent');
-  await p.click('#rec');
-  await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), null, { timeout: 20000 });
-  await p.waitForTimeout(11000);
-  await p.click('#stop');
-  await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
-  await transcrever(p);
+  await c.fill('#nome', 'Leandro do Escritório');
+  await c.click('#salvarNome');
+  await c.waitForFunction(() => /salvo|não consegui/.test(document.getElementById('nomeMsg').textContent),
+                          null, { timeout: 15000 });
+  b.conferir('o nome é salvo na própria conta, sem passar por servidor nosso',
+             (enviados.filter(e => e.tipo === 'nome').pop() || {}).corpo, { p_nome: 'Leandro do Escritório' });
 
-  /* Degustação: quem entrou na conta clica, assinando ou não.
-
-     A regra anterior escondia os botões de quem não assinava, e o primeiro a
-     esbarrar nela foi o dono do produto tentando testar a própria IA. Ninguém
-     assina um resumo por IA sem ver o resumo. */
-  b.verdade('quem entrou na conta tem os botões da IA, mesmo no grátis',
-            !(await p.isHidden('#iaAcoes')));
-  b.verdade('e a tela conta quantos resumos de cortesia sobraram',
-            /3 resumos de cortesia/.test(await p.textContent('#iaEstado')));
-  b.conferir('o modelo caro fica fora da degustação',
-             await p.evaluate(() =>
-               document.querySelector('#iaModeloSalavox option[value="preciso"]').disabled), true);
-
-  /* Este conferir tem de vir DEPOIS da ata na tela. Enquanto o cartão da ata
-     está escondido, o botão de e-mail está escondido junto — e a verificação
-     passava mesmo com a trava do plano arrancada. Foi a sabotagem que mostrou:
-     um teste verde por acidente é pior do que teste nenhum. */
-  b.verdade('com a ata na tela, o envio por e-mail continua fora do grátis',
-            await p.isHidden('#enviarEmail'));
-
-  /* usa uma cortesia */
-  cortesia = 2; restante = 1;
-  await p.click('#iaResumo');
-  await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent),
-                          null, { timeout: 30000 });
-  b.verdade('o resumo de cortesia sai de verdade',
-            /RESUMO DO SALAVOX/.test(await p.evaluate(() =>
-              (window.__salavox.resumos().find(r => r.chave === 'resumo') || {}).texto || '')));
-  b.verdade('e o que sobrou aparece contado como cortesia',
-            /1 resumo de cortesia/.test(await p.textContent('#iaMotorMsg')));
-
-  /* acabou a cortesia: a recusa tem de convidar a assinar, não só dizer não */
-  cortesia = 0;
-  await p.click('#iaPendencias');
-  await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent),
-                          null, { timeout: 30000 });
-  const recusa = await p.textContent('#iaMsg');
-  b.verdade('a recusa diz que a cortesia acabou e quanto custa continuar',
-            /cortesia/.test(recusa) && /19,90/.test(recusa));
-  b.verdade('e o cartão passa a oferecer o plano', /acabaram/.test(await p.textContent('#iaEstado')));
-
-  /* ---------- 3c. assinar: o navegador não libera plano nenhum ----------
-     O botão cria a cobrança e abre a tela de pagamento. Quem escreve a validade
-     é o webhook, no servidor. Se esta parte pudesse liberar, bastaria abrir o
-     inspetor para assinar de graça. */
-  b.verdade('quem está no grátis vê o botão de assinar', !(await p.isHidden('#assinar')));
-  b.verdade('e o formulário de cobrança começa escondido', await p.isHidden('#dadosCobranca'));
-
-  await p.click('#assinar');
-  b.verdade('clicar pede nome e documento', !(await p.isHidden('#dadosCobranca')));
-
-  await p.fill('#cobNome', 'Escritório Teste');
-  await p.fill('#cobDoc', '123');
-  await p.click('#cobConfirmar');
-  await p.waitForTimeout(300);
+  /* assinar: cria a cobrança e NÃO libera plano */
+  b.verdade('quem está no grátis vê o botão de assinar', !(await c.isHidden('#assinar')));
+  await c.click('#assinar');
+  await c.fill('#cobNome', 'Escritório Teste');
+  await c.fill('#cobDoc', '123');
+  await c.click('#cobConfirmar');
+  await c.waitForTimeout(300);
   b.verdade('documento curto é barrado antes de sair do navegador',
-            /11 dígitos/.test(await p.textContent('#contaMsg')) &&
+            /11 dígitos/.test(await c.textContent('#planoMsg')) &&
             !enviados.some(e => e.tipo === 'assinar'));
 
-  await p.fill('#cobDoc', '390.533.447-05');
-  /* `noopener` desliga a ligação entre as duas abas — que é o certo, e é
-     justamente por isso que a aba nova não chega como "popup" desta página.
-     Ela aparece como página nova do contexto. */
+  await c.fill('#cobDoc', '390.533.447-05');
   const abriu = ctx.waitForEvent('page', { timeout: 15000 }).catch(() => null);
-  await p.click('#cobConfirmar');
-  await p.waitForFunction(() => /Cobrança criada|err/.test(document.getElementById('contaMsg').innerHTML),
+  await c.click('#cobConfirmar');
+  await c.waitForFunction(() => /Cobrança criada|err/.test(document.getElementById('planoMsg').innerHTML),
                           null, { timeout: 15000 });
-  const pedidoAssinar = enviados.filter(e => e.tipo === 'assinar').pop();
+  const pedido = enviados.filter(e => e.tipo === 'assinar').pop();
   b.conferir('o pedido leva nome e documento como digitados',
-             { acao: pedidoAssinar.corpo.acao, nome: pedidoAssinar.corpo.nome, documento: pedidoAssinar.corpo.documento },
+             { acao: pedido.corpo.acao, nome: pedido.corpo.nome, documento: pedido.corpo.documento },
              { acao: 'assinar', nome: 'Escritório Teste', documento: '390.533.447-05' });
-  b.verdade('e vai com o token de quem pediu', /^Bearer /.test(pedidoAssinar.auth || ''));
   const popup = await abriu;
-  b.verdade('a tela de pagamento abre em outra aba, para não derrubar uma gravação em curso',
-            !!popup && /pagar-de-mentira/.test(popup.url()));
+  b.verdade('a tela de pagamento abre em outra aba', !!popup && /pagar-de-mentira/.test(popup.url()));
   if (popup) await popup.close();
-  b.verdade('o plano NÃO muda no navegador ao criar a cobrança',
-            /plano grátis/.test(await p.textContent('#contaEstado')));
+  b.verdade('e o plano NÃO muda no navegador ao criar a cobrança',
+            /gratis/.test(await c.textContent('#vPlano')));
 
-  /* vira assinante e tenta de novo */
+  /* vira assinante */
   plano = 'profissional';
   ate = new Date(Date.now() + 30 * 86400000).toISOString();
-  await p.evaluate(() => location.reload());
-  await p.waitForFunction(() => /ativo até/.test(document.getElementById('contaEstado').textContent),
-                          null, { timeout: 15000 }).catch(() => {});
-  b.verdade('assinante vê o plano e a validade', /profissional/.test(await p.textContent('#contaEstado')));
-  b.verdade('assinante não vê mais o botão de assinar', await p.isHidden('#assinar'));
-  b.verdade('e ganha o de cancelar', !(await p.isHidden('#cancelar')));
+  await c.reload();
+  await c.waitForFunction(() => !document.getElementById('dentro').classList.contains('hide'),
+                          null, { timeout: 15000 });
+  b.verdade('assinante vê o plano e a validade', /profissional/.test(await c.textContent('#vPlano')));
+  b.verdade('e ganha o botão de cancelar', !(await c.isHidden('#cancelar')));
 
-  p.on('dialog', d => d.accept());
-  await p.click('#cancelar');
-  await p.waitForFunction(() => /cancelada|err/.test(document.getElementById('contaMsg').innerHTML),
+  c.on('dialog', d => d.accept());
+  await c.click('#cancelar');
+  await c.waitForFunction(() => /cancelada|err/.test(document.getElementById('planoMsg').innerHTML),
                           null, { timeout: 15000 });
   b.conferir('cancelar manda só a ação, sem dado de ninguém',
              (enviados.filter(e => e.tipo === 'assinar').pop()).corpo, { acao: 'cancelar' });
   b.verdade('e a tela diz que o já pago continua valendo',
-            /até o fim do período já pago/.test(await p.textContent('#contaMsg')));
-  b.verdade('o plano continua ativo depois de cancelar',
-            /profissional/.test(await p.textContent('#contaEstado')));
+            /até o fim do período já pago/.test(await c.textContent('#planoMsg')));
+  await c.close();
+
+  /* ---------- 4. o aplicativo, com a sessão já criada ----------
+     De volta ao grátis: a parte 3 assinou para testar o cancelamento, e sem
+     desfazer isso o "e-mail continua fora do grátis" testaria um assinante. */
+  plano = 'gratis'; ate = null;
+  const p = await paginaLimpa(ctx, erros);
+  await montar(p);
+  await p.addInitScript(telaFalsa(4));
+  /* A sessão da parte 3 ficou no localStorage — mesma origem, mesmo contexto.
+     Sem limpar, esta página nasceria logada e o teste de "sem conta" mediria
+     um usuário logado. */
+  await p.addInitScript(() => { try { localStorage.removeItem('salavox.sessao'); } catch (e) {} });
+  /* Começa deslogado de propósito: é assim que dá para ver o cartão da IA
+     existindo sem os botões. Com a sessão já pronta, o cartão nasce liberado
+     e um defeito que libera cedo demais passaria despercebido. */
+  await p.goto(url + '/app');
+  await p.waitForFunction(() => !document.getElementById('contaCard').classList.contains('hide'),
+                          null, { timeout: 15000 });
+  b.verdade('cadastro e cobrança não estão mais no meio do caminho',
+            await p.evaluate(() => !document.getElementById('cobDoc') && !document.getElementById('assinar')));
 
   await p.check('#okConsent');
   await p.click('#rec');
@@ -258,29 +234,60 @@ export default async function (ctx, url, erros) {
   await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
   await transcrever(p);
 
-  // o botão de e-mail mora no cartão da ata, que só existe depois de transcrever
-  b.verdade('assinante ganha o botão de enviar por e-mail', !(await p.isHidden('#enviarEmail')));
+  b.verdade('sem conta, o cartão da IA aparece e os botões não',
+            !(await p.isHidden('#iaCard')) && await p.isHidden('#iaAcoes'));
+  b.verdade('e o cartão diz onde entrar', /sua conta/i.test(await p.textContent('#iaEstado')));
 
-  await p.evaluate(() => { document.getElementById('iaMsg').textContent = ''; });
-  await p.click('#iaPendencias');
-  await p.waitForFunction(() => /pronto|Não consegui/.test(document.getElementById('iaMsg').textContent), null, { timeout: 30000 });
+  /* O link do e-mail chegando com a aba já aberta: sem recarregar, sem perder
+     a ata que acabou de ser transcrita. */
+  await p.evaluate(() => { location.hash = 'access_token=token-de-teste&refresh_token=renova'; });
+  await p.waitForFunction(() => !document.getElementById('iaAcoes').classList.contains('hide'),
+                          null, { timeout: 15000 });
+  b.verdade('a faixa do aplicativo diz quem está logado, pelo nome',
+            /Leandro do Escritório/.test(await p.textContent('#contaEstado')));
+  b.verdade('e leva para a página de conta',
+            /\/conta$/.test(await p.getAttribute('#irConta', 'href')));
+  b.verdade('com conta, os botões da IA estão disponíveis', !(await p.isHidden('#iaAcoes')));
+  b.verdade('a degustação não abre o modelo caro',
+            await p.evaluate(() =>
+              document.querySelector('#iaModeloSalavox option[value="preciso"]').disabled));
 
-  const pedido = enviados.filter(e => e.tipo === 'resumo').pop();
-  b.verdade('o resumo do servidor entra na ata',
-            /RESUMO DO SALAVOX/.test(await p.evaluate(() =>
-              (window.__salavox.resumos().find(r => r.chave === 'pendencias') || {}).texto || '')));
-  b.verdade('a chamada leva o token de quem pediu', /^Bearer token-de-teste$/.test(pedido.auth || ''));
-  b.verdade('o que sai é o texto da ata, com a instrução da tarefa',
-            /decisões/i.test(pedido.corpo.prompt) && /PARTICIPANTES|VOCÊ/.test(pedido.corpo.prompt));
-  b.verdade('para o assinante a cota do mês aparece na tela',
-            /restam .*29.* resumos neste mês/.test(await p.textContent('#iaMotorMsg')));
-  b.conferir('e o modelo preciso é liberado',
-             await p.evaluate(() =>
-               document.querySelector('#iaModeloSalavox option[value="preciso"]').disabled), false);
+  await p.click('#iaOrganizar');
+  await p.waitForFunction(() => /organizada|Não consegui/.test(document.getElementById('iaMsg').textContent),
+                          null, { timeout: 30000 });
 
-  /* ---------- 3b. o resumo chega ao PDF e ao texto ---------- */
+  /* Uma passada só. Eram três botões e três cobranças; se algum dia voltarem a
+     ser três chamadas, o custo por ata triplica sem ninguém notar. */
+  b.conferir('a ata inteira sai de uma chamada só',
+             enviados.filter(e => e.tipo === 'resumo').length, 1);
+
+  const usado = enviados.filter(e => e.tipo === 'resumo').pop();
+  b.verdade('a chamada leva o token de quem pediu', /^Bearer token-de-teste$/.test(usado.auth || ''));
+  b.verdade('o que sai é o texto da ata, com o formato pedido ao modelo',
+            /## PEND[ÊE]NCIAS/.test(usado.corpo.prompt) && /PARTICIPANTES|VOCÊ/.test(usado.corpo.prompt));
+
+  const secoes = await p.evaluate(() =>
+    window.__salavox.resumos().map(r => [r.chave, r.titulo, r.texto]));
+  b.conferir('a resposta é cortada nas quatro seções da ata',
+             secoes.map(s => s[0]), ['resumo', 'decisoes', 'pendencias', 'passos']);
+  b.verdade('o resumo fica sem o título de seção grudado',
+            /^RESUMO DO SALAVOX/.test((secoes[0] || [])[2] || ''));
+  b.verdade('a pendência sai com responsável e prazo',
+            /Maria/.test((secoes[2] || [])[2] || '') && /15\/09/.test((secoes[2] || [])[2] || ''));
+
+  /* O e-mail não entra na ata: ele é a mensagem que leva a ata. */
+  b.verdade('o e-mail não vira mais um bloco da ata',
+            !secoes.some(s => s[0] === 'email'));
+  b.conferir('o assunto sai da resposta, sem o rótulo',
+             await p.inputValue('#emailAssunto'), 'Ata da reunião de hoje');
+  b.verdade('o corpo do e-mail aparece pronto para conferir',
+            /Olá, Maria/.test(await p.textContent('#emailCorpo')));
+  b.verdade('e o envio por e-mail continua fora do grátis', await p.isHidden('#enviarEmail'));
+
   const texto = await p.evaluate(() => window.__salavox.comoTexto());
   b.verdade('o resumo entra no texto exportado', /RESUMO DO SALAVOX/.test(texto));
+  b.verdade('as decisões e as pendências também', /fechar o balanço/.test(texto) && /mandar o extrato/.test(texto));
+  b.verdade('mas o e-mail não vai dentro da ata', !/Olá, Maria/.test(texto));
 
   const espera = p.waitForEvent('download', { timeout: 60000 });
   await p.click('#baixarPdf');
@@ -290,34 +297,78 @@ export default async function (ctx, url, erros) {
   for await (const parte of fluxo) tam += parte.length;
   b.entre('o PDF com o resumo sai (bytes)', tam, 3000, 3000000);
 
-  /* Só o nosso servidor. Houve aqui um modo com a chave de um serviço de
-     terceiro e outro falando com um modelo local na porta 11434; os dois foram
-     fechados, e este é o teste que impede alguém de reabrir qualquer saída sem
-     perceber. */
+  /* ---------- a cortesia acabando no meio do uso ----------
+     Quem recusa é o servidor, e a tela tem de acreditar nele na hora. Um
+     cartão que continua dizendo "você tem 7 de cortesia" depois de um 402
+     convida ao clique que vai ser recusado de novo. */
+  cortesia = 0;
+  await p.click('#iaOrganizar');
+  await p.waitForFunction(() => /Não consegui/.test(document.getElementById('iaMsg').textContent),
+                          null, { timeout: 30000 });
+  b.verdade('a recusa por cota vem do servidor, com o convite para assinar',
+            /cortesia acabaram/.test(await p.textContent('#iaMsg')));
+  b.verdade('e o cartão para de oferecer cortesia que já acabou',
+            /acabaram/.test(await p.textContent('#iaEstado')) &&
+            !/Você tem/.test(await p.textContent('#iaEstado')));
+
+  /* Só o nosso servidor. */
   const forasteiros = pedidos.filter(u => !/127\.0\.0\.1|localhost|projeto-de-teste\.supabase\.co/.test(u));
   b.conferir('a página não fala com mais ninguém', forasteiros, []);
 
-  /* ---------- 4. o que fica guardado no navegador ---------- */
   const guardado = await p.evaluate(() => {
     const tudo = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      tudo[k] = localStorage.getItem(k);
-    }
+    for (let i = 0; i < localStorage.length; i++) tudo[localStorage.key(i)] = localStorage.getItem(localStorage.key(i));
     return tudo;
   });
-  b.conferir('a única coisa guardada é a sessão', Object.keys(guardado), ['salavox.sessao']);
+  /* Duas chaves, e as duas são escolha de quem usa: a sessão e o idioma.
+     O que não pode aparecer aqui é reunião. */
+  b.conferir('só a sessão e o idioma ficam guardados',
+             Object.keys(guardado).sort(), ['salavox.idioma', 'salavox.sessao']);
   b.verdade('nenhum pedaço da reunião fica no navegador',
             !/PARTICIPANTES|Trecho \d|RESUMO DO SALAVOX/.test(JSON.stringify(guardado)));
 
-  await p.click('#contaSair');
-  await p.waitForTimeout(200);
-  b.conferir('sair apaga a sessão',
-             await p.evaluate(() => localStorage.getItem('salavox.sessao')), null);
-  b.verdade('sem entrar na conta não há botão de IA nenhum', await p.isHidden('#iaAcoes'));
-  b.verdade('e o cartão convida a entrar para experimentar',
-            /3 resumos para experimentar/.test(await p.textContent('#iaEstado')));
-
   await p.close();
+
+  /* ---------- 5. assinante: o e-mail sai daqui, com a ata junto ----------
+     Precisa de outra página porque o plano é lido uma vez, na entrada, e o
+     que muda o comportamento é o plano — não um botão. */
+  plano = 'profissional';
+  ate = new Date(Date.now() + 30 * 86400000).toISOString();
+  const a = await paginaLimpa(ctx, erros);
+  await montar(a);
+  await a.addInitScript(telaFalsa(4));
+  await a.goto(url + '/app#access_token=token-de-teste&refresh_token=renova');
+  await a.check('#okConsent');
+  await a.click('#rec');
+  await a.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'), null, { timeout: 20000 });
+  await a.waitForTimeout(11000);
+  await a.click('#stop');
+  await a.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent), null, { timeout: 60000 });
+  await transcrever(a);
+  await a.click('#iaOrganizar');
+  await a.waitForFunction(() => /organizada|Não consegui/.test(document.getElementById('iaMsg').textContent),
+                          null, { timeout: 30000 });
+
+  b.verdade('assinante ganha o botão de enviar', !(await a.isHidden('#enviarEmail')));
+  await a.click('#enviarEmail');
+  await a.waitForTimeout(300);
+  b.verdade('sem endereço nada sai',
+            /Diga para quem enviar/.test(await a.textContent('#emailMsg')) &&
+            !enviados.some(e => e.tipo === 'email'));
+
+  await a.fill('#emailPara', 'maria@empresa.com.br, joao@empresa.com.br');
+  await a.click('#enviarEmail');
+  await a.waitForFunction(() => /enviado|err/.test(document.getElementById('emailMsg').innerHTML),
+                          null, { timeout: 15000 });
+  const carta = (enviados.filter(e => e.tipo === 'email').pop() || {}).corpo || {};
+  b.conferir('vai para quem foi digitado, com o assunto que a IA escreveu',
+             { para: carta.para, assunto: carta.assunto },
+             { para: 'maria@empresa.com.br, joao@empresa.com.br', assunto: 'Ata da reunião de hoje' });
+  b.verdade('o corpo leva o e-mail da IA e a ata inteira embaixo',
+            /Olá, Maria/.test(carta.corpo || '') &&
+            /PARTICIPANTES|VOCÊ/.test(carta.corpo || '') &&
+            (carta.corpo || '').indexOf('Olá, Maria') < (carta.corpo || '').indexOf('RESUMO DO SALAVOX'));
+  await a.close();
+
   return b;
 }
