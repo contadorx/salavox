@@ -10,6 +10,11 @@
 <meta property="og:description" content="Sem robô na chamada, sem áudio na nuvem. A gravação e a transcrição acontecem no seu navegador.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/site.css">
+<style>
+  /* o seletor de idioma vive na barra do topo de todas as páginas */
+  .selIdioma{padding:6px 8px;font-size:13px;border-radius:8px;border:1.5px solid var(--linha,#E4E9E7);
+             background:#fff;color:var(--muted,#5E6F6B);font-family:inherit;margin-left:14px}
+</style>
 </head>
 <body>
 
@@ -22,6 +27,7 @@
       <a href="#comparar">Comparação</a>
       <a href="#precos">Preços</a>
     </div>
+    <select id="lingua" class="selIdioma" data-usuario aria-label="Idioma / Language"><option value="pt">Português</option><option value="en">English</option></select>
     <a class="btn btn-verde" href="/app">Abrir o Salavox</a>
   </div>
 </nav>
@@ -617,5 +623,6 @@
   </div>
 </footer>
 
+<script src="/idiomas.js"></script>
 </body>
 </html>

@@ -135,7 +135,12 @@ async function rodar([nome, teste], i, repetido = false) {
    o mais tentador — este projeto já decidiu não fazer isso. A corrida fica
    ~50 s mais longa e passa a dizer a verdade. */
 const LADOS = Number(process.env.LADOS || 2);
-const SOZINHOS = ['telas', 'pedacos', 'recuperacao'];
+const SOZINHOS = ['telas', 'pedacos', 'recuperacao', 'extras'];
+/* `extras` entrou nesta lista depois de reprovar sozinho na corrida cheia: ele
+   marca dois momentos com a mão, um no começo e um no meio, e confere se cada
+   marca caiu no instante em que o clique aconteceu. Com a máquina disputada o
+   clique atrasa e a marca do "meio" cai em 22 s de uma gravação de 30. A
+   medição está certa; o que faltava era ela não competir por CPU. */
 
 if (UM_DE_CADA) {
   for (let i = 0; i < TESTES.length; i++) await rodar(TESTES[i], i);

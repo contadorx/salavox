@@ -113,7 +113,43 @@ export default async function (ctx, url, erros) {
   /* A ata é da pessoa e continua como ela falou. */
   const ata = await p.textContent('#ata');
   b.verdade('o que foi dito na reunião não é traduzido', ata.length > 0);
-
   await p.close();
+
+  /* ---------- as páginas públicas ----------
+     A ferramenta em inglês com a página de venda em português é pior do que
+     nenhuma tradução: quem chega pelo site não entra. */
+  const publicas = [['/', 'site'], ['/conta', 'conta'],
+                    ['/privacidade', 'privacidade'], ['/termos', 'termos']];
+  const sobrouFora = [];
+  for (const [caminho, nome] of publicas) {
+    const q = await paginaLimpa(ctx, erros);
+    await emIngles(q);
+    await q.goto(url + caminho);
+    await q.waitForFunction(() => !!window.SalavoxIdioma, null, { timeout: 15000 }).catch(() => {});
+    await q.waitForTimeout(400);
+    for (const d of await q.$$('details summary')) { await d.click().catch(() => {}); }
+    await q.waitForTimeout(200);
+    const v = await q.evaluate(() => window.SalavoxIdioma ? window.SalavoxIdioma.vazamentos() : ['SEM RUNTIME']);
+    v.forEach(t => sobrouFora.push(nome + ' → ' + t));
+    b.verdade('a página ' + nome + ' se declara em inglês',
+              (await q.getAttribute('html', 'lang')) === 'en');
+    /* O título da aba é o que aparece na busca e no cartão de compartilhamento:
+       é onde quem não fala português encontra o produto. */
+    b.verdade('e o título da aba também está em inglês, na página ' + nome,
+              !/[ãõçáéêíóôú]|\b(reunião|gravação|conta|privacidade|termos|uso)\b/i
+                .test(await q.title()));
+    await q.close();
+  }
+
+  const foraLista = Array.from(new Set(sobrouFora));
+  if (foraLista.length) {
+    const fs = await import('node:fs');
+    fs.writeFileSync('/tmp/faltam-site.json',
+                     JSON.stringify(foraLista.map(t => t.split(' → ').slice(1).join(' → ')), null, 1));
+    console.log('    ' + foraLista.length + ' textos do site ainda em português (/tmp/faltam-site.json)');
+    foraLista.slice(0, 10).forEach(t => console.log('    falta traduzir: ' + t.slice(0, 90)));
+  }
+  b.conferir('nada de português sobra nas páginas públicas em inglês', foraLista.length, 0);
+
   return b;
 }

@@ -65,11 +65,19 @@
     [/^Só há ([\d.,]+) GB livres para o navegador\.$/, 'Only $1 GB free for the browser.'],
     [/^: ([\d.,]+) s de áudio em ([\d.,]+) s —$/, ': $1 s of audio in $2 s —'],
     [/^(\d+) de (\d+) na ata$/, '$1 of $2 in the minutes'],
-    [/^Reunião de (.+)$/, 'Meeting of $1'],
+    /* NÃO existe padrão para "Reunião de ...": ele casava com a frase
+       "Reunião de contador com cliente, de advogado com parte" na página de
+       venda e a devolvia como "Meeting of contador com cliente". O título
+       padrão da ata já nasce no idioma certo, em app.js. */
     [/^restam <b>(\d+)<\/b>/, 'left: <b>$1</b>'],
     [/^(\d+) trechos?$/, '$1 passages'],
     [/^Transcrito na (.+)$/, 'Transcribed on the $1'],
-    [/^Perguntar à ata: (.+)$/, 'Ask the minutes: $1']
+    [/^Perguntar à ata: (.+)$/, 'Ask the minutes: $1'],
+    [/^momento marcado em ([\d:]+)$/, 'moment flagged at $1'],
+    [/^tela mostrada em ([\d:]+)$/, 'screen shown at $1'],
+    [/^— (\d+) trechos?\.$/, '— $1 passages.'],
+    [/^([\d.,]+)× o tempo real$/, '$1× real time'],
+    [/^(\d+) resumos? de cortesia$/, '$1 complimentary summaries']
   ];
 
   function porPadrao(n) {
@@ -119,6 +127,11 @@
     return !!p && !p.closest(FORA);
   }
 
+  /* Tudo o que já saiu traduzido. Serve ao detector: sem isto ele acusaria
+     como "falta traduzir" justamente o texto que acabou de ser traduzido —
+     porque o inglês, claro, não é chave do dicionário. */
+  const SAIDAS = new Set();
+
   function traduzirNo(no) {
     const bruto = no.data;
     const n = norma(bruto);
@@ -128,6 +141,7 @@
     const antes = /^\s*/.exec(bruto)[0];
     const depois = /\s*$/.exec(bruto)[0];
     no.data = antes + en + depois;
+    SAIDAS.add(norma(en));
   }
 
   const ATRIBUTOS = ['placeholder', 'title', 'aria-label', 'alt'];
@@ -138,7 +152,7 @@
       if (!el.hasAttribute || !el.hasAttribute(a)) continue;
       const alvo = norma(el.getAttribute(a));
       const en = DIC[alvo] != null ? DIC[alvo] : porPadrao(alvo);
-      if (en != null) el.setAttribute(a, en);
+      if (en != null) { el.setAttribute(a, en); SAIDAS.add(norma(en)); }
     }
   }
 
@@ -170,26 +184,41 @@
     obs.observe(document.body, { childList: true, subtree: true, characterData: true });
   }
 
-  /* ---------- o que o teste usa ---------- */
+  /* ---------- o que o teste usa ----------
+
+     A primeira versão procurava português por heurística: acento, ou uma
+     palavra de uma lista. Ela dava zero com a página cheia de português na
+     tela — "nada sair", "Recursos", "Abrir o Salavox" não têm acento nem
+     caem na lista, e passaram batido até alguém olhar uma captura.
+
+     A pergunta certa não é "isto parece português?", é **"isto passou pelo
+     dicionário?"**. Agora sobra tudo o que está visível e não foi traduzido,
+     acentuado ou não. Texto que é igual nos dois idiomas — "Salavox", "PDF",
+     "Pix" — entra no dicionário apontando para si mesmo: custa uma linha e
+     documenta a decisão, em vez de escondê-la numa lista de exceções. */
+  const NEUTRO = /^[\d\s.,:;!?·—–\-•|%/()\[\]{}<>+×=$€£"'@#*_~^\\]*$/;
+
   function vazamentos() {
     const fora = [];
+    const passou = t => !t || NEUTRO.test(t) || DIC[t] != null ||
+                        porPadrao(t) != null || SAIDAS.has(t);
     const cam = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
       acceptNode: no => podeMexer(no) && no.parentElement.offsetParent !== null
         ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
     });
     for (let no = cam.nextNode(); no; no = cam.nextNode()) {
       const t = norma(no.data);
-      const alvo = semEnderecos(t);
-      if (t && (SINAIS.test(alvo) || PALAVRAS.test(alvo))) fora.push(t);
+      if (!passou(t)) fora.push(t);
     }
     document.querySelectorAll('[placeholder],[title],[aria-label]').forEach(el => {
       if (el.closest('[data-usuario]')) return;
       for (const a of ATRIBUTOS) {
         const v = el.hasAttribute(a) ? norma(el.getAttribute(a)) : '';
-        const alvoA = semEnderecos(v);
-        if (v && (SINAIS.test(alvoA) || PALAVRAS.test(alvoA))) fora.push(v);
+        if (!passou(v)) fora.push(v);
       }
     });
+    const t = norma(document.title);
+    if (!passou(t)) fora.push('<title> ' + t);
     return Array.from(new Set(fora));
   }
 
@@ -207,11 +236,25 @@
     };
   }
 
+  /* O título da aba e a descrição não estão no corpo da página, e a varredura
+     não os alcançaria. Ficariam em português na aba do navegador, no resultado
+     de busca e no cartão que aparece ao compartilhar o endereço — que é
+     justamente onde quem não fala português encontra o produto. */
+  function traduzirCabeca() {
+    const t = DIC[norma(document.title)];
+    if (t) { document.title = t; SAIDAS.add(norma(t)); }
+    document.querySelectorAll('meta[name="description"],meta[property="og:description"],' +
+                              'meta[property="og:title"]').forEach(m => {
+      const en = DIC[norma(m.getAttribute('content') || '')];
+      if (en) { m.setAttribute('content', en); SAIDAS.add(norma(en)); }
+    });
+  }
+
   function iniciar() {
     const id = idiomaAtual();
     document.documentElement.lang = id === 'en' ? 'en' : 'pt-BR';
     ligarSeletor();
-    if (id === 'en') { varrer(document.body); observar(); }
+    if (id === 'en') { traduzirCabeca(); varrer(document.body); observar(); }
   }
 
   window.SalavoxIdioma = {

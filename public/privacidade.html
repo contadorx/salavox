@@ -7,13 +7,18 @@
 <meta name="description" content="O Salavox não recebe suas gravações, não coleta dados pessoais e não usa cookies. Todo o processamento acontece no seu computador.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/site.css">
+<style>
+  /* o seletor de idioma vive na barra do topo de todas as páginas */
+  .selIdioma{padding:6px 8px;font-size:13px;border-radius:8px;border:1.5px solid var(--linha,#E4E9E7);
+             background:#fff;color:var(--muted,#5E6F6B);font-family:inherit;margin-left:14px}
+</style>
 </head>
 <body>
 
 <nav class="nav">
   <div class="wrap nav-inner">
     <a class="marca" href="/"><img src="/logo.svg" alt=""><span>Sala<b>vox</b></span></a>
-    <div class="nav-links"><a href="/termos">Termos</a><a href="/privacidade">Privacidade</a></div>
+    <div class="nav-links"><a href="/termos">Termos</a><a href="/privacidade">Privacidade</a><select id="lingua" class="selIdioma" data-usuario aria-label="Idioma / Language"><option value="pt">Português</option><option value="en">English</option></select></div>
     <a class="btn btn-verde" href="/app">Abrir o Salavox</a>
   </div>
 </nav>
@@ -143,5 +148,6 @@
   </div>
 </footer>
 
+<script src="/idiomas.js"></script>
 </body>
 </html>
