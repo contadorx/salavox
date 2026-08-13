@@ -74,7 +74,7 @@ Nada é anunciado como pronto sem ter rodado:
 
 ```
 python3 build.py                     # embutido no runner, mas vale rodar sozinho quando se mexe no HTML
-node testes/rodar-tudo.mjs           # os sete blocos, em paralelo — 70 s
+node testes/rodar-tudo.mjs           # os dez blocos, em paralelo — 70 s
 node testes/rodar-tudo.mjs ia telas  # só os blocos pedidos
 JUNTOS=1 node testes/rodar-tudo.mjs  # um de cada vez, para depurar
 node testes/sabotagem.mjs            # quebra o app de propósito e exige que os testes falhem — 3 min 40 s
@@ -86,7 +86,7 @@ Sai com código diferente de zero quando falha. É isso que permite dizer "passo
 **Três regras que valem mais que a lista:**
 
 - **Todo teste novo é sabotado de propósito antes de ser aceito.** Auditor que só sabe dizer "ok" não é
-  trava. `testes/sabotagem.mjs` planta 38 defeitos, um de cada vez, e exige que a verificação correspondente falhe — e já
+  trava. `testes/sabotagem.mjs` planta 50 defeitos, um de cada vez, e exige que a verificação correspondente falhe — e já
   reprovou dois testes meus, um deles que "pegava" o defeito pelo motivo errado.
 - **Valor esperado é golden, escrito no arquivo.** `['00:00','00:04','00:08','00:12']` está lá em letra de
   forma. Recalcular o esperado com a mesma função que se testa faz o teste passar sempre, inclusive depois
@@ -172,6 +172,34 @@ Depois de paralelizar, a mesma lição voltou duas vezes seguidas, e das duas o 
   de relógio, e não há como se descolarem.
 
 Em ambos os casos a saída fácil era afrouxar a margem — e teria escondido o defeito seguinte.
+
+### O ritmo: zip primeiro, varredura depois — decidido em 12/08/2026
+
+O protocolo mandava verificar tudo antes de entregar: três corridas da suíte e as 50 sabotagens. Isso
+custa de 30 a 60 minutos por build nesta máquina, e num deles o Leandro esperou mais de uma hora por um
+trabalho de escrever que levou uma fração disso.
+
+**A ordem mudou, a rede não.**
+
+1. Escrever, construir, **uma** corrida da suíte.
+2. **Entregar o zip.**
+3. Sabotagem completa e corridas repetidas rodam depois. Se acharem algo, vai correção — dizendo o que
+   era e desde quando.
+
+O que isso troca: ele deixa de *esperar* a rede de proteção, não deixa de tê-la. O risco real é publicar
+antes de a varredura terminar; por isso a correção, se vier, vem com o defeito nomeado.
+
+**O que não muda:** nada é entregue sem pelo menos uma corrida verde, e nada é entregue com um teste
+vermelho conhecido sem que isso esteja dito na mensagem.
+
+### Rodar `nproc` antes de caçar fantasma
+
+Nesta máquina são **dois núcleos**. Os testes gravam mídia em tempo real, e dois Chromiums gravando ao
+mesmo tempo nunca couberam aqui. Passei quase uma hora re-rodando a suíte atrás de uma instabilidade que
+era da máquina — e só olhei o número de núcleos no fim.
+
+**Antes de investigar teste que pisca, olhe o ambiente:** quantos núcleos, quanta memória, e se não há
+outra corrida sua ainda viva. Custa dois segundos e já custou uma tarde.
 
 ### O modelo simulado tem de errar como o de verdade
 

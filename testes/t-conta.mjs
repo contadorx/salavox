@@ -55,7 +55,7 @@ export default async function (ctx, url, erros) {
   const p = await paginaLimpa(ctx, erros);
   const enviados = [];
   const pedidos = [];
-  let plano = 'gratis', ate = null, cortesia = 3, restante = 2;
+  let plano = 'gratis', ate = null, cortesia = 3, restante = 2, assinaturaViva = null;
 
   p.on('request', r => {
     const u = r.url();
@@ -78,6 +78,26 @@ export default async function (ctx, url, erros) {
   await p.route(SUPA + '/rest/v1/rpc/cortesia_restante', r => r.fulfill({
     contentType: 'application/json', body: String(cortesia)
   }));
+  await p.route(SUPA + '/rest/v1/rpc/minha_cobranca', r => r.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ assinatura: assinaturaViva, plano, assinante_ate: ate })
+  }));
+  await p.route('**/api/assinar', r => {
+    const corpo = r.request().postDataJSON();
+    enviados.push({ tipo: 'assinar', corpo, auth: r.request().headers()['authorization'] });
+    if (corpo.acao === 'cancelar') {
+      assinaturaViva = null;
+      return r.fulfill({ contentType: 'application/json',
+        body: JSON.stringify({ cancelada: true, vale_ate: ate }) });
+    }
+    assinaturaViva = 'sub_9';
+    return r.fulfill({ contentType: 'application/json',
+      /* O endereço de pagamento aponta para o próprio servidor de teste: uma
+         URL externa de mentira vira `chrome-error://` quando o DNS falha, e o
+         teste passaria a conferir a mensagem de erro do navegador em vez do
+         que interessa — que a tela abriu em OUTRA aba. */
+      body: JSON.stringify({ assinatura: 'sub_9', pagar: url + '/pagar-de-mentira', valor: 19.90 }) });
+  });
   await p.route('**/api/resumo', r => {
     const req = r.request();
     enviados.push({ tipo: 'resumo', corpo: req.postDataJSON(), auth: req.headers()['authorization'] });
@@ -171,6 +191,44 @@ export default async function (ctx, url, erros) {
             /cortesia/.test(recusa) && /19,90/.test(recusa));
   b.verdade('e o cartão passa a oferecer o plano', /acabaram/.test(await p.textContent('#iaEstado')));
 
+  /* ---------- 3c. assinar: o navegador não libera plano nenhum ----------
+     O botão cria a cobrança e abre a tela de pagamento. Quem escreve a validade
+     é o webhook, no servidor. Se esta parte pudesse liberar, bastaria abrir o
+     inspetor para assinar de graça. */
+  b.verdade('quem está no grátis vê o botão de assinar', !(await p.isHidden('#assinar')));
+  b.verdade('e o formulário de cobrança começa escondido', await p.isHidden('#dadosCobranca'));
+
+  await p.click('#assinar');
+  b.verdade('clicar pede nome e documento', !(await p.isHidden('#dadosCobranca')));
+
+  await p.fill('#cobNome', 'Escritório Teste');
+  await p.fill('#cobDoc', '123');
+  await p.click('#cobConfirmar');
+  await p.waitForTimeout(300);
+  b.verdade('documento curto é barrado antes de sair do navegador',
+            /11 dígitos/.test(await p.textContent('#contaMsg')) &&
+            !enviados.some(e => e.tipo === 'assinar'));
+
+  await p.fill('#cobDoc', '390.533.447-05');
+  /* `noopener` desliga a ligação entre as duas abas — que é o certo, e é
+     justamente por isso que a aba nova não chega como "popup" desta página.
+     Ela aparece como página nova do contexto. */
+  const abriu = ctx.waitForEvent('page', { timeout: 15000 }).catch(() => null);
+  await p.click('#cobConfirmar');
+  await p.waitForFunction(() => /Cobrança criada|err/.test(document.getElementById('contaMsg').innerHTML),
+                          null, { timeout: 15000 });
+  const pedidoAssinar = enviados.filter(e => e.tipo === 'assinar').pop();
+  b.conferir('o pedido leva nome e documento como digitados',
+             { acao: pedidoAssinar.corpo.acao, nome: pedidoAssinar.corpo.nome, documento: pedidoAssinar.corpo.documento },
+             { acao: 'assinar', nome: 'Escritório Teste', documento: '390.533.447-05' });
+  b.verdade('e vai com o token de quem pediu', /^Bearer /.test(pedidoAssinar.auth || ''));
+  const popup = await abriu;
+  b.verdade('a tela de pagamento abre em outra aba, para não derrubar uma gravação em curso',
+            !!popup && /pagar-de-mentira/.test(popup.url()));
+  if (popup) await popup.close();
+  b.verdade('o plano NÃO muda no navegador ao criar a cobrança',
+            /plano grátis/.test(await p.textContent('#contaEstado')));
+
   /* vira assinante e tenta de novo */
   plano = 'profissional';
   ate = new Date(Date.now() + 30 * 86400000).toISOString();
@@ -178,6 +236,19 @@ export default async function (ctx, url, erros) {
   await p.waitForFunction(() => /ativo até/.test(document.getElementById('contaEstado').textContent),
                           null, { timeout: 15000 }).catch(() => {});
   b.verdade('assinante vê o plano e a validade', /profissional/.test(await p.textContent('#contaEstado')));
+  b.verdade('assinante não vê mais o botão de assinar', await p.isHidden('#assinar'));
+  b.verdade('e ganha o de cancelar', !(await p.isHidden('#cancelar')));
+
+  p.on('dialog', d => d.accept());
+  await p.click('#cancelar');
+  await p.waitForFunction(() => /cancelada|err/.test(document.getElementById('contaMsg').innerHTML),
+                          null, { timeout: 15000 });
+  b.conferir('cancelar manda só a ação, sem dado de ninguém',
+             (enviados.filter(e => e.tipo === 'assinar').pop()).corpo, { acao: 'cancelar' });
+  b.verdade('e a tela diz que o já pago continua valendo',
+            /até o fim do período já pago/.test(await p.textContent('#contaMsg')));
+  b.verdade('o plano continua ativo depois de cancelar',
+            /profissional/.test(await p.textContent('#contaEstado')));
 
   await p.check('#okConsent');
   await p.click('#rec');

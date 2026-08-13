@@ -51,6 +51,15 @@ export default async function (ctx, url, erros) {
      modelo começava com duas idas à rede no primeiro segundo da gravação, e
      isso deslocava a detecção da primeira tela. Agora essa preparação espera
      cinco segundos — a primeira janela só fecha aos trinta. */
+  /* Esperar a transcrição ao vivo ficar de pé, em vez de torcer para que tenha
+     ficado. Ela só começa a preparar o modelo aos quinze segundos de áudio, e
+     nesta máquina (dois núcleos) o carregamento concorre com a gravação. Sem
+     esta espera, o teste virava uma moeda: às vezes o modelo ficava pronto a
+     tempo da primeira janela fechar aos trinta, às vezes não — e a falha
+     descrevia a máquina, não o produto. */
+  await p.waitForFunction(() => window.__salavox.vivo().ativo || window.__salavox.vivo().erro,
+                          null, { timeout: 40000 });
+
   const vivoAntes = await p.evaluate(() => window.__salavox.vivo());
   b.verdade('a transcrição ao vivo está ligada por padrão', vivoAntes.ligado);
   b.conferir('e não quebrou durante a gravação', vivoAntes.erro, null);
@@ -87,6 +96,14 @@ export default async function (ctx, url, erros) {
   b.entre('pedaços de vídeo no disco (1 a cada 10 s)', info.video, 4, 8);
   b.entre('pedaços de áudio no disco (1 a cada 4 s)', info.audio, 12, 20);
   b.verdade('os metadados da sessão foram gravados', info.meta);
+
+  /* Este bloco mede a gravação em pedaços: que cada janela de 30 s receba o seu
+     trecho de áudio e seja datada a partir do início dela. A compactação de
+     silêncio muda de propósito os instantes — ela costura a fala e reescreve a
+     linha do tempo —, então aqui ela fica desligada. Quem a mede é
+     `t-compactacao.mjs`, com um áudio de bordas conhecidas. Um teste, uma
+     afirmação. */
+  await p.uncheck('#compactar');
 
   await transcrever(p);
   b.verdade('a ata final diz que aproveitou o trabalho adiantado',

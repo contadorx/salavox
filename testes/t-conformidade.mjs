@@ -7,6 +7,33 @@
 
 import { telaFalsa, paginaLimpa, bloco, transcrever } from './apoio.mjs';
 
+/* Marcas concorrentes citadas por escrito. Regra do escritório, e ela não é
+   estética: objeção de concorrente se responde verbalmente, nunca num documento
+   que circula. Vale para a página pública, para a ferramenta e para os
+   documentos que vão no repositório — `interno/` fica fora, porque não é
+   publicado.
+
+   Esta trava existe porque a tentação é real: ao responder a um concorrente, o
+   caminho mais curto é nomeá-lo. */
+const MARCAS = ['fireflies', 'otter', 'tldv', 'tl;dv', 'notta', 'tactiq', 'fathom',
+                'gong', 'chorus', 'grain', 'avoma', 'sembly', 'krisp'];
+
+async function semMarcaConcorrente(b) {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { RAIZ } = await import('./apoio.mjs');
+  const olhar = ['public/index.html', 'public/app.html', 'public/privacidade.html',
+                 'public/termos.html', 'public/painel.html', 'src/app.html', 'src/app.js',
+                 'README.md', 'CONCEITO.md', 'CAMADA-PAGA.md', 'DESEMPENHO.md'];
+  const achados = [];
+  for (const rel of olhar) {
+    let t = '';
+    try { t = fs.readFileSync(path.join(RAIZ, rel), 'utf8').toLowerCase(); } catch (e) { continue; }
+    for (const m of MARCAS) if (t.includes(m)) achados.push(rel + ': ' + m);
+  }
+  b.conferir('nenhuma marca concorrente é citada por escrito no que vai publicado', achados, []);
+}
+
 export default async function (ctx, url, erros) {
   const b = bloco('vocabulário, correção, consentimento e inglês');
   const p = await paginaLimpa(ctx, erros);
@@ -97,6 +124,8 @@ export default async function (ctx, url, erros) {
   let tam = 0;
   for await (const parte of fluxo) tam += parte.length;
   b.entre('o PDF com o registro de consentimento sai (bytes)', tam, 3000, 3000000);
+
+  await semMarcaConcorrente(b);
 
   await p.close();
   return b;

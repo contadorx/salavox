@@ -18,6 +18,14 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
   medido por inteiro e o que foi adiantado é reconciliado: janela cujo canal se revelou mudo é descartada,
   janela pulada que passa a ter voz é transcrita então. O adiantamento é otimização; quem manda no
   resultado é a medição completa.
+- **Compacta o silêncio antes de transcrever.** O Whisper processa sempre trinta segundos, com ou sem fala
+  dentro. A fala de cada canal é costurada — vãos de 0,4 s ou mais saem, com 0,2 s de folga em volta das
+  palavras e uma rampa de 10 ms na emenda — e o modelo recebe conversa em vez de espera. Num áudio de teste
+  com 20 s de fala em 120 s, isso levou **quatro passagens pelo modelo a uma**. Os instantes voltam
+  remapeados para o minuto certo da reunião; é a parte que pode dar errado feio, e é a mais testada.
+- **Diz em que motor rodou e quantas vezes mais rápido que o tempo real.** A diferença entre a placa de
+  vídeo e o processador é de 5 a 20 vezes — maior que qualquer otimização — e até agora a queda acontecia
+  em silêncio.
 - **Não transcreve silêncio, e diz que não transcreveu.** Antes de chamar o modelo, o áudio cru é medido
   em quadros de 20 ms: um canal que nunca chega a nível de voz é declarado mudo e não é enviado; uma janela
   sem pelo menos 200 ms de fala é pulada. Isso economiza tempo em reunião real e, principalmente, impede
@@ -34,6 +42,9 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
 - **Usa uma gravação que já existe**: arraste um arquivo de áudio ou vídeo e ele vira ata do mesmo jeito.
 - Transcreve em português, inglês ou espanhol, **detecta o idioma** sozinho, e sabe entregar a
   **ata em inglês** sem custo de tempo — o Whisper traduz com um parâmetro.
+- **Três modelos**: rápido, preciso (padrão) e **turbo** (`whisper-large-v3-turbo`), este com decodificador
+  de 4 camadas em vez de 32 — qualidade perto do maior Whisper com velocidade de modelo pequeno, em troca
+  de um download bem maior. A tela avisa o tamanho antes de a pessoa escolher.
 - **Vocabulário do escritório**: siglas, nomes de clientes e termos que a transcrição sempre erra são
   corrigidos no texto que sai, comparando cada palavra com a lista por distância de edição.
 - **Corrige o texto na própria ata**: clicar numa fala e escrever por cima; a correção vai para o PDF, o
@@ -53,6 +64,10 @@ Grava a reunião, transcreve e entrega a ata. **Nenhum robô entra na chamada e 
   O caminho antigo montava tudo num Blob e passava por `createObjectURL` — duas cópias de centenas de
   megabytes antes de a barra aparecer, e era isso que demorava. Onde a API de salvar não existe, o caminho
   antigo continua valendo, e a tela diz que vai demorar.
+- **Assinatura pelo Asaas**, com Pix, boleto ou cartão escolhidos por quem paga. O navegador cria a
+  cobrança e abre a tela de pagamento; quem escreve a validade é o **webhook**, no servidor, quando o
+  pagamento é confirmado — estorno e chargeback cortam o acesso na hora, e o mesmo pagamento nunca conta
+  duas vezes. Cancelar não corta o mês já pago.
 - **Painel de negócio em `/painel`**, para quem estiver em `ADMIN_EMAILS`: contas, assinantes, receita,
   custo de IA contado por token, margem, conversão da degustação, e o atendimento de conta — achar pelo
   e-mail, liberar ou estender plano, zerar cota.
@@ -92,9 +107,9 @@ PROTOCOLO.md         como se trabalha neste projeto
 
 ```bash
 python3 build.py                     # gera public/app.html e public/versao.txt
-node testes/rodar-tudo.mjs           # os nove blocos em paralelo — 70 s
+node testes/rodar-tudo.mjs           # os dez blocos em paralelo — 70 s
 node testes/rodar-tudo.mjs silencio  # só um bloco
-node testes/sabotagem.mjs            # 38 defeitos plantados, exige que os testes peguem
+node testes/sabotagem.mjs            # 50 defeitos plantados, exige que os testes peguem
 node testes/sabotagem.mjs silencio   # só as sabotagens de uma área
 node ferramentas/gerar-imagens.mjs   # refaz as imagens da página inicial a partir do app
 node ferramentas/ver-home.mjs        # confere a página inicial
@@ -123,7 +138,7 @@ A versão aparece no rodapé da ferramenta e em `/versao.txt`. Para saber o que 
 ## O que foi verificado
 
 `node testes/rodar-tudo.mjs` roda tudo isto e sai com erro se algo falhar; `node testes/sabotagem.mjs`
-planta 38 defeitos no código, um de cada vez, e exige que a verificação correspondente pegue cada um —
+planta 50 defeitos no código, um de cada vez, e exige que a verificação correspondente pegue cada um —
 inclusive um cenário de controle, que precisa **passar**.
 
 Com captura sintética no Chromium: a gravação sai com **dois canais** de energias distintas (0,14 e 0,21

@@ -1,0 +1,101 @@
+-- Salavox — cobrança pelo Asaas
+-- Ordem de execução: depois de 001, 002 e 003. Roda num banco em uso: só
+-- acrescenta colunas com valor padrão e funções novas.
+--
+-- O QUE MUDA NA PRÁTICA
+--
+-- Até aqui, virar assinante era um `update` na mão. Agora quem escreve a data
+-- de validade é o webhook do Asaas, quando o pagamento é confirmado. O painel
+-- continua podendo liberar à mão — é o que resolve atendimento —, mas deixa de
+-- ser o único caminho.
+--
+-- TRÊS CUIDADOS QUE ESTÃO NO CÓDIGO ABAIXO, E O MOTIVO DE CADA UM
+--
+-- 1. IDEMPOTÊNCIA. O Asaas reenvia o evento quando não recebe 2xx, e reenvia
+--    até quinze vezes. Sem guardar qual pagamento já foi aplicado, uma rede
+--    instável daria dois, três, cinco meses de assinatura por um pagamento só.
+--    Por isso `ultimo_pagamento`: o mesmo id não conta duas vezes.
+--
+-- 2. RENOVAR NÃO PODE ENCURTAR. A validade nova parte da maior data entre
+--    hoje e a que já existe. Quem paga no dia 20 com validade até o dia 30 não
+--    pode perder os dez dias que faltavam.
+--
+-- 3. QUEM É QUEM. A ligação entre a conta do Salavox e a do Asaas é o
+--    `cobranca_id` guardado aqui, e não o `externalReference` que viaja no
+--    evento. Campo que depende de o fornecedor propagar direito é campo que
+--    um dia chega vazio.
+
+alter table perfis add column if not exists assinatura_id    text;   -- sub_xxx no Asaas
+alter table perfis add column if not exists ultimo_pagamento text;   -- pay_xxx já aplicado
+
+create index if not exists perfis_cobranca on perfis (cobranca_id);
+
+-- Guarda a ligação com o Asaas assim que a assinatura é criada.
+create or replace function cobranca_guardar(p_perfil uuid, p_cobranca text, p_assinatura text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  update perfis set cobranca_id = p_cobranca, assinatura_id = p_assinatura where id = p_perfil;
+end $$;
+
+-- Aplica um pagamento confirmado. Devolve json dizendo o que aconteceu, para o
+-- servidor poder registrar sem adivinhar.
+create or replace function cobranca_aplicar(p_cobranca text, p_pagamento text, p_dias int)
+returns json language plpgsql security definer set search_path = public as $$
+declare v_id uuid; v_ate timestamptz; v_ultimo text; v_base timestamptz;
+begin
+  select id, assinante_ate, ultimo_pagamento into v_id, v_ate, v_ultimo
+    from perfis where cobranca_id = p_cobranca;
+  if v_id is null then return json_build_object('achou', false); end if;
+
+  -- o mesmo pagamento não conta duas vezes, por mais que o evento volte
+  if v_ultimo is not null and v_ultimo = p_pagamento then
+    return json_build_object('achou', true, 'repetido', true, 'assinante_ate', v_ate);
+  end if;
+
+  v_base := greatest(coalesce(v_ate, now()), now());
+  update perfis
+     set plano = 'profissional',
+         assinante_ate = v_base + (p_dias || ' days')::interval,
+         ultimo_pagamento = p_pagamento
+   where id = v_id
+   returning assinante_ate into v_ate;
+
+  return json_build_object('achou', true, 'repetido', false, 'assinante_ate', v_ate);
+end $$;
+
+-- Estorno, chargeback ou cancelamento com devolução: o acesso cai agora.
+-- Não apaga o histórico de uso — o custo daqueles resumos aconteceu.
+create or replace function cobranca_revogar(p_cobranca text)
+returns json language plpgsql security definer set search_path = public as $$
+declare v_id uuid;
+begin
+  select id into v_id from perfis where cobranca_id = p_cobranca;
+  if v_id is null then return json_build_object('achou', false); end if;
+  update perfis set plano = 'gratis', assinante_ate = null where id = v_id;
+  return json_build_object('achou', true);
+end $$;
+
+-- Lê o que o aplicativo precisa mostrar no botão: se já existe assinatura e
+-- qual é. Esta, sim, é chamada pelo navegador de quem está logado, e só devolve
+-- dados da própria conta.
+create or replace function minha_cobranca()
+returns json language plpgsql security definer set search_path = public as $$
+declare r json;
+begin
+  select json_build_object(
+    'assinatura', assinatura_id,
+    'plano', plano,
+    'assinante_ate', assinante_ate
+  ) into r from perfis where id = auth.uid();
+  return coalesce(r, json_build_object('assinatura', null));
+end $$;
+
+-- ------------------------------------------------------------- fechadura
+revoke execute on function cobranca_guardar(uuid, text, text) from public, anon, authenticated;
+revoke execute on function cobranca_aplicar(text, text, int)  from public, anon, authenticated;
+revoke execute on function cobranca_revogar(text)             from public, anon, authenticated;
+
+grant execute on function cobranca_guardar(uuid, text, text)  to service_role;
+grant execute on function cobranca_aplicar(text, text, int)   to service_role;
+grant execute on function cobranca_revogar(text)              to service_role;
+grant execute on function minha_cobranca()                    to authenticated;

@@ -17,6 +17,7 @@ ilimitados e sem cadastro.
 2. Rode `migrations/001-contas.sql.txt` no editor SQL, de uma vez.
    Depois `migrations/002-degustacao.sql.txt` — é ele que libera os **3 resumos de cortesia** por conta.
    Depois `migrations/003-painel.sql.txt` — contagem de tokens e as funções do painel.
+   Depois `migrations/004-cobranca.sql.txt` — a ligação com o Asaas e a validade da assinatura.
    **Se o 001 já foi aplicado, rode só os que faltam:** nenhum dos dois cria ou apaga tabela; o 002 troca
    a função `consumir_ia`, e o 003 acrescenta duas colunas de contador e as funções de leitura.
 3. Em Authentication → URL Configuration, aponte o **Site URL** para `https://salavox.com/app` — é para lá
@@ -36,6 +37,9 @@ ser verdade.
 | `RESEND_API_KEY` | resend.com, para o envio de e-mail |
 | `REMETENTE` | ex.: `ata@salavox.com`, com o domínio verificado no Resend |
 | `ADMIN_EMAILS` | os e-mails que abrem `/painel`, separados por vírgula — **sem ela o painel não abre para ninguém** |
+| `ASAAS_API_KEY` | Asaas → Integrações → API. `$aact_hmlg_…` no sandbox, `$aact_prod_…` em produção |
+| `ASAAS_URL` | `https://api.asaas.com/v3` (sandbox: `https://api-sandbox.asaas.com/v3`) |
+| `ASAAS_WEBHOOK_TOKEN` | um segredo que **você inventa** e repete na tela de webhooks do Asaas |
 
 ## 3. `public/config.json` — **já vai preenchido**
 
@@ -121,11 +125,34 @@ não rouba os dias que faltavam; e zera a cota do mês, para quando o erro foi n
 A única suposição da tela é a cotação do dólar, que fica num campo no rodapé e é dita como suposição. O
 resto é medição.
 
-## 4. Cobrança
+## 4. Cobrança — Asaas
 
-Ainda não está ligada. O que existe é o campo `assinante_ate` no perfil: quem tem data no futuro é
-assinante. O meio de pagamento (Stripe, Asaas, Mercado Pago) precisa, ao confirmar o pagamento, escrever
-essa data — por webhook, com a service role key. Enquanto isso não existe, dá para liberar alguém à mão:
+**No Asaas**, além de pegar a chave da API:
+
+1. Vá em **Integrações → Webhooks** e crie um com a URL `https://salavox.com/api/asaas`, versão da API
+   **v3**, e um **token de autenticação** que você inventa — o mesmo valor vai em `ASAAS_WEBHOOK_TOKEN`.
+2. Marque os eventos de **cobrança** (payment). Os que importam são `PAYMENT_CONFIRMED`,
+   `PAYMENT_RECEIVED`, `PAYMENT_REFUNDED` e os de chargeback; os outros chegam e são ignorados.
+3. Comece pelo **sandbox** (`api-sandbox.asaas.com`), com um webhook apontando para a publicação de teste.
+   Só depois troque as duas variáveis para produção.
+
+**Como o dinheiro vira acesso, em uma frase:** o navegador cria a cobrança e abre a tela de pagamento; o
+webhook, e só ele, escreve a data de validade quando o Asaas confirma.
+
+Três decisões que estão no código e vale conhecer:
+
+- **Libera no `PAYMENT_CONFIRMED`, não no `PAYMENT_RECEIVED`.** A documentação do Asaas recomenda o
+  segundo, e recomenda bem — para a pergunta "já posso contar com esse dinheiro". A pergunta aqui é
+  "esta pessoa pagou?". No cartão a liquidação leva semanas: esperar por ela seria alguém pagar hoje e
+  usar o produto no mês que vem. O risco é coberto do outro lado — estorno e chargeback **cortam o
+  acesso na hora**.
+- **O mesmo pagamento não conta duas vezes.** O Asaas reenvia o evento quando não recebe 2xx, até quinze
+  vezes. O id do pagamento fica guardado no perfil e o repetido é ignorado; sem isso, uma rede instável
+  daria cinco meses por um pagamento.
+- **Erro nosso responde 2xx assim mesmo.** Quinze falhas seguidas interrompem a fila do Asaas inteira,
+  inclusive os eventos de quem pagou certo. O erro vai para o log da função, não para o código HTTP.
+
+Liberar à mão continua existindo — é o que resolve atendimento — pelo botão do painel ou por SQL:
 
 ```sql
 update perfis set plano = 'profissional', assinante_ate = now() + interval '30 days'
@@ -153,8 +180,11 @@ chamada leva o token de quem pediu e o corpo é o texto da ata; a página não f
 e o navegador guarda **apenas** a sessão — nenhum pedaço da reunião.
 
 **Não verificado**, porque depende de credencial real: a chamada à Anthropic, o envio pelo Resend, as
-migrations rodando no Supabase de verdade (inclusive a `cortesia_restante`, cuja resposta o teste simula)
-e o fluxo do link de e-mail ponta a ponta. As funções em `api/`
+migrations rodando no Supabase de verdade (inclusive a `cortesia_restante`, cuja resposta o teste simula),
+o fluxo do link de e-mail ponta a ponta e **todo o caminho do Asaas** — criar cliente, criar assinatura e
+receber o webhook. A lógica das funções está verificada contra um Asaas de mentira que responde nos
+formatos que a documentação descreve; os formatos de verdade só se confirmam no sandbox. **Rode uma
+assinatura de ponta a ponta no sandbox antes de apontar para produção.** As funções em `api/`
 estão escritas e revisadas, mas nunca executaram contra os serviços reais. Rode uma vez com uma conta de
 teste antes de anunciar.
 

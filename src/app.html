@@ -220,8 +220,24 @@
       <button id="contaEntrar" class="hide">Entrar sem senha</button>
       <button id="contaSair" class="ghost sm hide">Sair</button>
       <button id="diagnostico" class="ghost sm hide">Diagnóstico</button>
+      <button id="assinar" class="hide">Assinar por R$ 19,90/mês</button>
+      <button id="cancelar" class="ghost sm hide">Cancelar assinatura</button>
       <span class="status" id="contaMsg"></span>
     </div>
+
+    <div class="hide" id="dadosCobranca" style="margin-top:12px">
+      <div class="row">
+        <input type="text" id="cobNome" placeholder="Nome ou razão social" maxlength="80" style="min-width:230px">
+        <input type="text" id="cobDoc" placeholder="CPF ou CNPJ" maxlength="18" autocomplete="off" style="min-width:170px">
+        <input type="text" id="cobFone" placeholder="Celular (opcional)" maxlength="16" autocomplete="off" style="min-width:150px">
+        <button id="cobConfirmar">Gerar a cobrança</button>
+        <button class="ghost sm" id="cobCancelar">Deixa pra lá</button>
+      </div>
+      <p class="note">O meio de pagamento exige nome e CPF/CNPJ para emitir a cobrança — e você vai
+      precisar deles na nota. Esses dados vão para o <b>Asaas</b>, que processa o pagamento; do nosso lado
+      fica só o identificador que ele devolve. Você escolhe <b>Pix, boleto ou cartão</b> na tela dele.</p>
+    </div>
+
     <p class="note">A conta guarda o seu e-mail, o plano e quantos resumos você usou no mês.
     <b>Nunca</b> guarda áudio, vídeo, transcrição ou ata — nada disso chega ao nosso servidor.</p>
   </div>
@@ -301,8 +317,9 @@
     <div class="row">
       <button id="trans" disabled>Gerar a transcrição</button>
       <select id="modelo">
-        <option value="onnx-community/whisper-base">Modelo rápido</option>
-        <option value="onnx-community/whisper-small" selected>Modelo preciso</option>
+        <option value="onnx-community/whisper-base">Rápido — leve, erra mais nomes</option>
+        <option value="onnx-community/whisper-small" selected>Preciso — o equilíbrio</option>
+        <option value="onnx-community/whisper-large-v3-turbo">Turbo — o melhor texto (baixa bem mais)</option>
       </select>
       <select id="idioma">
         <option value="pt" selected>Português</option>
@@ -315,6 +332,9 @@
         <option value="translate">Ata em inglês</option>
       </select>
     </div>
+    <div class="row" style="margin-top:2px">
+      <label class="chk"><input type="checkbox" id="compactar" checked> compactar o silêncio antes de transcrever</label>
+    </div>
     <details class="vocab">
       <summary>Vocabulário do escritório</summary>
       <p class="status" style="margin:8px 0">Nomes de clientes, siglas e termos que a transcrição costuma
@@ -324,6 +344,12 @@
     <div class="bar hide" id="barWrap"><i id="bar"></i></div>
     <div class="status" id="trMsg"></div>
     <div class="status" id="modeloMsg" style="margin-top:6px"></div>
+    <p class="note" id="modeloAviso"></p>
+    <p class="note"><b>Compactar o silêncio</b> costura a fala de cada lado, tirando os vãos, e manda ao
+    modelo conversa em vez de espera. O Whisper processa sempre trinta segundos, com ou sem fala dentro —
+    então numa reunião normal isso corta o tempo pela metade ou mais. O corte só acontece em silêncio de
+    pelo menos 0,4 s, com folga em volta das palavras, e os instantes voltam para o minuto certo da
+    reunião. Se algum trecho sair no lugar errado, desmarque e refaça: a ata sai igual, só demora mais.</p>
     <p class="note hide" id="fique">Mantenha esta aba aberta e visível. A transcrição roda no seu navegador
     e fica muito mais lenta se a aba for para segundo plano.</p>
   </div>

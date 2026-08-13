@@ -540,23 +540,22 @@ registerProcessor('toca', Toca);`;
     vivo.ligado = $('aoVivo').checked;
     if (vivo.ligado) {
       mostrarVivo();
-      /* Com folga de propósito, e a folga tem motivo medido.
+      /* Quando preparar o modelo: nem no primeiro segundo, nem por relógio.
 
-         Preparar o modelo começa com duas idas à rede — procurar o espelho
-         local e achar o runtime — e elas caíam no primeiro segundo da
-         gravação, que é o momento mais sensível que existe aqui: o navegador
-         ainda está montando a captura, a janela compartilhada ainda não pintou
-         e o gravador acabou de começar. Numa medição, essa disputa moveu a
-         detecção da primeira tela e sujou a ata com um quadro do começo.
+         Preparar começa com duas idas à rede — procurar o espelho local e
+         achar o runtime. Enquanto isso acontecia no primeiro segundo da
+         gravação, atrapalhava o momento mais sensível que existe aqui: o
+         navegador ainda montando a captura, a janela compartilhada ainda sem
+         pintar. Uma medição pegou isso deslocando a detecção da primeira tela.
 
-         A primeira janela só fecha aos trinta segundos. Esperar cinco não
-         atrasa nada e devolve o começo da gravação a quem ele pertence. */
-      setTimeout(() => {
-        if (!vivo.ligado || !gravador || gravador.state === 'inactive') return;
-        prepararModelo($('modelo').value, () => {})
-          .then(() => { vivo.ativo = true; mostrarVivo(); passoAoVivo(); })
-          .catch(e => { vivo.erro = (e && e.message) || String(e); mostrarVivo(); });
-      }, 5000);
+         Um atraso fixo resolveu pela metade e criou outro desperdício: em
+         gravação curta o modelo era carregado para nada, porque a primeira
+         janela só fecha aos trinta segundos e a gravação acabava antes.
+
+         Agora a preparação é disparada pelo próprio áudio, quando já há quinze
+         segundos gravados. Sobra meia janela de folga para o modelo ficar
+         pronto, e gravação que nunca chega lá não paga por nada. */
+      vivo.preparando = false;
     }
 
     gravador.start(10000);          // um arquivo a cada dez segundos
@@ -803,6 +802,29 @@ registerProcessor('toca', Toca);`;
     } catch (e) { return null; }
   }
 
+  /* Tamanho aproximado de cada modelo, para quem escolhe saber o que está
+     pedindo antes de pedir. Não são números do fornecedor: são ordens de
+     grandeza da família Whisper nas quantizações que usamos, e estão escritos
+     como aproximação porque é o que são. O turbo é o único que muda de patamar,
+     e é justamente o que alguém escolheria sem perceber. */
+  const TAMANHOS = {
+    'onnx-community/whisper-base': '~50 MB',
+    'onnx-community/whisper-small': '~200 MB',
+    'onnx-community/whisper-large-v3-turbo': '~700 MB'
+  };
+
+  function avisarModeloEscolhido() {
+    const m = $('modelo').value;
+    if (!/turbo/.test(m)) { $('modeloAviso').textContent = ''; return; }
+    $('modeloAviso').innerHTML =
+      `<b>Turbo:</b> o texto sai bem melhor — decodificador curto, qualidade perto do maior Whisper que ` +
+      `existe. Em troca, são <b>${TAMANHOS[m]}</b> na primeira vez (depois fica guardado), e ele pede uma ` +
+      `placa de vídeo com folga. Em máquina modesta pode cair para o processador e ficar mais lento que o ` +
+      `modelo preciso — a linha de desempenho no fim da transcrição diz qual dos dois aconteceu.`;
+  }
+  $('modelo').onchange = avisarModeloEscolhido;
+  avisarModeloEscolhido();
+
   async function mostrarModeloGuardado() {
     const g = await modeloGuardado();
     $('modeloMsg').innerHTML = g
@@ -884,17 +906,19 @@ registerProcessor('toca', Toca);`;
               self.postMessage({ tipo: 'progresso', pct: v.reduce((a, b) => a + b, 0) / v.length });
             }
           };
+          let motor = 'placa de vídeo';
           try {
             pipe = await mod.pipeline('automatic-speech-recognition', m.modelo,
               { device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
                 progress_callback });
           } catch (e) {
+            motor = 'processador';
             self.postMessage({ tipo: 'aviso',
               msg: 'WebGPU indisponível — usando o processador, vai demorar mais.' });
             pipe = await mod.pipeline('automatic-speech-recognition', m.modelo,
               { dtype: 'q8', progress_callback });
           }
-          self.postMessage({ tipo: 'pronto' });
+          self.postMessage({ tipo: 'pronto', motor });
           return;
         }
         if (m.tipo === 'transcrever') {
@@ -914,6 +938,43 @@ registerProcessor('toca', Toca);`;
   const pendentes = new Map();
   let proximoPedido = 1;
 
+  /* ============================================================
+     Quanto tempo isto está levando, e em quê.
+
+     A diferença entre rodar na placa de vídeo e rodar no processador é de 5 a
+     20 vezes — maior que qualquer otimização que se possa fazer no código. Até
+     agora essa queda acontecia em silêncio, e quem estava no caminho lento não
+     tinha como saber: virava "o Salavox é lento".
+
+     O número que interessa é **quantas vezes mais rápido que o tempo real**:
+     dez minutos de reunião transcritos em dois minutos são 5×. Abaixo de 1×
+     a transcrição não acompanha nem a gravação, e é aí que trocar de modelo ou
+     de navegador deixa de ser detalhe.
+     ============================================================ */
+  let motorEmUso = null;
+  const relogioModelo = { segundosDeAudio: 0, milissegundos: 0 };
+
+  const desempenho = () => ({
+    motor: motorEmUso,
+    modelo: promessaModelo ? promessaModelo.modelo : null,
+    segundosDeAudio: relogioModelo.segundosDeAudio,
+    segundos: relogioModelo.milissegundos / 1000,
+    vezesOTempoReal: relogioModelo.milissegundos > 0
+      ? relogioModelo.segundosDeAudio / (relogioModelo.milissegundos / 1000) : null
+  });
+
+  function contarDesempenho() {
+    const d = desempenho();
+    if (!d.vezesOTempoReal || d.segundosDeAudio < 5) return '';
+    const v = d.vezesOTempoReal;
+    const quanto = n => n < 10 ? n.toFixed(1).replace('.', ',') : n.toFixed(0);
+    return `<br>Transcrito na <b>${escapar(d.motor || 'máquina local')}</b>: ` +
+      `${quanto(d.segundosDeAudio)} s de áudio em ${quanto(d.segundos)} s — ` +
+      `<b>${v >= 10 ? v.toFixed(0) : v.toFixed(1)}× o tempo real</b>` +
+      (v < 1 ? '. <span class="err">Mais lento que a própria reunião</span> — vale escolher o modelo ' +
+               'rápido, ou abrir em um navegador com aceleração por placa de vídeo.' : '.');
+  }
+
   function ligarTrabalhador() {
     if (trabalhador) return trabalhador;
     const url = URL.createObjectURL(new Blob([CODIGO_TRABALHADOR], { type: 'text/javascript' }));
@@ -922,7 +983,11 @@ registerProcessor('toca', Toca);`;
       const m = ev.data;
       if (m.tipo === 'progresso' && avisoModelo) avisoModelo(m.pct);
       else if (m.tipo === 'aviso' && avisoModelo) avisoModelo(null, m.msg);
-      else if (m.tipo === 'pronto') { const p = pendentes.get('modelo'); if (p) { pendentes.delete('modelo'); p.ok(); } }
+      else if (m.tipo === 'pronto') {
+        motorEmUso = m.motor || null;
+        const p = pendentes.get('modelo');
+        if (p) { pendentes.delete('modelo'); p.ok(); }
+      }
       else if (m.tipo === 'trecho') {
         /* A resposta devolve as opções com que foi pedida. Serve para
            correlacionar pedido e resposta quando há mais de um em voo, e é o
@@ -970,8 +1035,14 @@ registerProcessor('toca', Toca);`;
   function transcreverNoTrabalhador(dados, opts) {
     const w = ligarTrabalhador();
     const id = proximoPedido++;
+    const segundos = dados.length / SR;
+    const t0 = performance.now();
     return new Promise((ok, falhou) => {
-      pendentes.set(id, { ok, falhou });
+      pendentes.set(id, {
+        ok: m => { relogioModelo.segundosDeAudio += segundos;
+                   relogioModelo.milissegundos += performance.now() - t0; ok(m); },
+        falhou
+      });
       w.postMessage({ tipo: 'transcrever', id, dados, opts }, [dados.buffer]);
     });
   }
@@ -1141,6 +1212,108 @@ registerProcessor('toca', Toca);`;
     return ord[Math.min(ord.length - 1, Math.floor(ord.length * 0.999))];
   }
 
+  /* ============================================================
+     Compactar a fala.
+
+     O Whisper processa **sempre trinta segundos**, tenha fala dentro ou não.
+     Uma janela com quatro segundos de conversa custa igual a uma janela cheia.
+     Pular a janela quase muda já era feito; o que sobrava era o silêncio
+     ENTRE as falas, que numa reunião real é a maior parte de cada canal.
+
+     Aqui a fala de um canal é costurada: os vãos saem, os pedaços viram
+     pacotes densos de até trinta segundos, e o modelo passa a receber conversa
+     em vez de espera. Um canal que fala 30% do tempo sai de 120 passagens por
+     hora para cerca de 40.
+
+     TRÊS CUIDADOS, e cada um existe por um jeito específico de estragar a ata:
+
+     1. **Só se corta em silêncio de verdade.** Vão menor que 400 ms fica onde
+        está — é respiro dentro da frase, não pausa entre frases. E cada pedaço
+        leva 200 ms de folga dos dois lados, senão o começo das palavras é
+        comido pelo corte.
+
+     2. **A emenda é suavizada.** Colar dois trechos de amplitudes diferentes
+        cria um degrau na forma de onda, que o modelo ouve como estalo e às
+        vezes transcreve como sílaba. Dez milissegundos de rampa em cada
+        junção resolvem.
+
+     3. **O mapa de volta é a parte perigosa.** O modelo devolve instantes na
+        linha do tempo compactada, que não é a da reunião. Errar esse
+        remapeamento desloca a ata inteira sem que nada pareça errado — é o
+        defeito mais caro que este trecho pode produzir, e é o que a
+        verificação persegue com valores escritos à mão.
+     ============================================================ */
+
+  const VAO_MINIMO = 20;    // 400 ms em quadros de 20 ms: menos que isso é respiro
+  const FOLGA = 10;         // 200 ms de sobra em volta de cada pedaço de fala
+  const RAMPA = 160;        // 10 ms de subida e descida na emenda
+
+  /* Onde há fala num canal, em amostras. `elegivel` diz quais quadros podem
+     entrar — é como as janelas já transcritas ao vivo ficam de fora. */
+  function acharFala(quadros, limiar, elegivel) {
+    const vivos = [];
+    for (let i = 0; i < quadros.length; i++)
+      if (quadros[i] > limiar && (!elegivel || elegivel(i))) vivos.push(i);
+    if (!vivos.length) return [];
+
+    const grupos = [];
+    let ini = vivos[0], ant = vivos[0];
+    for (let k = 1; k < vivos.length; k++) {
+      const i = vivos[k];
+      if (i - ant > VAO_MINIMO) { grupos.push([ini, ant]); ini = i; }
+      ant = i;
+    }
+    grupos.push([ini, ant]);
+
+    /* A folga é generosa com a fala e cuidadosa com a fronteira: ela para no
+       primeiro quadro que não pode entrar. Sem isso, o pedaço puxaria áudio de
+       uma janela já transcrita ao vivo e a mesma fala apareceria duas vezes. */
+    const podeEntrar = i => i >= 0 && i < quadros.length && (!elegivel || elegivel(i));
+    return grupos
+      .map(([a, b]) => {
+        let ini = a, fim = b + 1;
+        for (let k = 0; k < FOLGA && podeEntrar(ini - 1); k++) ini--;
+        for (let k = 0; k < FOLGA && podeEntrar(fim); k++) fim++;
+        return [ini, fim];
+      })
+      .filter(([a, b]) => (b - a) >= 10)                    // menos de 200 ms não é fala
+      .map(([a, b]) => ({ de: a * QUADRO, ate: b * QUADRO }));
+  }
+
+  /* Junta os pedaços em pacotes de até trinta segundos. Pedaço maior que isso
+     é fatiado — fala corrida de meio minuto existe. */
+  function empacotar(pedacos, maximo) {
+    const pacotes = [];
+    let atual = [], soma = 0;
+    for (const p of pedacos) {
+      let { de, ate } = p;
+      while (ate - de > maximo) {
+        if (soma) { pacotes.push(atual); atual = []; soma = 0; }
+        pacotes.push([{ de, ate: de + maximo }]);
+        de += maximo;
+      }
+      if (soma + (ate - de) > maximo) { pacotes.push(atual); atual = []; soma = 0; }
+      atual.push({ de, ate });
+      soma += ate - de;
+    }
+    if (atual.length) pacotes.push(atual);
+    return pacotes;
+  }
+
+  /* O instante que o modelo devolveu, dentro do pacote, virando instante da
+     reunião. Percorre os pedaços acumulando duração até achar em qual deles a
+     marca caiu. */
+  function instanteReal(pacote, dentro) {
+    let acumulado = 0;
+    for (const p of pacote) {
+      const dur = (p.ate - p.de) / SR;
+      if (dentro < acumulado + dur || p === pacote[pacote.length - 1])
+        return (p.de / SR) + Math.max(0, Math.min(dur, dentro - acumulado));
+      acumulado += dur;
+    }
+    return pacote.length ? pacote[0].de / SR : 0;
+  }
+
   /* A regra da janela, num lugar só e com nome: **tem voz suficiente para
      valer uma chamada ao modelo?** Contar quadros acima do limiar, e não olhar
      o pico, é o que separa um clique de teclado (dois quadros) de uma frase
@@ -1211,7 +1384,7 @@ registerProcessor('toca', Toca);`;
      ============================================================ */
 
   const vivo = {
-    ligado: false, ativo: false, erro: null,
+    ligado: false, ativo: false, erro: null, preparando: false,
     quadros: { voce: [], outros: [] },   // rms por quadro, acumulado enquanto grava
     porJanela: [],                       // os mesmos quadros, janela a janela
     falas: new Map(),                    // indice da janela -> { quem: [falas] }
@@ -1223,13 +1396,24 @@ registerProcessor('toca', Toca);`;
     vivo.ativo = false; vivo.erro = null;
     vivo.quadros = { voce: [], outros: [] };
     vivo.porJanela = []; vivo.falas = new Map(); vivo.feitas = new Set();
-    vivo.proxima = 0; vivo.ocupado = false;
+    vivo.proxima = 0; vivo.ocupado = false; vivo.preparando = false;
   }
 
   /* Chamado a cada pedaço de áudio escrito. Faz no máximo uma janela por vez:
      enfileirar transcrições atrasaria o encerramento sem adiantar nada. */
   async function passoAoVivo() {
-    if (!vivo.ativo || vivo.ocupado || vivo.erro) return;
+    if (!vivo.ligado || vivo.erro) return;
+    const segundosGravados = depPcm.bytes / BYTES_POR_AMOSTRA / SR;
+
+    if (!vivo.ativo) {
+      if (vivo.preparando || segundosGravados < 15) return;
+      vivo.preparando = true;
+      prepararModelo($('modelo').value, () => {})
+        .then(() => { vivo.ativo = true; mostrarVivo(); passoAoVivo(); })
+        .catch(e => { vivo.erro = (e && e.message) || String(e); mostrarVivo(); });
+      return;
+    }
+    if (vivo.ocupado) return;
     const prontas = Math.floor(depPcm.bytes / BYTES_POR_AMOSTRA / JANELA);
     if (prontas <= vivo.proxima) return;
     vivo.ocupado = true;
@@ -1265,6 +1449,7 @@ registerProcessor('toca', Toca);`;
 
   function mostrarVivo() {
     if (!vivo.ligado) { $('vivoMsg').textContent = ''; return; }
+    const onde = motorEmUso ? ` — na <b>${escapar(motorEmUso)}</b>` : '';
     if (vivo.erro) {
       $('vivoMsg').innerHTML = `<span class="err">A transcrição ao vivo parou: ${escapar(vivo.erro)}</span>` +
         ' — a gravação segue normal e a ata será feita inteira no fim.';
@@ -1273,9 +1458,9 @@ registerProcessor('toca', Toca);`;
     if (!vivo.ativo) { $('vivoMsg').textContent = 'Preparando o modelo para transcrever durante a reunião…'; return; }
     const min = Math.round(vivo.proxima * 30 / 60 * 10) / 10;
     $('vivoMsg').innerHTML = vivo.proxima
-      ? `<span class="ok">Transcrevendo enquanto grava</span> — ${vivo.proxima} ` +
+      ? `<span class="ok">Transcrevendo enquanto grava</span>${onde} — ${vivo.proxima} ` +
         `${vivo.proxima === 1 ? 'janela pronta' : 'janelas prontas'} (${min} min de reunião já viraram texto).`
-      : 'Transcrevendo enquanto grava — a primeira janela fecha aos 30 segundos.';
+      : `Transcrevendo enquanto grava${onde} — a primeira janela fecha aos 30 segundos.`;
   }
 
   const opcoesDoModelo = () => {
@@ -1341,6 +1526,7 @@ registerProcessor('toca', Toca);`;
     // uma transcrição nova roda faz parecer que já acabou
     aviso('Etapa 1 de 2 — preparando o modelo…');
     $('bar').style.width = '2%';
+    relogioModelo.segundosDeAudio = 0; relogioModelo.milissegundos = 0;
     try {
       if (!blobPcm || !blobPcm.size) {
         aviso('Preparando o áudio…');
@@ -1400,60 +1586,94 @@ registerProcessor('toca', Toca);`;
         return;
       }
 
-      const totalBlocos = nJanelas * ativos.length;
       const inicio = performance.now();
-      let feitos = 0, adiantados = 0, descartados = 0;
+      let adiantados = 0, descartados = 0, pacotesFeitos = 0;
       const guardadas = new Map();
       falas = [];
 
+      /* ---- primeiro, o que já foi adiantado durante a gravação ----
+
+         O que foi transcrito ao vivo só continua valendo se passar pela medição
+         completa: o limiar de lá era uma estimativa feita com parte da reunião.
+         O que não passa é descartado — é por isso que a ata final não depende
+         de a estimativa do meio da reunião ter acertado. */
+      const jaFeito = new Set();
       for (let i = 0; i < porJanela.length; i++) {
-        const ini = i * JANELA, fim = Math.min(ini + JANELA, totalAmostras);
-        // A última janela costuma ser um resto de fração de segundo. Mandar isso
-        // ao modelo produz texto inventado, com instante além do fim da reunião:
-        // um teste com 60,05 s gerou fala datada em 01:09. Resto curto não entra.
-        if (fim - ini < SR) break;
-        const q = fim - ini;
-
-        /* Quais canais desta janela têm voz. Só se lê o áudio do disco se
-           algum tiver — em reunião com um lado calado isso corta metade do
-           trabalho, e é o mesmo cálculo que impede a invenção. */
-        const comVoz = ativos.filter(([quem]) => janelaTemVoz(porJanela[i][quem], limiar[quem]));
-        feitos += ativos.length - comVoz.length;
-
-        /* Reconciliação com o que foi adiantado durante a gravação.
-
-           O que já foi transcrito ao vivo só continua valendo se passar pela
-           medição completa: o limiar de lá era uma estimativa feita com parte
-           da reunião. O que não passa é descartado, e é por isso que a ata
-           final não depende de a estimativa ter acertado. */
-        const faltando = [];
-        for (const par of comVoz) {
-          const quem = par[0];
-          if (vivo.feitas.has(i + ':' + quem)) {
+        for (const [quem] of ativos) {
+          if (!vivo.feitas.has(i + ':' + quem)) continue;
+          if (janelaTemVoz(porJanela[i][quem], limiar[quem])) {
             if (!guardadas.has(i)) guardadas.set(i, {});
             guardadas.get(i)[quem] = (vivo.falas.get(i) || {})[quem] || [];
-            adiantados++; feitos++;
-          } else faltando.push(par);
+            jaFeito.add(i + ':' + quem);
+            adiantados++;
+          } else descartados++;
         }
-        for (const [quem] of ativos)
-          if (vivo.feitas.has(i + ':' + quem) && !comVoz.some(par => par[0] === quem)) descartados++;
+      }
 
-        let bruto = null;
-        if (faltando.length) bruto = await lerJanela(ini, fim);
+      /* ---- o resto vai compactado ----
 
-        for (const [quem, desl] of faltando) {
-          const r = await transcreverNoTrabalhador(separar(bruto, q, desl), opcoesDoModelo());
-          guardarTrechos(guardadas, i, quem, ini, q, r);
-          feitos++;
+         Cada canal vira uma lista de pedaços de fala, os pedaços viram pacotes
+         densos de até trinta segundos, e é o pacote que vai ao modelo. Quadro
+         que pertence a janela já transcrita ao vivo não entra. */
+      const compactar = $('compactar').checked;
+      const trabalho = [];
+      for (const [quem, desl] of ativos) {
+        const porQuadro = Math.floor(JANELA / QUADRO);
+        const elegivel = q => !jaFeito.has(Math.floor(q / porQuadro) + ':' + quem);
+        const pedacos = compactar
+          ? acharFala(quadros[quem], limiar[quem], elegivel)
+          : porJanela.map((_, i) => i).filter(i => !jaFeito.has(i + ':' + quem) &&
+              janelaTemVoz(porJanela[i][quem], limiar[quem]))
+              .map(i => ({ de: i * JANELA, ate: Math.min((i + 1) * JANELA, totalAmostras) }));
+        for (const pacote of empacotar(pedacos, JANELA)) trabalho.push({ quem, desl, pacote });
+      }
+
+      const totalBlocos = trabalho.length + adiantados;
+      for (const { quem, desl, pacote } of trabalho) {
+        /* Resto de fração de segundo não entra. Mandar isso ao modelo produz
+           texto inventado com instante além do fim da reunião — foi assim que
+           uma gravação de 60 s gerou fala datada em 01:09, e a regra vale para
+           o pacote compactado exatamente como valia para a janela. */
+        if (pacote.reduce((t, p) => t + (p.ate - p.de), 0) < SR) continue;
+        /* Monta o pacote lendo só os pedaços que interessam, com uma rampa de
+           10 ms em cada emenda para o modelo não ouvir o corte como estalo. */
+        const total = pacote.reduce((t, p) => t + (p.ate - p.de), 0);
+        const dados = new Float32Array(total);
+        let onde = 0;
+        for (const p of pacote) {
+          const bruto = await lerJanela(p.de, p.ate);
+          const n = p.ate - p.de;
+          for (let k = 0; k < n; k++) {
+            let v = bruto[k * 2 + desl] / 32768;
+            if (k < RAMPA) v *= k / RAMPA;
+            else if (k > n - RAMPA) v *= Math.max(0, (n - k) / RAMPA);
+            dados[onde + k] = v;
+          }
+          onde += n;
         }
 
-        const pct = feitos / totalBlocos * 100;
+        const r = await transcreverNoTrabalhador(dados, opcoesDoModelo());
+        const trechos = (r && r.chunks && r.chunks.length) ? r.chunks
+          : [{ timestamp: [0, total / SR], text: (r && r.texto) || '' }];
+        const lista = [];
+        trechos.forEach(c => {
+          const txt = (c.text || '').trim();
+          const dentro = Math.max(0, Math.min((c.timestamp && c.timestamp[0]) || 0, total / SR));
+          if (txt) lista.push({ quem,
+            a: Math.min(instanteReal(pacote, dentro), totalAmostras / SR), texto: txt });
+        });
+        const chave = 'p' + (pacotesFeitos++);
+        if (!guardadas.has(chave)) guardadas.set(chave, {});
+        guardadas.get(chave)[quem] = lista;
+
+        const feitos = adiantados + pacotesFeitos;
+        const pct = feitos / Math.max(1, totalBlocos) * 100;
         $('bar').style.width = (20 + pct * 0.8).toFixed(1) + '%';
-        const resta = (performance.now() - inicio) / Math.max(1, feitos) * (totalBlocos - feitos) / 1000;
-        const falta = feitos >= 2 && resta > 5
+        const resta = (performance.now() - inicio) / Math.max(1, pacotesFeitos) *
+                      (trabalho.length - pacotesFeitos) / 1000;
+        const falta = pacotesFeitos >= 2 && resta > 5
           ? ` — faltam ~${resta < 90 ? Math.ceil(resta) + 's' : Math.ceil(resta / 60) + ' min'}` : '';
-        aviso(`Etapa 2 de 2 — transcrevendo ${fmt(ini / SR)} de ${fmt(totalAmostras / SR)}: ` +
-              `${pct.toFixed(0)}%${falta}`);
+        aviso(`Etapa 2 de 2 — transcrevendo: ${pct.toFixed(0)}%${falta}`);
       }
 
       for (const [, porCanal] of guardadas)
@@ -1478,7 +1698,8 @@ registerProcessor('toca', Toca);`;
             (mudos.length ? `<br><span class="err">O canal ${mudos.map(nome).join(' e o ')} ficou em ` +
               'silêncio e não foi transcrito</span> — sem isso o modelo inventaria texto.' : '') +
             (laco.tirados ? `<br>${laco.tirados} ${laco.tirados === 1 ? 'trecho repetido foi descartado' :
-              'trechos repetidos foram descartados'}: o modelo entrou em laço sobre ruído.` : '') + adianto);
+              'trechos repetidos foram descartados'}: o modelo entrou em laço sobre ruído.` : '') +
+            adianto + contarDesempenho());
     } catch (e) {
       aviso(`<span class="err">Não consegui transcrever: ${(e && e.message) || e}</span>`);
     } finally {
@@ -2318,6 +2539,7 @@ registerProcessor('toca', Toca);`;
       perfil = Array.isArray(d) ? d[0] : null;
     } catch (e) { perfil = null; }
     await lerCortesia();
+    await lerCobranca();
     desenharConta();
   }
 
@@ -2330,6 +2552,9 @@ registerProcessor('toca', Toca);`;
       $('contaEntrar').classList.remove('hide');
       $('contaSair').classList.add('hide');
       $('enviarEmail').classList.add('hide');
+      $('assinar').classList.add('hide');
+      $('cancelar').classList.add('hide');
+      $('dadosCobranca').classList.add('hide');
       return;
     }
     const pago = temPlano();
@@ -2340,7 +2565,111 @@ registerProcessor('toca', Toca);`;
     $('contaEntrar').classList.add('hide');
     $('contaSair').classList.remove('hide');
     $('enviarEmail').classList.toggle('hide', !pago);
+    /* O botão de assinar aparece para quem não tem plano ativo — inclusive para
+       quem já teve e deixou vencer, que é justamente quem se quer de volta. O de
+       cancelar só existe se houver assinatura viva no meio de pagamento. */
+    const pedindoDados = !$('dadosCobranca').classList.contains('hide');
+    $('assinar').classList.toggle('hide', pago || pedindoDados);
+    $('cancelar').classList.toggle('hide', !(cobranca && cobranca.assinatura));
   }
+
+  /* ============================================================
+     Assinar, cancelar e o que o navegador NÃO decide.
+
+     Nada aqui libera plano nenhum. O botão cria a cobrança e abre a tela de
+     pagamento; quem escreve a data de validade é o webhook do Asaas, do lado
+     do servidor, quando o pagamento é confirmado. Se esta parte do código
+     pudesse liberar acesso, bastaria abrir o inspetor para assinar de graça.
+     ============================================================ */
+
+  let cobranca = null;
+
+  async function lerCobranca() {
+    cobranca = null;
+    if (!cfg || !sessao) return;
+    try {
+      const r = await fetch(cfg.supabaseUrl + '/rest/v1/rpc/minha_cobranca', {
+        method: 'POST',
+        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + sessao.access_token,
+                   'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      if (r.ok) cobranca = await r.json();
+    } catch (e) {}
+  }
+
+  $('assinar').onclick = () => {
+    $('dadosCobranca').classList.remove('hide');
+    $('assinar').classList.add('hide');
+    $('cobNome').focus();
+  };
+
+  $('cobCancelar').onclick = () => {
+    $('dadosCobranca').classList.add('hide');
+    $('contaMsg').textContent = '';
+    desenharConta();
+  };
+
+  $('cobConfirmar').onclick = async () => {
+    const nome = ($('cobNome').value || '').trim();
+    const documento = ($('cobDoc').value || '').trim();
+    if (nome.length < 3) { $('contaMsg').innerHTML = '<span class="err">informe o nome</span>'; return; }
+    if (documento.replace(/\D/g, '').length !== 11 && documento.replace(/\D/g, '').length !== 14) {
+      $('contaMsg').innerHTML = '<span class="err">CPF tem 11 dígitos e CNPJ tem 14</span>';
+      return;
+    }
+    $('cobConfirmar').disabled = true;
+    $('contaMsg').textContent = 'Criando a cobrança…';
+    try {
+      const r = await fetch('/api/assinar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
+        body: JSON.stringify({ acao: 'assinar', nome, documento, telefone: ($('cobFone').value || '').trim() })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.erro || ('o servidor respondeu ' + r.status));
+      $('dadosCobranca').classList.add('hide');
+      await lerCobranca();
+      if (d.pagar) {
+        /* Abre em outra aba de propósito: esta aqui pode ter uma gravação em
+           andamento, e trocar de página no meio da reunião perderia o que
+           ainda não foi escrito no disco. */
+        window.open(d.pagar, '_blank', 'noopener');
+        $('contaMsg').innerHTML = '<span class="ok">Cobrança criada</span> — a tela de pagamento abriu em ' +
+          'outra aba. O plano é liberado assim que o pagamento for confirmado.';
+      } else {
+        $('contaMsg').innerHTML = `<span class="ok">Cobrança criada</span> — ${escapar(d.aviso || '')}`;
+      }
+      desenharConta();
+    } catch (e) {
+      $('contaMsg').innerHTML = `<span class="err">${escapar((e && e.message) || e)}</span>`;
+    } finally {
+      $('cobConfirmar').disabled = false;
+    }
+  };
+
+  $('cancelar').onclick = async () => {
+    if (!confirm('Cancelar a assinatura? O plano continua valendo até o fim do período já pago.')) return;
+    $('cancelar').disabled = true;
+    $('contaMsg').textContent = 'Cancelando…';
+    try {
+      const r = await fetch('/api/assinar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
+        body: JSON.stringify({ acao: 'cancelar' })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.erro || ('o servidor respondeu ' + r.status));
+      await lerCobranca();
+      $('contaMsg').innerHTML = '<span class="ok">Assinatura cancelada</span> — não haverá nova cobrança, ' +
+        'e o plano segue valendo até o fim do período já pago.';
+      desenharConta();
+    } catch (e) {
+      $('contaMsg').innerHTML = `<span class="err">${escapar((e && e.message) || e)}</span>`;
+    } finally {
+      $('cancelar').disabled = false;
+    }
+  };
 
   $('contaEntrar').onclick = async () => {
     const email = ($('contaEmail').value || '').trim();
@@ -2520,7 +2849,8 @@ registerProcessor('toca', Toca);`;
     consentimento: () => consentimento, aplicarVocabulario, corrigirComVocabulario,
     resumos: () => resumos, montarPrompt, perfil: () => perfil, temPlano, cfg: () => cfg,
     tirarLacos, nivelAlto, janelaTemVoz, limiarDoCanal, canalMudo, rmsPorQuadro,
-    podeSalvarEmFluxo, pedidosAoModelo: () => proximoPedido - 1, vivo: () => ({ ligado: vivo.ligado, ativo: vivo.ativo, erro: vivo.erro,
+    acharFala, empacotar, instanteReal,
+    podeSalvarEmFluxo, cobranca: () => cobranca, desempenho, pedidosAoModelo: () => proximoPedido - 1, vivo: () => ({ ligado: vivo.ligado, ativo: vivo.ativo, erro: vivo.erro,
                                       janelas: vivo.proxima, feitas: [...vivo.feitas] }),
     QUADRO, PISO_VOZ, QUADROS_MIN,
     micLigado: () => !!(micFluxoAtual && micFluxoAtual.getAudioTracks()[0] &&

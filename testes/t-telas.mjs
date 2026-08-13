@@ -21,6 +21,13 @@ export default async function (ctx, url, erros) {
 
   b.verdade('o cartão de telas aparece quando se grava a tela', !(await p.isHidden('#telasCard')));
 
+  /* Este bloco mede as telas: onde elas caem e como se intercalam com as falas.
+     A compactação de silêncio reescreve a linha do tempo das falas de propósito
+     — passa a datá-las onde a voz está, e não no início da janela de 30 s —, o
+     que muda a intercalação sem que nada esteja errado. Aqui ela fica
+     desligada, e quem a mede é `t-compactacao.mjs`. Um teste, uma afirmação. */
+  await p.uncheck('#compactar');
+
   await transcrever(p);
   b.verdade('a ata sai com trechos', /Ata pronta/.test(await p.textContent('#trMsg')));
 

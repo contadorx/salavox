@@ -228,6 +228,136 @@ export default async function (ctx, url, erros) {
   b.conferir('sem sessão o resumo é recusado antes de qualquer chamada',
              { codigo: res.codigo, chamadas: espiao.chamadas.length }, { codigo: 401, chamadas: 0 });
 
+  /* ---------- 9. assinar: o que sai daqui, e o que não sai ---------- */
+  const assinar = (await import('../api/assinar.js')).default;
+  const webhook = (await import('../api/asaas.js')).default;
+  const ASAAS = 'https://api-de-teste.asaas.com/v3';
+
+  const ambienteCobranca = () => {
+    ambiente();
+    process.env.ASAAS_API_KEY = 'chave-do-asaas';
+    process.env.ASAAS_URL = ASAAS;
+    process.env.ASAAS_WEBHOOK_TOKEN = 'segredo-do-webhook';
+  };
+
+  const perfilSemCobranca = ok([{ id: 'u7', email: 'contador@escritorio.com.br',
+                                  plano: 'gratis', assinante_ate: null,
+                                  cobranca_id: null, assinatura_id: null }]);
+
+  /* Documento inválido para antes de sair daqui: o Asaas recusaria com uma
+     mensagem em inglês, e uma viagem à rede para dizer "CPF errado" é uma
+     viagem desperdiçada. */
+  ambienteCobranca();
+  espiao = espionarFetch([
+    [SUPA + '/auth/v1/user', ok({ id: 'u7', email: 'contador@escritorio.com.br' })],
+    [SUPA + '/rest/v1/perfis', perfilSemCobranca]
+  ]);
+  res = respostaFalsa();
+  await assinar({ method: 'POST', headers: { authorization: 'Bearer t' },
+                  body: { nome: 'Escritório Teste', documento: '111.111.111-11' } }, res);
+  espiao.restaurar();
+  b.conferir('CPF inválido é recusado aqui mesmo', res.codigo, 400);
+  b.conferir('e o meio de pagamento não é incomodado',
+             espiao.chamadas.filter(c => c.url.indexOf('asaas') >= 0).length, 0);
+
+  /* Caminho feliz: cria o cliente, cria a assinatura, guarda a ligação e
+     devolve o endereço de pagamento — sem tocar em plano nenhum. */
+  ambienteCobranca();
+  espiao = espionarFetch([
+    [SUPA + '/auth/v1/user', ok({ id: 'u7', email: 'contador@escritorio.com.br' })],
+    [SUPA + '/rest/v1/perfis', perfilSemCobranca],
+    [ASAAS + '/customers', ok({ id: 'cus_123' })],
+    [ASAAS + '/subscriptions/sub_9/payments', ok({ data: [{ invoiceUrl: 'https://asaas/pagar/1' }] })],
+    [ASAAS + '/subscriptions', ok({ id: 'sub_9' })],
+    ['/rpc/cobranca_guardar', ok(null)]
+  ]);
+  res = respostaFalsa();
+  await assinar({ method: 'POST', headers: { authorization: 'Bearer t' },
+                  body: { nome: 'Escritório Teste', documento: '390.533.447-05' } }, res);
+  espiao.restaurar();
+  b.conferir('a assinatura é criada e o endereço de pagamento volta',
+             { codigo: res.codigo, pagar: res.corpo.pagar, valor: res.corpo.valor },
+             { codigo: 200, pagar: 'https://asaas/pagar/1', valor: 19.90 });
+
+  const cli = espiao.chamadas.find(c => c.url.endsWith('/customers'));
+  b.conferir('o documento vai só com dígitos', cli.corpo.cpfCnpj, '39053344705');
+  b.verdade('a chave do Asaas vai no cabeçalho próprio dele, não em Authorization',
+            cli.cabecalhos.access_token === 'chave-do-asaas' && !cli.cabecalhos.Authorization);
+  b.verdade('e o User-Agent exigido pelo Asaas vai junto', /^Salavox\//.test(cli.cabecalhos['User-Agent'] || ''));
+
+  const ass = espiao.chamadas.find(c => c.url.endsWith('/subscriptions') && c.opcoes.method === 'POST');
+  b.conferir('a assinatura é mensal, no valor do plano, deixando o pagador escolher como pagar',
+             { value: ass.corpo.value, cycle: ass.corpo.cycle, billingType: ass.corpo.billingType },
+             { value: 19.90, cycle: 'MONTHLY', billingType: 'UNDEFINED' });
+  b.verdade('a ligação com o Asaas é guardada no perfil',
+            espiao.chamadas.some(c => c.url.indexOf('cobranca_guardar') >= 0 &&
+                                      c.corpo.p_cobranca === 'cus_123' && c.corpo.p_assinatura === 'sub_9'));
+  b.conferir('nenhum plano é liberado por esta função — quem libera é o webhook',
+             espiao.chamadas.filter(c => /cobranca_aplicar|painel_liberar/.test(c.url)).length, 0);
+
+  /* ---------- 10. webhook: a porta ---------- */
+  ambienteCobranca();
+  espiao = espionarFetch([['/rpc/cobranca_aplicar', ok({ achou: true, repetido: false })]]);
+  res = respostaFalsa();
+  await webhook({ method: 'POST', headers: {},
+                  body: { event: 'PAYMENT_CONFIRMED', payment: { id: 'pay_1', customer: 'cus_123' } } }, res);
+  espiao.restaurar();
+  b.conferir('webhook sem token é recusado', res.codigo, 401);
+  b.conferir('e nada é escrito no banco', espiao.chamadas.length, 0);
+
+  ambienteCobranca();
+  espiao = espionarFetch([['/rpc/cobranca_aplicar', ok({ achou: true, repetido: false })]]);
+  res = respostaFalsa();
+  await webhook({ method: 'POST', headers: { 'asaas-access-token': 'chute' },
+                  body: { event: 'PAYMENT_CONFIRMED', payment: { id: 'pay_1', customer: 'cus_123' } } }, res);
+  espiao.restaurar();
+  b.conferir('webhook com token errado também', res.codigo, 401);
+  b.conferir('e continua sem escrever nada', espiao.chamadas.length, 0);
+
+  /* ---------- 11. webhook: liberar, cortar e ignorar ---------- */
+  ambienteCobranca();
+  espiao = espionarFetch([['/rpc/cobranca_aplicar',
+                           ok({ achou: true, repetido: false, assinante_ate: '2026-09-12T00:00:00Z' })]]);
+  res = respostaFalsa();
+  await webhook({ method: 'POST', headers: { 'asaas-access-token': 'segredo-do-webhook' },
+                  body: { event: 'PAYMENT_CONFIRMED', payment: { id: 'pay_1', customer: 'cus_123' } } }, res);
+  espiao.restaurar();
+  b.conferir('pagamento confirmado libera o plano', { codigo: res.codigo, aplicado: res.corpo.aplicado },
+             { codigo: 200, aplicado: true });
+  const aplic = espiao.chamadas.find(c => c.url.indexOf('cobranca_aplicar') >= 0);
+  b.conferir('a conta é achada pelo cliente do Asaas, e o pagamento vai junto para não contar duas vezes',
+             { p_cobranca: aplic.corpo.p_cobranca, p_pagamento: aplic.corpo.p_pagamento, p_dias: aplic.corpo.p_dias },
+             { p_cobranca: 'cus_123', p_pagamento: 'pay_1', p_dias: 31 });
+
+  ambienteCobranca();
+  espiao = espionarFetch([['/rpc/cobranca_revogar', ok({ achou: true })]]);
+  res = respostaFalsa();
+  await webhook({ method: 'POST', headers: { 'asaas-access-token': 'segredo-do-webhook' },
+                  body: { event: 'PAYMENT_REFUNDED', payment: { id: 'pay_1', customer: 'cus_123' } } }, res);
+  espiao.restaurar();
+  b.conferir('estorno corta o acesso', { codigo: res.codigo, revogado: res.corpo.revogado },
+             { codigo: 200, revogado: true });
+
+  ambienteCobranca();
+  espiao = espionarFetch([]);
+  res = respostaFalsa();
+  await webhook({ method: 'POST', headers: { 'asaas-access-token': 'segredo-do-webhook' },
+                  body: { event: 'PAYMENT_BANK_SLIP_VIEWED', payment: { id: 'pay_1', customer: 'cus_123' } } }, res);
+  espiao.restaurar();
+  b.conferir('evento que não interessa é aceito e ignorado, sem tocar no banco',
+             { codigo: res.codigo, chamadas: espiao.chamadas.length }, { codigo: 200, chamadas: 0 });
+
+  /* Erro nosso não pode virar falha de entrega: quinze seguidas param a fila do
+     Asaas inteira, inclusive os eventos de quem pagou certo. */
+  ambienteCobranca();
+  espiao = espionarFetch([['/rpc/cobranca_aplicar', ruim(500)]]);
+  res = respostaFalsa();
+  await webhook({ method: 'POST', headers: { 'asaas-access-token': 'segredo-do-webhook' },
+                  body: { event: 'PAYMENT_CONFIRMED', payment: { id: 'pay_1', customer: 'cus_123' } } }, res);
+  espiao.restaurar();
+  b.conferir('banco fora do ar ainda responde 2xx, para não travar a fila do Asaas', res.codigo, 200);
+
   limpar();
+  for (const k of ['ASAAS_API_KEY', 'ASAAS_URL', 'ASAAS_WEBHOOK_TOKEN']) delete process.env[k];
   return b;
 }

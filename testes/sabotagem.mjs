@@ -221,7 +221,7 @@ const SABOTAGENS = [
     nome: 'a ata final ignora o que já foi transcrito e refaz tudo',
     teste: 'pedacos',
     porta: 8177,
-    trocas: [["          if (vivo.feitas.has(i + ':' + quem)) {", '          if (false) {']],
+    trocas: [["          if (!vivo.feitas.has(i + ':' + quem)) continue;", '          continue;']],
     pega: 'transcrever durante a reunião não adiantaria nada, e ninguém perceberia porque a ata sai igual'
   },
   {
@@ -241,6 +241,110 @@ const SABOTAGENS = [
     trocas: [['"supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.',
               '"supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.x", "_lixo": "']],
     pega: 'a chave que ignora todas as políticas do banco iria para o navegador de qualquer visitante'
+  },
+  {
+    nome: 'o webhook do Asaas aceita qualquer um',
+    teste: 'funcoes',
+    porta: 8181,
+    arquivo: 'api/asaas.js',
+    trocas: [["  if (!veio || String(veio) !== String(segredo)) {", '  if (false) {']],
+    pega: 'quem descobrisse o endereço se daria plano profissional com um curl'
+  },
+  {
+    nome: 'o mesmo pagamento pode ser aplicado duas vezes',
+    teste: 'funcoes',
+    porta: 8182,
+    arquivo: 'api/asaas.js',
+    trocas: [['        p_cobranca: cliente, p_pagamento: pagamento.id || evento, p_dias: DIAS_POR_CICLO',
+              '        p_cobranca: cliente, p_dias: DIAS_POR_CICLO']],
+    pega: 'o Asaas reenvia até quinze vezes, e cada reenvio daria mais um mês de graça'
+  },
+  {
+    nome: 'estorno e chargeback deixam de cortar o acesso',
+    teste: 'funcoes',
+    porta: 8183,
+    arquivo: 'api/asaas.js',
+    trocas: [["const CORTAM  = ['PAYMENT_REFUNDED',", "const CORTAM  = ['NUNCA_ACONTECE',"]],
+    pega: 'quem pedisse o dinheiro de volta ficaria com o plano assim mesmo'
+  },
+  {
+    nome: 'o navegador libera o plano ao criar a cobrança',
+    teste: 'conta',
+    porta: 8184,
+    trocas: [["      await lerCobranca();\n      if (d.pagar) {",
+              "      await lerCobranca();\n      perfil.plano = 'profissional';\n      perfil.assinante_ate = new Date(Date.now() + 31 * 86400000).toISOString();\n      if (d.pagar) {"]],
+    pega: 'bastaria abrir o inspetor, ou nem isso, para ter o plano sem pagar'
+  },
+  {
+    nome: 'assinar libera o plano no servidor, antes de o dinheiro entrar',
+    teste: 'funcoes',
+    porta: 8185,
+    arquivo: 'api/assinar.js',
+    trocas: [["    await rpc('cobranca_guardar', { p_perfil: usuario.id, p_cobranca: cliente, p_assinatura: assinatura.id });",
+              "    await rpc('cobranca_guardar', { p_perfil: usuario.id, p_cobranca: cliente, p_assinatura: assinatura.id });\n    await rpc('cobranca_aplicar', { p_cobranca: cliente, p_pagamento: 'x', p_dias: 31 });"]],
+    pega: 'clicar em assinar daria o plano, pago ou não'
+  },
+  {
+    nome: 'documento inválido é repassado ao meio de pagamento',
+    teste: 'funcoes',
+    porta: 8186,
+    arquivo: 'api/assinar.js',
+    trocas: [['    if (!documentoValido(documento))', '    if (false)']],
+    pega: 'o cliente levaria uma recusa em inglês do fornecedor em vez de um aviso claro'
+  },
+  {
+    nome: 'o instante volta na linha do tempo compactada, e não na da reunião',
+    teste: 'compactacao',
+    porta: 8187,
+    trocas: [['  function instanteReal(pacote, dentro) {\n    let acumulado = 0;',
+              '  function instanteReal(pacote, dentro) {\n    return dentro;\n    let acumulado = 0;']],
+    pega: 'a ata sairia bonita, com carimbo de hora, e com todos os instantes errados'
+  },
+  {
+    nome: 'a folga em volta da fala some',
+    teste: 'compactacao',
+    porta: 8188,
+    trocas: [['        for (let k = 0; k < FOLGA && podeEntrar(ini - 1); k++) ini--;', '        /* sabotado */']],
+    pega: 'o corte comeria o começo das palavras, e ninguém compara a ata com o áudio para descobrir'
+  },
+  {
+    nome: 'qualquer pausa vira corte, inclusive o respiro dentro da frase',
+    teste: 'compactacao',
+    porta: 8189,
+    trocas: [['  const VAO_MINIMO = 20;', '  const VAO_MINIMO = 1;']],
+    pega: 'a frase seria picada em pedaços e o modelo perderia o contexto de cada um'
+  },
+  {
+    nome: 'a compactação deixa de acontecer',
+    teste: 'compactacao',
+    porta: 8190,
+    trocas: [["      const compactar = $('compactar').checked;", '      const compactar = false;']],
+    pega: 'a caixa ficaria marcada na tela e o trabalho continuaria sendo o dobro, sem ninguém notar'
+  },
+  {
+    nome: 'o pacote passa dos trinta segundos que o modelo aceita',
+    teste: 'compactacao',
+    porta: 8191,
+    trocas: [['      if (soma + (ate - de) > maximo) { pacotes.push(atual); atual = []; soma = 0; }',
+              '      /* sabotado */']],
+    pega: 'o Whisper cortaria o excesso em silêncio e a ata perderia falas inteiras'
+  },
+  {
+    nome: 'a medição de velocidade não conta o tempo',
+    teste: 'compactacao',
+    porta: 8192,
+    trocas: [['        ok: m => { relogioModelo.segundosDeAudio += segundos;\n                   relogioModelo.milissegundos += performance.now() - t0; ok(m); },',
+              '        ok: m => { ok(m); },']],
+    pega: 'a única medida que diz se vale trocar de modelo ou de navegador ficaria em branco'
+  },
+  {
+    nome: 'uma marca concorrente entra na página pública',
+    teste: 'conformidade',
+    porta: 8193,
+    arquivo: 'public/index.html',
+    trocas: [['<h2 class="titulo">Onde ele ganha e onde ele perde</h2>',
+              '<h2 class="titulo">Onde ele ganha do Fireflies e onde ele perde</h2>']],
+    pega: 'objeção de concorrente viraria documento que circula, contra a regra do escritório'
   },
   {
     nome: 'o resumo da IA não chega ao PDF nem ao texto',

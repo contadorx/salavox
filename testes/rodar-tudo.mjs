@@ -33,6 +33,7 @@ import conta from './t-conta.mjs';
 import silencio from './t-silencio.mjs';
 import painel from './t-painel.mjs';
 import funcoes from './t-funcoes.mjs';
+import compactacao from './t-compactacao.mjs';
 
 const TODOS = [
   ['telas', telas],
@@ -43,13 +44,14 @@ const TODOS = [
   ['conta', conta],
   ['silencio', silencio],
   ['painel', painel],
-  ['funcoes', funcoes]
+  ['funcoes', funcoes],
+  ['compactacao', compactacao]
 ];
 
 const pedidos = process.argv.slice(2).filter(a => !a.startsWith('--'));
 // o mais demorado entra primeiro: senão ele começa por último e todo mundo espera
 const DEMORA = { pedacos: 70, conta: 45, recuperacao: 31, silencio: 25, telas: 18, extras: 18,
-                 conformidade: 16, painel: 10, funcoes: 2 };
+                 conformidade: 16, painel: 10, funcoes: 2, compactacao: 20 };
 const TESTES = (pedidos.length ? TODOS.filter(([n]) => pedidos.includes(n)) : TODOS.slice())
   .sort((a, b) => (DEMORA[b[0]] || 0) - (DEMORA[a[0]] || 0));
 const PORTA = Number(process.env.PORTA || 8131);
@@ -80,19 +82,40 @@ async function rodar([nome, teste], i) {
   resultado.push({ nome, b, erros, quebrou, seg: (Date.now() - t0) / 1000 });
 }
 
-/* Três de cada vez, não seis. Estes testes gravam mídia em tempo real: com a
-   máquina saturada o navegador perde quadros, a tela sintética troca de slide
-   sem ser capturada, e o teste acusa defeito que não existe. Três foi o número
-   em que a suíte ficou verde três corridas seguidas nesta máquina. */
-const LADOS = Number(process.env.LADOS || 3);
+/* Duas faixas, e um bloco que roda sozinho.
+
+   Eram três faixas enquanto a suíte tinha seis blocos. Com dez — e com a
+   transcrição rodando DURANTE a gravação — três Chromiums gravando vídeo ao
+   mesmo tempo saturam a máquina, e o que passa a falhar são as medições finas.
+   Não é defeito do produto: é o instrumento medindo uma máquina sem fôlego.
+
+   Três blocos precisam de mais que isso, e rodam **um de cada vez, no fim**:
+
+     telas        a tela sintética é pintada pela linha principal da própria
+                  página, a dez quadros por segundo, e capturada a oito. Com a
+                  máquina disputada a pintura atrasa, um quadro pela metade é
+                  gravado no lugar do preto do começo, e a varredura acha uma
+                  tela a mais.
+     pedacos      compara a duração do áudio com o relógio, com margem de 1,5 s
+                  em 60 — a mais fina da suíte.
+     recuperacao  mata a aba no meio da gravação e conta o que sobrou.
+
+   Os três medem mídia em tempo real; os outros sete medem lógica, e lógica não
+   se importa com máquina ocupada. Afrouxar as margens seria o remédio errado e
+   o mais tentador — este projeto já decidiu não fazer isso. A corrida fica
+   ~50 s mais longa e passa a dizer a verdade. */
+const LADOS = Number(process.env.LADOS || 2);
+const SOZINHOS = ['telas', 'pedacos', 'recuperacao'];
 
 if (UM_DE_CADA) {
   for (let i = 0; i < TESTES.length; i++) await rodar(TESTES[i], i);
 } else {
-  const fila = TESTES.map((t, i) => [t, i]);
-  await Promise.all(Array.from({ length: Math.min(LADOS, fila.length) }, async () => {
-    while (fila.length) { const [t, i] = fila.shift(); await rodar(t, i); }
+  const juntos = TESTES.map((t, i) => [t, i]).filter(([t]) => SOZINHOS.indexOf(t[0]) < 0);
+  const sos    = TESTES.map((t, i) => [t, i]).filter(([t]) => SOZINHOS.indexOf(t[0]) >= 0);
+  await Promise.all(Array.from({ length: Math.min(LADOS, juntos.length) }, async () => {
+    while (juntos.length) { const [t, i] = juntos.shift(); await rodar(t, i); }
   }));
+  for (const [t, i] of sos) await rodar(t, i);
 }
 
 await nav.close();
