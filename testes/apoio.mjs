@@ -50,6 +50,17 @@ export function micMudo() {
 
 /* Tela sintética: troca de "slide" num intervalo conhecido, para que os
    instantes detectados possam ser comparados com valores golden. */
+/* Não há simulacro de janela flutuante aqui, e a história vale a nota.
+
+   O primeiro `'documentPictureInPicture' in window` deu falso, e eu já tinha
+   escrito um `iframe` de mentira para pôr no lugar. O falso era o teste: a
+   API só existe em contexto seguro, e eu havia perguntado numa página
+   `about:blank`. Servida em `127.0.0.1`, que o navegador trata como seguro,
+   ela está lá — e o bloco de silêncio abre a janela de verdade.
+
+   Fica o registro porque a tentação de simular estava a um passo, e simular
+   teria escondido o recurso funcionando. */
+
 export function telaFalsa(segundosPorSlide) {
   return `(spp => {
     navigator.mediaDevices.getDisplayMedia = async () => {

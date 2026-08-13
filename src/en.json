@@ -620,5 +620,6 @@
  "Aparece quando a transcrição terminar: cada fala com o instante e quem falou, para baixar em PDF, texto ou legenda.": "Appears when the transcription finishes: every line with its timestamp and who spoke, to download as PDF, text or subtitles.",
  "Aparece com a ata na tela: resumo da reunião, decisões, pendências com responsável e prazo, e o e-mail pronto para os participantes.": "Appears once the minutes are on screen: meeting summary, decisions, open items with owner and due date, and the e-mail ready for the participants.",
  "com o plano": "with the plan",
- "telas": "screens"
+ "telas": "screens",
+ "Janelinha flutuante": "Floating window"
 }

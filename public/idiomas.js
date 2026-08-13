@@ -261,6 +261,7 @@
     "Identificadores de rastreamento, perfis de comportamento ou dados para publicidade": "Tracking identifiers, behavioural profiles or advertising data",
     "Individual": "Individual",
     "Integra com agenda e CRM": "Integrates with calendar and CRM",
+    "Janelinha flutuante": "Floating window",
     "Já tem a gravação? Arraste": "Already have the recording? Drag it in",
     "Legenda": "Subtitles",
     "Leia isto antes de gravar": "Read this before recording",

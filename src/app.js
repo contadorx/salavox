@@ -373,6 +373,149 @@ registerProcessor('toca', Toca);`;
   }
 
   /* ============================================================
+     A janelinha flutuante.
+
+     A pergunta que originou isto foi "dá para ter os controles na
+     barra que o navegador cria ao compartilhar a tela?". Não dá:
+     aquela barra é do navegador, ela não aceita botão de página
+     nenhuma, e tentar imitá-la dentro da aba não resolve — durante
+     a reunião a aba do Salavox está atrás do Meet, e voltar a ela
+     para marcar um momento é justamente o gesto que a pessoa não
+     pode fazer no meio de uma conversa com cliente.
+
+     O que existe é o **Document Picture-in-Picture**: uma janela
+     de verdade, pequena, que o sistema mantém por cima das outras,
+     com HTML nosso dentro. É o mais perto do pedido que a
+     plataforma permite, e é honesto sobre o que é.
+
+     Quatro controles cabem lá, e são os que importam durante a
+     reunião: o relógio, os dois medidores (para ver que os dois
+     lados estão entrando), marcar o momento, fechar o microfone e
+     encerrar. Baixar, transcrever e o resto ficam na aba — nada
+     disso se faz no meio de uma reunião.
+
+     Ela é uma janela separada, com documento separado: o CSS da
+     página não chega lá, e o dicionário de idiomas também não. Por
+     isso o texto sai por `T()`, daqui.
+
+     Onde não existe API — hoje, fora do Chrome e do Edge — o botão
+     não aparece. Botão que abre e não faz nada é pior do que botão
+     que não existe.
+     ============================================================ */
+
+  let janelinha = null;              // a janela aberta, ou null
+  const TEM_JANELINHA = 'documentPictureInPicture' in window;
+
+  const ESTILO_JANELINHA = `
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+         background:#0C1513;color:#fff;padding:14px 16px;user-select:none}
+    .rel{font:800 40px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-1.5px}
+    .rel small{font:600 12px/1 inherit;letter-spacing:.08em;text-transform:uppercase;
+               color:rgba(255,255,255,.45);display:block;margin-bottom:6px;font-family:inherit}
+    .vu{display:flex;gap:12px;margin:14px 0 16px}
+    .vu div{flex:1}
+    .vu span{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+             color:rgba(255,255,255,.5);display:block;margin-bottom:5px}
+    .vu i{display:block;height:8px;border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden}
+    .vu i>u{display:block;height:100%;width:0;background:#63D4C0;transition:width .08s}
+    .vu .eles u{background:#D9A05B}
+    /* Três botões numa fileira só não cabem em 320 px sem quebrar o rótulo no
+       meio. Os dois de uso corriqueiro dividem a primeira linha; o de encerrar
+       ocupa a segunda inteira — e ficar sozinho é bom para ele, que é o único
+       irreversível dos três. */
+    .bt{display:flex;gap:8px;flex-wrap:wrap}
+    button{flex:1;font:700 12.5px/1 inherit;border:0;border-radius:10px;padding:11px 6px;cursor:pointer;
+           background:rgba(255,255,255,.12);color:#fff;white-space:nowrap}
+    button:hover{background:rgba(255,255,255,.2)}
+    button.parar{background:#B3402A;flex-basis:100%}
+    button.mudo{background:#8A6D1F}
+    .aviso{font-size:11.5px;color:rgba(255,255,255,.45);margin-top:10px;line-height:1.45}`;
+
+  async function abrirJanelinha() {
+    if (!TEM_JANELINHA || janelinha) return;
+    let w;
+    try {
+      w = await window.documentPictureInPicture.requestWindow({ width: 340, height: 280 });
+    } catch (e) {
+      $('marcasMsg').innerHTML = `<span class="err">${T('Não consegui abrir a janelinha',
+        'I could not open the floating window')}: ${(e && e.message) || e}</span>`;
+      return;
+    }
+    janelinha = w;
+
+    const estilo = w.document.createElement('style');
+    estilo.textContent = ESTILO_JANELINHA;
+    w.document.head.appendChild(estilo);
+    w.document.title = 'Salavox';
+
+    w.document.body.innerHTML =
+      `<div class="rel"><small>${T('gravando', 'recording')}</small><span id="jTempo">00:00</span></div>` +
+      `<div class="vu">` +
+        `<div><span>${T('você', 'you')}</span><i><u id="jVoce"></u></i></div>` +
+        `<div class="eles"><span>${T('participantes', 'participants')}</span><i><u id="jEles"></u></i></div>` +
+      `</div>` +
+      `<div class="bt">` +
+        `<button id="jMarcar">${T('Marcar momento', 'Flag moment')}</button>` +
+        `<button id="jCalar">${T('Fechar microfone', 'Close mic')}</button>` +
+        `<button id="jParar" class="parar">${T('Encerrar', 'Stop')}</button>` +
+      `</div>` +
+      `<p class="aviso" id="jAviso">${T('A aba do Salavox pode ficar atrás da reunião — a gravação continua.',
+                                        'The Salavox tab can stay behind the meeting — recording continues.')}</p>`;
+
+    /* Os botões daqui não repetem lógica nenhuma: eles clicam nos da aba.
+       Duplicar o que "encerrar" faz seria criar um segundo caminho para o
+       mesmo ato, e um dos dois ficaria para trás na primeira mudança. */
+    w.document.getElementById('jMarcar').onclick = () => $('marcar').click();
+    w.document.getElementById('jCalar').onclick = () => $('calar').click();
+    w.document.getElementById('jParar').onclick = () => $('stop').click();
+
+    w.addEventListener('pagehide', fecharJanelinha);
+    $('janelinha').classList.add('hide');
+    pintarJanelinha();
+  }
+
+  function fecharJanelinha() {
+    /* A referência sai antes do `close()`, e não depois.
+
+       Fechar a janela dispara `pagehide`, que chama esta mesma função. Neste
+       Chromium o evento chega no laço seguinte, então a ordem invertida também
+       funcionaria — cheguei a escrever uma sabotagem para provar o contrário e
+       ela não pegou nada. Fica assim mesmo: a ordem certa custa uma linha e
+       não depende de quando o navegador resolve avisar. O que não fica é a
+       sabotagem, porque cenário que não reproduz defeito é ruído no
+       relatório. */
+    const w = janelinha;
+    if (!w) return;
+    janelinha = null;
+    try { w.close(); } catch (e) {}
+    /* Só volta a oferecer se ainda houver gravação em curso. */
+    $('janelinha').classList.toggle('hide', $('stop').classList.contains('hide') || !TEM_JANELINHA);
+  }
+
+  /* Espelha na janelinha o que a aba já sabe. Chamada pelo mesmo laço que
+     desenha os medidores — um relógio só, e ele já existe. */
+  function pintarJanelinha() {
+    if (!janelinha) return;
+    const d = janelinha.document;
+    const t = d.getElementById('jTempo');
+    if (t) t.textContent = $('tempo').textContent;
+    const v = d.getElementById('jVoce'), e = d.getElementById('jEles');
+    if (v) v.style.width = ($('vuYou').style.width || '0%');
+    if (e) e.style.width = ($('vuThem').style.width || '0%');
+    const c = d.getElementById('jCalar');
+    if (c) {
+      /* Sem microfone na gravação não há o que fechar, e o botão some. */
+      c.style.display = $('calar').classList.contains('hide') ? 'none' : '';
+      const fechado = $('calar').classList.contains('rec');
+      c.textContent = fechado ? T('Reabrir microfone', 'Reopen mic') : T('Fechar microfone', 'Close mic');
+      c.classList.toggle('mudo', fechado);
+    }
+  }
+
+  $('janelinha').onclick = () => abrirJanelinha();
+
+  /* ============================================================
      Consentimento. A responsabilidade de avisar os participantes é
      de quem grava — a ferramenta não tem como verificar isso, então
      ao menos obriga a confirmação explícita e oferece o texto pronto.
@@ -590,6 +733,8 @@ registerProcessor('toca', Toca);`;
       $('rec').classList.remove('hide'); $('rec').disabled = false;
       $('stop').classList.add('hide'); $('vu').classList.add('hide');
       $('marcar').classList.add('hide'); $('calar').classList.add('hide');
+      $('janelinha').classList.add('hide');
+      fecharJanelinha();
       $('recMsg').textContent = 'Fechando os pedaços gravados…';
       meta.segundos = segundos;
       await salvarMeta();
@@ -638,7 +783,8 @@ registerProcessor('toca', Toca);`;
     }
 
     let anima;
-    const desenhar = () => { medidores.forEach(m => m()); anima = requestAnimationFrame(desenhar); };
+    const desenhar = () => { medidores.forEach(m => m()); pintarJanelinha();
+                             anima = requestAnimationFrame(desenhar); };
     desenhar();
 
     /* O modelo começa a carregar agora, junto com a gravação, e não depois
@@ -675,6 +821,7 @@ registerProcessor('toca', Toca);`;
     $('rec').classList.add('hide');
     $('stop').classList.remove('hide');
     $('marcar').classList.remove('hide');
+    $('janelinha').classList.toggle('hide', !TEM_JANELINHA);
     /* Fechar o microfone de verdade, aqui dentro.
 
        O pedido veio de uma reunião real: "o microfone estava fechado e ele

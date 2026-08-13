@@ -151,6 +151,14 @@ const SABOTAGENS = [
     pega: 'quem clicasse achando que parou de ser gravado continuaria sendo gravado'
   },
   {
+    nome: 'o botão da janelinha reimplementa o marcar em vez de clicar no da aba',
+    teste: 'silencio',
+    porta: 8196,
+    trocas: [["    w.document.getElementById('jMarcar').onclick = () => $('marcar').click();",
+              "    w.document.getElementById('jMarcar').onclick = () => {};"]],
+    pega: 'marcar o momento pela janelinha não deixaria rastro na ata, e ninguém confere a janelinha'
+  },
+  {
     nome: 'fonte que não registrou som nenhum passa em silêncio',
     teste: 'silencio',
     porta: 8167,

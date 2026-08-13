@@ -129,6 +129,54 @@ export default async function (ctx, url, erros) {
   b.conferir('reabrir religa a trilha',
              await p.evaluate(() => window.__salavox.micLigado()), true);
 
+  /* ---------- 2b. a janelinha flutuante ----------
+     Durante a reunião a aba do Salavox está atrás do Meet. A janelinha existe
+     para que marcar um momento, fechar o microfone e encerrar não exijam
+     procurar a aba no meio de uma conversa com cliente. */
+  b.verdade('a janelinha é oferecida durante a gravação', !(await p.isHidden('#janelinha')));
+  await p.click('#janelinha');
+  await p.waitForFunction(() => !!window.documentPictureInPicture.window, null, { timeout: 10000 });
+  await p.waitForTimeout(400);
+
+  const dentro = await p.evaluate(() => {
+    const d = window.documentPictureInPicture.window.document;
+    return { botoes: Array.from(d.querySelectorAll('button')).map(b => b.id),
+             tempo: (d.getElementById('jTempo') || {}).textContent,
+             temMedidores: !!d.getElementById('jVoce') && !!d.getElementById('jEles') };
+  });
+  b.conferir('ela leva os três controles da reunião, e só eles',
+             dentro.botoes, ['jMarcar', 'jCalar', 'jParar']);
+  b.verdade('com o relógio e os dois medidores', /^\d\d:\d\d$/.test(dentro.tempo || '') && dentro.temMedidores);
+  b.verdade('e some o botão da aba, para não haver dois', await p.isHidden('#janelinha'));
+
+  /* O botão da janelinha não repete lógica: ele clica no da aba. É assim que
+     os dois não se descolam na primeira mudança. */
+  await p.evaluate(() => window.documentPictureInPicture.window.document.getElementById('jCalar').click());
+  await p.waitForTimeout(200);
+  b.conferir('fechar o microfone pela janelinha desliga a trilha de verdade',
+             await p.evaluate(() => window.__salavox.micLigado()), false);
+  b.verdade('e o rótulo lá dentro acompanha',
+            /Reabrir/.test(await p.evaluate(() => window.documentPictureInPicture.window.document.getElementById('jCalar').textContent)));
+  await p.evaluate(() => window.documentPictureInPicture.window.document.getElementById('jCalar').click());
+  await p.waitForTimeout(200);
+  b.conferir('reabrir por lá também religa',
+             await p.evaluate(() => window.__salavox.micLigado()), true);
+
+  const marcasAntes = await p.evaluate(() => window.__salavox.momentos().length);
+  await p.evaluate(() => window.documentPictureInPicture.window.document.getElementById('jMarcar').click());
+  await p.waitForTimeout(200);
+  b.conferir('marcar o momento pela janelinha entra na mesma lista',
+             await p.evaluate(() => window.__salavox.momentos().length), marcasAntes + 1);
+
+  /* Fechar a janela é o gesto mais banal do recurso, e era onde estava o
+     defeito: `close()` dispara `pagehide`, que chamava de volta quem estava
+     fechando. */
+  await p.evaluate(() => window.documentPictureInPicture.window.close());
+  await p.waitForTimeout(400);
+  b.verdade('fechar a janelinha devolve o botão para a aba, sem travar a página',
+            !(await p.isHidden('#janelinha')) &&
+            await p.evaluate(() => !window.documentPictureInPicture.window));
+
   await p.waitForTimeout(11000);
   await p.click('#stop');
   await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent),
