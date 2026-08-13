@@ -719,6 +719,7 @@ registerProcessor('toca', Toca);`;
     const modoPcm = await ligarPcm(micFluxo, telaFluxo, temSistema, ab => {
       const escrita = depPcm.escrever(new Blob([ab]));
       passoAoVivo();      // de propósito sem await: escrever no disco não espera o modelo
+      adiantarModelo();   // idem: o download corre ao lado da gravação
       return escrita;
     });
 
@@ -812,6 +813,8 @@ registerProcessor('toca', Toca);`;
          pronto, e gravação que nunca chega lá não paga por nada. */
       vivo.preparando = false;
     }
+    adiantando = false;
+    $('baixaMsg').textContent = '';
 
     gravador.start(10000);          // um arquivo a cada dez segundos
     marcarInicioPcm();              // zera o áudio cru no mesmo instante do vídeo
@@ -1066,22 +1069,58 @@ registerProcessor('toca', Toca);`;
      grandeza da família Whisper nas quantizações que usamos, e estão escritos
      como aproximação porque é o que são. O turbo é o único que muda de patamar,
      e é justamente o que alguém escolheria sem perceber. */
+  /* Estes números são a soma dos arquivos que cada caminho realmente pede,
+     conferidos na lista de arquivos de cada repositório — não são estimativa.
+
+     A tabela tem duas colunas porque a escolha do motor muda o que se baixa, e
+     muda muito: no processador o codificador vem comprimido (q8); na placa de
+     vídeo ele vem sem compressão (fp32), porque as versões comprimidas do
+     codificador produzem texto quebrado em parte das máquinas. Um codificador
+     fp32 de whisper-small são 353 MB contra 92 MB do comprimido.
+
+     Isto estava errado na tela: dizia "~200 MB" para o Preciso enquanto o
+     caminho padrão baixava 586 MB. Quase o triplo, e a queixa que chegou foi
+     exatamente essa — "mesmo estando em CDN é lento". */
   const TAMANHOS = {
-    'onnx-community/whisper-base': '~50 MB',
-    'onnx-community/whisper-small': '~200 MB',
-    'onnx-community/whisper-large-v3-turbo': '~700 MB'
+    'onnx-community/whisper-base':          { cpu: 77,   gpu: 206 },
+    'onnx-community/whisper-small':         { cpu: 249,  gpu: 586 },
+    'onnx-community/whisper-large-v3-turbo':{ cpu: 1085, gpu: 2884 }
   };
+
+  const usaPlaca = () => !!($('placa') && $('placa').checked);
+
+  const tamanhoDoModelo = () => {
+    const t = TAMANHOS[$('modelo').value];
+    return t ? (usaPlaca() ? t.gpu : t.cpu) : null;
+  };
+
+  const emMB = n => n >= 1024 ? (n / 1024).toFixed(1).replace('.', ',') + ' GB' : n + ' MB';
 
   function avisarModeloEscolhido() {
     const m = $('modelo').value;
-    if (!/turbo/.test(m)) { $('modeloAviso').textContent = ''; return; }
-    $('modeloAviso').innerHTML =
-      `<b>Turbo:</b> o texto sai bem melhor — decodificador curto, qualidade perto do maior Whisper que ` +
-      `existe. Em troca, são <b>${TAMANHOS[m]}</b> na primeira vez (depois fica guardado), e ele pede uma ` +
-      `placa de vídeo com folga. Em máquina modesta pode cair para o processador e ficar mais lento que o ` +
-      `modelo preciso — a linha de desempenho no fim da transcrição diz qual dos dois aconteceu.`;
+    const t = TAMANHOS[m];
+    if (!t) { $('modeloAviso').textContent = ''; return; }
+    const dobra = (t.gpu / t.cpu).toFixed(1).replace('.', ',');
+    let txt = T(`Na primeira vez, este caminho baixa <b>${emMB(tamanhoDoModelo())}</b> — depois fica ` +
+                `guardado no navegador e não baixa de novo.`,
+                `The first time, this path downloads <b>${emMB(tamanhoDoModelo())}</b> — after that it is ` +
+                `kept in the browser and is not downloaded again.`);
+    if (usaPlaca()) {
+      txt += ' ' + T(`Na placa de vídeo o codificador vem sem compressão, e é por isso que são ` +
+                     `<b>${dobra}×</b> o tamanho do processador.`,
+                     `On the graphics card the encoder comes uncompressed, which is why it is ` +
+                     `<b>${dobra}×</b> the size of the processor path.`);
+    }
+    if (/turbo/.test(m)) {
+      txt += ' ' + T('<b>Turbo:</b> o melhor texto que existe em Whisper, e o único que muda de patamar ' +
+                     'de tamanho. Só escolha se a máquina tiver folga.',
+                     '<b>Turbo:</b> the best text Whisper produces, and the only one in a different size ' +
+                     'league. Only choose it on a machine with room to spare.');
+    }
+    $('modeloAviso').innerHTML = txt;
   }
   $('modelo').onchange = avisarModeloEscolhido;
+  if ($('placa')) $('placa').onchange = avisarModeloEscolhido;
   avisarModeloEscolhido();
 
   async function mostrarModeloGuardado() {
@@ -1157,23 +1196,52 @@ registerProcessor('toca', Toca);`;
             const w = mod.env.backends && mod.env.backends.onnx && mod.env.backends.onnx.wasm;
             if (w) { w.numThreads = 1; if (m.wasm) w.wasmPaths = m.wasm; }
           } catch (e) {}
+          /* Progresso em bytes, não só em porcentagem.
+
+             A biblioteca informa o progresso de 0 a 100 por arquivo, e a
+             média das porcentagens mente: o codificador e o decodificador têm
+             tamanhos muito diferentes, e 50% da média não é metade do
+             download. Somando os bytes lidos e o total dá para dizer quantos
+             MB de quantos — que é o que alguém olhando uma barra quer saber.
+
+             (Sem crase neste comentário: ele mora dentro do texto que vira o
+             Worker, e uma crase aqui fecha o template string do arquivo.) */
           const visto = {};
           const progress_callback = p => {
             if (p.status === 'progress' && p.file) {
-              visto[p.file] = p.progress || 0;
+              visto[p.file] = { pct: p.progress || 0, lidos: p.loaded || 0, total: p.total || 0 };
               const v = Object.values(visto);
-              self.postMessage({ tipo: 'progresso', pct: v.reduce((a, b) => a + b, 0) / v.length });
+              const lidos = v.reduce((a, x) => a + x.lidos, 0);
+              const total = v.reduce((a, x) => a + x.total, 0);
+              self.postMessage({ tipo: 'progresso', lidos, total,
+                pct: total ? lidos / total * 100 : v.reduce((a, x) => a + x.pct, 0) / v.length });
             }
           };
-          let motor = 'placa de vídeo';
-          try {
-            pipe = await mod.pipeline('automatic-speech-recognition', m.modelo,
-              { device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
-                progress_callback });
-          } catch (e) {
-            motor = 'processador';
-            self.postMessage({ tipo: 'aviso',
-              msg: 'WebGPU indisponível — usando o processador, vai demorar mais.' });
+          /* Processador primeiro; placa de vídeo só quando pedida.
+
+             A ordem era a inversa, e custava caro em dois lugares. No tamanho:
+             o caminho da placa baixa o codificador sem compressão — 353 MB em
+             vez de 92 MB no whisper-small —, porque as versões comprimidas do
+             codificador produzem texto quebrado em parte das máquinas. E no
+             relógio: o relato público da própria biblioteca é que, em Whisper,
+             o processador com WASM costuma terminar antes da placa.
+
+             Quem quiser a placa marca a caixa e vê o tamanho mudar na tela
+             antes de decidir. Se ela falhar, cai no processador — o caminho
+             que agora é o padrão, e não mais o castigo. */
+          let motor = 'processador';
+          if (m.placa) {
+            try {
+              pipe = await mod.pipeline('automatic-speech-recognition', m.modelo,
+                { device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
+                  progress_callback });
+              motor = 'placa de vídeo';
+            } catch (e) {
+              self.postMessage({ tipo: 'aviso',
+                msg: 'WebGPU indisponível — usando o processador.' });
+            }
+          }
+          if (!pipe) {
             pipe = await mod.pipeline('automatic-speech-recognition', m.modelo,
               { dtype: 'q8', progress_callback });
           }
@@ -1240,7 +1308,7 @@ registerProcessor('toca', Toca);`;
     trabalhador = new Worker(url, { type: 'module' });
     trabalhador.onmessage = ev => {
       const m = ev.data;
-      if (m.tipo === 'progresso' && avisoModelo) avisoModelo(m.pct);
+      if (m.tipo === 'progresso' && avisoModelo) avisoModelo(m.pct, null, m.lidos, m.total);
       else if (m.tipo === 'aviso' && avisoModelo) avisoModelo(null, m.msg);
       else if (m.tipo === 'pronto') {
         motorEmUso = m.motor || null;
@@ -1275,18 +1343,29 @@ registerProcessor('toca', Toca);`;
      duplicata. */
   function prepararModelo(modelo, aoProgresso) {
     avisoModelo = aoProgresso;
-    if (promessaModelo && promessaModelo.modelo === modelo) return promessaModelo.p;
+    /* A chave inclui o motor, e não só o modelo: trocar a caixa da placa de
+       vídeo troca os arquivos que serão baixados. Sem isso, marcar a caixa
+       depois de uma transcrição devolveria o pipeline antigo em silêncio. */
+    const chave = modelo + '|' + (usaPlaca() ? 'gpu' : 'cpu');
+    if (promessaModelo && promessaModelo.chave === chave) return promessaModelo.p;
     const w = ligarTrabalhador();
     const p = (async () => {
+      /* Sem isto, o navegador trata o modelo como cache descartável e o apaga
+         quando o disco aperta — e a próxima reunião baixa tudo de novo. Pedir
+         armazenamento persistente é uma linha e é a diferença entre "baixa uma
+         vez" e "baixa de vez em quando". O pedido pode ser negado; nesse caso
+         nada piora. */
+      try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); }
+      catch (e) {}
       const espelho = await espelhoLocal(modelo);
       origemModelo = espelho ? 'servidor do Salavox' : 'CDN pública';
       const wasm = await acharWasm();
       return new Promise((ok, falhou) => {
         pendentes.set('modelo', { ok, falhou });
-        w.postMessage({ tipo: 'carregar', tjs: TJS, modelo, espelho, wasm });
+        w.postMessage({ tipo: 'carregar', tjs: TJS, modelo, espelho, wasm, placa: usaPlaca() });
       });
     })();
-    promessaModelo = { modelo, p };
+    promessaModelo = { chave, p };
     p.catch(() => { promessaModelo = null; });     // erro não pode ficar grudado na promessa
     return p;
   }
@@ -1658,6 +1737,50 @@ registerProcessor('toca', Toca);`;
     vivo.proxima = 0; vivo.ocupado = false; vivo.preparando = false;
   }
 
+  /* Baixar o modelo DURANTE a reunião, com ou sem transcrição ao vivo.
+
+     Antes isto só acontecia quando a transcrição ao vivo estava ligada. Com
+     ela desligada, o download inteiro caía no clique de "Gerar a transcrição"
+     — a pessoa encerrava a reunião e ficava olhando uma barra parada, que é
+     exatamente a queixa que chegou.
+
+     A reunião dura minutos; o download cabe dentro dela e não disputa nada,
+     porque quem transcreve é outra linha de trabalho e quem escreve no disco é
+     a principal.
+
+     O gatilho continua sendo o áudio gravado, e não o relógio: são quinze
+     segundos de gravação antes de começar. Esse número não é estético — a
+     preparação começa com duas idas à rede, e quando elas aconteciam no
+     primeiro segundo, atrapalhavam o navegador montando a captura. Uma medição
+     pegou isso deslocando a detecção da primeira tela. */
+  let adiantando = false;
+
+  function adiantarModelo() {
+    if (adiantando || typeof Worker === 'undefined') return;
+    if (depPcm.bytes / BYTES_POR_AMOSTRA / SR < 15) return;
+    adiantando = true;
+    const t = tamanhoDoModelo();
+    prepararModelo($('modelo').value, (pct, msg, lidos, total) => {
+      if (vivo.ligado) return;          // com a ao vivo ligada, quem fala é o vivoMsg
+      const quanto = total ? `${(lidos / 1048576).toFixed(0)} de ${(total / 1048576).toFixed(0)} MB`
+                           : (t ? emMB(t) : '');
+      $('baixaMsg').innerHTML = msg
+        ? escapar(msg)
+        : T(`Baixando o modelo durante a reunião — <b>${(pct || 0).toFixed(0)}%</b>` +
+            (quanto ? ` (${quanto})` : '') + '. Ao encerrar, ele já estará pronto.',
+            `Downloading the model during the meeting — <b>${(pct || 0).toFixed(0)}%</b>` +
+            (quanto ? ` (${quanto})` : '') + '. By the time you stop, it will be ready.');
+    })
+      .then(() => {
+        if (!vivo.ligado) $('baixaMsg').innerHTML =
+          `<span class="ok">${T('Modelo pronto', 'Model ready')}</span> — ` +
+          T('a transcrição começa sem espera.', 'transcription starts with no wait.');
+      })
+      /* Falhar aqui não é erro para quem grava: o passo 2 tenta de novo, e é lá
+         que a mensagem faz sentido. Silêncio, e a gravação segue. */
+      .catch(() => { $('baixaMsg').textContent = ''; adiantando = false; });
+  }
+
   /* Chamado a cada pedaço de áudio escrito. Faz no máximo uma janela por vez:
      enfileirar transcrições atrasaria o encerramento sem adiantar nada. */
   async function passoAoVivo() {
@@ -1792,12 +1915,21 @@ registerProcessor('toca', Toca);`;
         blobPcm = await pcmDoArquivo(blobGravacao);
       }
 
-      await prepararModelo($('modelo').value, (pct, msg) => {
+      await prepararModelo($('modelo').value, (pct, msg, lidos, total) => {
         if (msg) return aviso(msg);
-        // a primeira etapa ocupa os primeiros 20% da barra; os 80% restantes são
-        // da transcrição, que é a parte demorada
-        $('bar').style.width = (pct * 20).toFixed(1) + '%';
-        aviso(`Etapa 1 de 2 — baixando o modelo do ${origemModelo}: ${(pct * 100).toFixed(0)}% (só na primeira vez)`);
+        /* A primeira etapa ocupa os primeiros 20% da barra; os 80% restantes
+           são da transcrição, que é a parte demorada.
+
+           `pct` vem de 0 a 100, e não de 0 a 1 — a conta antiga multiplicava
+           por 100 de novo e a tela chegava a mostrar "4300%". */
+        $('bar').style.width = (pct * 0.2).toFixed(1) + '%';
+        const quanto = total
+          ? ` — ${(lidos / 1048576).toFixed(0)} de ${(total / 1048576).toFixed(0)} MB`
+          : '';
+        aviso(T(`Etapa 1 de 2 — baixando o modelo do ${origemModelo}: ${pct.toFixed(0)}%${quanto} ` +
+                '(só na primeira vez)',
+                `Step 1 of 2 — downloading the model from ${origemModelo}: ${pct.toFixed(0)}%${quanto} ` +
+                '(first time only)'));
       });
 
       const totalAmostras = Math.floor(blobPcm.size / BYTES_POR_AMOSTRA);

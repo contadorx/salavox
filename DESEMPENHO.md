@@ -234,3 +234,66 @@ faixas** — trinta segundos a mais por corrida, medições em que dá para acre
 Nada disso está medido com o modelo real — só a nossa parte está. Os números de ganho acima são ordens de
 grandeza conhecidas do Whisper, não medições deste projeto, e estão marcadas como estimativa em todos os
 lugares onde aparecem.
+
+---
+
+## 13/08/2026 — o download, que era o gargalo que ninguém tinha medido
+
+A pergunta que abriu isto foi: *"o modelo preciso baixar mesmo? mesmo estando em CDN é lento."*
+
+Sim, precisa. Não existe transcrição no navegador sem o modelo estar no navegador. As alternativas
+seriam mandar o áudio para um servidor — que é o produto inteiro ao contrário — ou usar o
+reconhecimento embutido do Chrome, que também manda o áudio para fora. **O download é o preço de o
+áudio não sair do computador**, e ele se paga uma vez por navegador.
+
+O que estava errado não era existir. Era o tamanho, e era a hora.
+
+### O tamanho: a tela mentia por quase três vezes
+
+A ferramenta tentava a placa de vídeo primeiro. Nesse caminho o codificador vem **sem compressão**
+(fp32), porque as versões comprimidas do codificador produzem texto quebrado em parte das máquinas.
+Conferindo arquivo por arquivo nos repositórios:
+
+| modelo | processador (q8) | placa de vídeo (fp32 + q4) | o que a tela dizia |
+|---|---|---|---|
+| Rápido — `whisper-base` | **77 MB** | 206 MB | «~50 MB» |
+| Preciso — `whisper-small` | **249 MB** | 586 MB | «~200 MB» |
+| Turbo — `whisper-large-v3-turbo` | **1,1 GB** | 2,9 GB | «~700 MB» |
+
+O caminho padrão do modelo Preciso baixava **586 MB** anunciando 200. O Turbo baixava **2,9 GB**
+anunciando 700 — o codificador dele sozinho tem 2,55 GB em fp32.
+
+### A decisão: processador por padrão
+
+Além de baixar 2,4× menos no Preciso, o relato público da própria biblioteca é que, em Whisper, o
+WASM no processador costuma terminar **antes** da WebGPU — há relatos de 2 a 4× a favor do
+processador para um minuto de áudio. Não temos como medir qualidade aqui, então a placa continua
+disponível: é uma caixa a marcar, e o número na tela muda junto com ela, antes de decidir.
+
+O que era o castigo — «WebGPU indisponível, vai demorar mais» — passou a ser o caminho normal.
+
+### A hora: durante a reunião, não depois dela
+
+Com a transcrição ao vivo desligada, o download inteiro caía no clique de «Gerar a transcrição»: a
+pessoa encerrava a reunião e ficava olhando uma barra parada. Agora ele começa **durante a
+gravação**, com ou sem transcrição ao vivo — a reunião dura minutos, o download cabe dentro dela, e
+quem baixa é outra linha de trabalho.
+
+O gatilho continua sendo o áudio gravado, não o relógio: quinze segundos. Esse número não é estético.
+A preparação começa com duas idas à rede, e quando elas aconteciam no primeiro segundo atrapalhavam o
+navegador montando a captura — uma medição pegou isso deslocando a detecção da primeira tela.
+
+### Duas correções que vieram junto
+
+**A porcentagem estava multiplicada por cem.** A biblioteca informa progresso de 0 a 100 por arquivo,
+e o código tratava como 0 a 1. A barra da etapa 1 podia chegar a marcar «4300%».
+
+**O modelo guardado podia ser apagado.** Sem `navigator.storage.persist()`, o navegador trata o cache
+como descartável e o limpa quando o disco aperta — e a reunião seguinte baixa tudo de novo. Uma
+linha, e é a diferença entre «baixa uma vez» e «baixa de vez em quando».
+
+### O que continua na fila
+
+Espelhar o modelo no próprio domínio (`ferramentas/baixar-modelo.mjs`) já existe e resolve rede de
+escritório que bloqueia CDN de terceiro — falta decidir o custo de banda na hospedagem. As linhas do
+WASM (item 4) continuam dependendo dos cabeçalhos COOP/COEP na Vercel.

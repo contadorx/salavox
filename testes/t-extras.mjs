@@ -31,6 +31,26 @@ export default async function (ctx, url, erros) {
   await p.addInitScript(telaFalsa(4));
   await p.goto(url + '/app');
 
+  /* ---------- 0. o tamanho anunciado é o do caminho que vai rodar ----------
+
+     A tela dizia "~200 MB" para o modelo Preciso enquanto o caminho padrão
+     baixava 586 MB — quase o triplo. O número não é decoração: é com ele que
+     alguém decide esperar ou desistir. */
+  const anuncio = async () => (await p.textContent('#modeloAviso')).replace(/\s+/g, ' ');
+  b.verdade('no processador, o Preciso anuncia os 249 MB que ele realmente baixa',
+            /249 MB/.test(await anuncio()));
+  await p.check('#placa');
+  await p.waitForTimeout(120);
+  b.verdade('marcar a placa de vídeo muda o número anunciado para 586 MB',
+            /586 MB/.test(await anuncio()));
+  b.verdade('e a tela explica por que é maior', /sem compress/i.test(await anuncio()));
+  await p.selectOption('#modelo', 'onnx-community/whisper-large-v3-turbo');
+  await p.waitForTimeout(120);
+  b.verdade('o turbo na placa passa de dois gigabytes, e diz isso', /2,8 GB/.test(await anuncio()));
+  await p.uncheck('#placa');
+  await p.selectOption('#modelo', 'onnx-community/whisper-small');
+  await p.waitForTimeout(120);
+
   /* ---------- A. arquivo que já existe, arrastado para a página ---------- */
   await p.selectOption('#idioma', '');                      // detectar o idioma
   await p.evaluate(MONTAR_WAV);
@@ -54,6 +74,14 @@ export default async function (ctx, url, erros) {
   b.verdade('"detectar o idioma" não força idioma nenhum no modelo', !('language' in opcoes));
 
   const falas = await p.evaluate(() => window.__salavox.falas().map(f => ({ a: Math.round(f.a), quem: f.quem, texto: f.texto })));
+  /* O motor padrão é o processador. Não é detalhe de implementação: é a
+     diferença entre 249 MB e 586 MB no primeiro uso, e o relato público da
+     própria biblioteca é que em Whisper o processador costuma terminar antes.
+     O modelo simulado aceita qualquer configuração, então se a ordem voltar a
+     ser "placa primeiro" ele responderia "placa de vídeo" aqui. */
+  b.conferir('sem marcar nada, quem transcreve é o processador',
+             await p.evaluate(() => window.__salavox.desempenho().motor), 'processador');
+
   b.conferir('as falas do arquivo entram todas como um interlocutor só',
              [...new Set(falas.map(f => f.quem))], ['outros']);
   b.conferir('as duas janelas de trinta segundos foram lidas',

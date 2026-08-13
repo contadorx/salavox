@@ -112,7 +112,11 @@ export default async function (ctx, url, erros) {
              ['Bom dia a todos.', 'Fechamos em doze parcelas.', 'Certo.', 'Certo.', 'Vamos fazer assim.']);
   b.conferir('e o número descartado é dito', laco.tirados, 3);
 
-  /* ---------- 2. a gravação de verdade, com o microfone fechado ---------- */
+  /* ---------- 2. a gravação de verdade, com o microfone fechado ----------
+     Com a transcrição ao vivo DESLIGADA de propósito: é o caso em que o
+     download do modelo costumava cair inteiro no clique de "Gerar a
+     transcrição", depois da reunião. */
+  await p.uncheck('#aoVivo');
   await p.check('#okConsent');
   await p.click('#rec');
   await p.waitForFunction(() => !document.getElementById('stop').classList.contains('hide'),
@@ -177,7 +181,15 @@ export default async function (ctx, url, erros) {
             !(await p.isHidden('#janelinha')) &&
             await p.evaluate(() => !window.documentPictureInPicture.window));
 
-  await p.waitForTimeout(11000);
+  /* Passados quinze segundos de áudio gravado, o modelo começa a ser baixado
+     ao lado da gravação. O gatilho é o áudio, e não o relógio da página: no
+     primeiro segundo as duas idas à rede atrapalhavam a captura da tela. */
+  await p.waitForFunction(() => document.getElementById('baixaMsg').textContent.trim().length > 0,
+                          null, { timeout: 30000 });
+  b.verdade('o modelo é baixado durante a reunião, mesmo sem transcrição ao vivo',
+            /Baixando o modelo|Modelo pronto/.test(await p.textContent('#baixaMsg')));
+
+  await p.waitForTimeout(4000);
   await p.click('#stop');
   await p.waitForFunction(() => /pronta|vazia/.test(document.getElementById('recMsg').textContent),
                           null, { timeout: 60000 });

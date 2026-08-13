@@ -83,6 +83,8 @@
     [/^Perguntar à ata: (.+)$/, 'Ask the minutes: $1'],
     [/^momento marcado em ([\d:]+)$/, 'moment flagged at $1'],
     [/^tela mostrada em ([\d:]+)$/, 'screen shown at $1'],
+    /* tamanho de arquivo é o mesmo nas duas línguas */
+    [/^[\d.,]+ (MB|GB)$/, '$&'],
     [/^★ ([\d:]+)$/, '★ $1'],
     [/^— (\d+) trechos?\.$/, '— $1 passages.'],
     [/^([\d.,]+)× o tempo real$/, '$1× real time'],

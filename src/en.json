@@ -621,5 +621,14 @@
  "Aparece com a ata na tela: resumo da reunião, decisões, pendências com responsável e prazo, e o e-mail pronto para os participantes.": "Appears once the minutes are on screen: meeting summary, decisions, open items with owner and due date, and the e-mail ready for the participants.",
  "com o plano": "with the plan",
  "telas": "screens",
- "Janelinha flutuante": "Floating window"
+ "Janelinha flutuante": "Floating window",
+ "usar a placa de vídeo": "use the graphics card",
+ "processador": "processor",
+ "Modelo pronto": "Model ready",
+ "WebGPU indisponível — usando o processador.": "WebGPU unavailable — using the processor.",
+ "The first time, this path downloads": "The first time, this path downloads",
+ "— after that it is kept in the browser and is not downloaded again.": "— after that it is kept in the browser and is not downloaded again.",
+ "On the graphics card the encoder comes uncompressed, which is why it is": "On the graphics card the encoder comes uncompressed, which is why it is",
+ "the size of the processor path.": "the size of the processor path.",
+ "the best text Whisper produces, and the only one in a different size league. Only choose it on a machine with room to spare.": "the best text Whisper produces, and the only one in a different size league. Only choose it on a machine with room to spare."
 }
