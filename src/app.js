@@ -633,9 +633,27 @@ registerProcessor('toca', Toca);`;
     if (!soMicrofone()) {
       $('recMsg').textContent = 'Agora escolha a janela da reunião e marque a opção de compartilhar o áudio…';
       try {
+        /* As três dicas abaixo existem para encurtar o ritual do seletor.
+
+           `systemAudio: include` pede ao Chrome que ofereça o áudio do sistema
+           inteiro, e não só o da aba — é o que faz a caixa de áudio aparecer
+           marcada por padrão, e é o que cobre reunião em programa instalado.
+
+           `selfBrowserSurface: exclude` tira a aba do próprio Salavox da lista.
+           Ela nunca é a resposta certa, e estava lá para ser escolhida por
+           engano no meio de uma reunião que já começou.
+
+           `surfaceSwitching: include` deixa trocar a janela compartilhada sem
+           parar a gravação. Antes, mudar de tela no meio encerrava tudo.
+
+           Navegador que não conhece essas chaves as ignora — não há caminho
+           novo aqui, só um seletor menos hostil onde ele existe. */
         telaFluxo = await navigator.mediaDevices.getDisplayMedia({
           video: $('tela').checked ? { frameRate: 8 } : { frameRate: 2 },
-          audio: true
+          audio: true,
+          systemAudio: 'include',
+          selfBrowserSurface: 'exclude',
+          surfaceSwitching: 'include'
         });
       } catch (e) {
         if (micFluxo) micFluxo.getTracks().forEach(t => t.stop());   // não deixa o microfone aberto à toa
@@ -653,6 +671,35 @@ registerProcessor('toca', Toca);`;
       if (telaFluxo) telaFluxo.getTracks().forEach(t => t.stop());
       $('recMsg').innerHTML = '<span class="err">Nenhuma fonte de áudio. Ao compartilhar, marque "compartilhar áudio".</span>';
       $('rec').disabled = false;
+      return;
+    }
+
+    /* Esqueceu de marcar a caixa do áudio: para aqui, e não no fim.
+
+       Este é o erro mais fácil de cometer no seletor do navegador e o mais
+       caro de descobrir tarde. Sem o áudio da aba, quem grava com alto-falante
+       ainda ouve os outros — pelo microfone, refletidos na sala. A gravação
+       não sai vazia, sai pior que vazia: sai com a reunião inteira atribuída a
+       uma pessoa só, e ninguém percebe até ler a ata.
+
+       Parar custa trinta segundos agora. Descobrir no fim custa a reunião. */
+    if (!temSistema && !soMicrofone()) {
+      telaFluxo.getTracks().forEach(t => t.stop());
+      if (micFluxo) micFluxo.getTracks().forEach(t => t.stop());
+      $('recMsg').innerHTML = T(
+        '<span class="err">A tela foi compartilhada sem o áudio.</span> Sem ele, as vozes dos outros ' +
+        'não entram — e, se você estiver no alto-falante, elas vazam pelo seu microfone e a ata sai ' +
+        'com a reunião toda atribuída a você. <b>Clique em gravar de novo e marque a caixa de ' +
+        'compartilhar o áudio</b> no seletor do navegador.',
+        '<span class="err">The screen was shared without the audio.</span> Without it the other ' +
+        'voices do not come in — and if you are on a speaker they leak through your microphone and the ' +
+        'minutes come out with the whole meeting attributed to you. <b>Click record again and tick the ' +
+        'share-audio box</b> in the browser picker.') +
+        ` <button class="ghost sm" id="soMeuMic">${T('gravar só o meu microfone',
+                                                     'record my microphone only')}</button>`;
+      $('rec').disabled = false;
+      const b = $('soMeuMic');
+      if (b) b.onclick = () => { $('modoMic').checked = true; $('modoMic').onchange(); $('rec').click(); };
       return;
     }
 
@@ -1146,6 +1193,59 @@ registerProcessor('toca', Toca);`;
      os cabeçalhos de isolamento: sem isolamento não há SharedArrayBuffer, e
      sem SharedArrayBuffer o WASM roda numa linha só, por mais núcleos que a
      máquina tenha. */
+  /* A placa de vídeo que falhou uma vez não é oferecida de novo.
+
+     A caixa existe porque em algumas máquinas a placa ajuda. Em outras, o
+     modelo de 4 bits simplesmente não abre — e aí ela não é uma opção, é uma
+     armadilha: some com a transcrição ao vivo, derruba o passo 2 e devolve uma
+     linha de C++ que não diz nada a quem só queria a ata.
+
+     Agora a primeira falha desliga a caixa NESTE navegador e escreve o porquê
+     ao lado dela. Não é decisão nossa tomada por todo mundo: é a máquina
+     respondendo por si, uma vez, em vez de repetir o mesmo erro a cada reunião.
+     Quem quiser insistir tem o "tentar de novo" ali do lado. */
+  const CHAVE_SEM_PLACA = 'salavox.semPlaca';
+
+  function desligarPlaca(porque) {
+    try { localStorage.setItem(CHAVE_SEM_PLACA, String(porque || 'sem detalhe').slice(0, 300)); } catch (e) {}
+    if ($('placa')) $('placa').checked = false;
+    mostrarPlaca();
+    avisarModeloEscolhido();
+  }
+
+  /* O `try` cobre só a leitura do armazenamento, e nada além dela.
+
+     Ele cobria a função inteira, e engoliu um defeito de verdade: a chamada
+     acontecia antes de `CHAVE_SEM_PLACA` existir, o erro de inicialização caía
+     dentro deste mesmo `try`, e a caixa continuava oferecida como se nada
+     tivesse acontecido. Try largo demais é lugar onde defeito se esconde. */
+  const porqueSemPlaca = () => {
+    try { return localStorage.getItem(CHAVE_SEM_PLACA); } catch (e) { return null; }
+  };
+
+  function mostrarPlaca() {
+    const porque = porqueSemPlaca();
+    const cx = $('placa'), aviso = $('placaMsg');
+    if (!cx || !aviso) return;
+    if (!porque) { cx.disabled = false; aviso.innerHTML = ''; return; }
+    cx.checked = false;
+    cx.disabled = true;
+    aviso.innerHTML = T(
+      'Neste navegador a placa de vídeo <b>não conseguiu abrir o modelo</b>, então ela saiu da frente. ' +
+      'O processador dá conta e costuma ser mais rápido em Whisper.',
+      'On this browser the graphics card <b>could not open the model</b>, so it stepped aside. ' +
+      'The processor handles it and is usually faster for Whisper.') +
+      ` <button class="ghost sm" id="placaDeNovo">${T('tentar de novo', 'try again')}</button>` +
+      `<br><span class="status">${escapar(String(porque).slice(0, 200))}</span>`;
+    const b = $('placaDeNovo');
+    if (b) b.onclick = () => {
+      try { localStorage.removeItem(CHAVE_SEM_PLACA); } catch (e) {}
+      promessaModelo = null;          // a próxima transcrição monta o modelo de novo
+      mostrarPlaca();
+      avisarModeloEscolhido();
+    };
+  }
+
   const quantasLinhas = (nucleos, isolado) => {
     if (!isolado) return 1;
     return Math.max(1, Math.min(4, (nucleos || 2) - 1));
@@ -1197,12 +1297,16 @@ registerProcessor('toca', Toca);`;
 
   const CODIGO_TRABALHADOR = `
     let pipe = null;
+    /* Guardados para poder remontar o modelo sem a placa de vídeo, se ele
+       falhar só na hora de transcrever. Ver o comentário lá embaixo. */
+    let mod = null, carga = null, motorAtual = null;
 
     self.onmessage = async ev => {
       const m = ev.data;
       try {
         if (m.tipo === 'carregar') {
-          const mod = await import(m.tjs);
+          carga = m;
+          mod = await import(m.tjs);
           if (m.espelho) { mod.env.remoteHost = m.espelho; mod.env.remotePathTemplate = '{model}'; }
           mod.env.allowLocalModels = false;
           mod.env.allowRemoteModels = true;
@@ -1296,19 +1400,48 @@ registerProcessor('toca', Toca);`;
             } catch (e) {
               ultimoErro = (e && e.message) || String(e);
               const resta = tentativas[i + 1];
-              self.postMessage({ tipo: 'aviso', msg: resta
+              self.postMessage({ tipo: 'aviso', caiu: t.motor, porque: ultimoErro, msg: resta
                 ? 'O modelo não abriu na ' + t.motor + '. Tentando ' +
                   (resta.motor === 'processador' ? 'no processador' : 'na ' + resta.motor) + '…'
                 : 'O modelo não abriu.' });
             }
           }
           if (!pipe) throw new Error(ultimoErro || 'não consegui montar o modelo');
+          motorAtual = motor;
           self.postMessage({ tipo: 'pronto', motor });
           return;
         }
         if (m.tipo === 'transcrever') {
           if (!pipe) throw new Error('o modelo ainda não está pronto');
-          const r = await pipe(m.dados, m.opts);
+          let r;
+          try {
+            r = await pipe(m.dados, m.opts);
+          } catch (e) {
+            /* O degrau também precisa existir AQUI.
+
+               A fila de tentativas cobria só o carregamento, e não bastou: o
+               relato de 13/08/2026 veio com o carimbo do build que já tinha a
+               fila, e mesmo assim a transcrição ao vivo parou. O motivo é que
+               montar o modelo pode dar certo e a sessão do ONNX só quebrar na
+               primeira transcrição — é lá que o arquivo de 4 bits é aberto de
+               verdade.
+
+               Quer dizer: a escolha da placa parecia ter funcionado, e a queda
+               vinha depois, num lugar onde ninguém tinha posto rede.
+
+               Agora, se a falha tem cara de sessão que não abre e estamos na
+               placa, o modelo é remontado no processador e ESTE MESMO pedido é
+               refeito. Uma vez só: se cair de novo, é erro de verdade. */
+            const msg = (e && e.message) || String(e);
+            const deSessao = /session|Missing required scale|MatMulNBits|DequantizeLinear|ERROR_CODE/i.test(msg);
+            if (!(motorAtual === 'placa de vídeo' && deSessao && mod && carga)) throw e;
+            self.postMessage({ tipo: 'aviso', caiu: 'placa de vídeo', porque: msg,
+              msg: 'O modelo abriu na placa de vídeo mas quebrou ao transcrever. Refazendo no processador…' });
+            pipe = await mod.pipeline('automatic-speech-recognition', carga.modelo, { dtype: 'q8' });
+            motorAtual = 'processador';
+            self.postMessage({ tipo: 'pronto', motor: 'processador' });
+            r = await pipe(m.dados, m.opts);
+          }
           self.postMessage({ tipo: 'trecho', id: m.id, opcoes: m.opts,
                              chunks: (r && r.chunks) || null, texto: (r && r.text) || '' });
           return;
@@ -1376,7 +1509,11 @@ registerProcessor('toca', Toca);`;
     trabalhador.onmessage = ev => {
       const m = ev.data;
       if (m.tipo === 'progresso' && avisoModelo) avisoModelo(m.pct, null, m.lidos, m.total);
-      else if (m.tipo === 'aviso' && avisoModelo) avisoModelo(null, m.msg);
+      else if (m.tipo === 'aviso') {
+        if (m.porque) guardarUltimoErro(m.porque);
+        if (m.caiu === 'placa de vídeo') desligarPlaca(m.porque);
+        if (avisoModelo) avisoModelo(null, m.msg);
+      }
       else if (m.tipo === 'pronto') {
         motorEmUso = m.motor || null;
         const p = pendentes.get('modelo');
@@ -1904,6 +2041,105 @@ registerProcessor('toca', Toca);`;
      é o que permite alguém pesquisar ou me mandar; mas vem acompanhada da
      frase que resolve, e do carimbo de versão, que é o que diz qual código
      estava rodando quando aquilo aconteceu. */
+  /* ============================================================
+     Diagnóstico: os fatos da máquina, num clique.
+
+     O botão existia na tela e não fazia nada — perdeu o código
+     quando a conta mudou de lugar. Ele volta fazendo o que faltava
+     nas últimas semanas: transformar "deu erro" em fatos.
+
+     Cada defeito que chegou aqui de uma reunião de verdade custou
+     uma ida e volta para descobrir o óbvio — qual versão estava no
+     ar, se a placa estava marcada, se os cabeçalhos de isolamento
+     chegaram, se o modelo estava guardado. Tudo isso a página sabe
+     e nunca foi perguntada.
+
+     Uma regra manda neste texto: **ele não pode conter reunião.**
+     Nem fala, nem título, nem nome de participante, nem e-mail. É
+     um relatório para colar num chat, e um relatório que vaza a
+     ata seria pior do que não existir. O teste guarda isso.
+     ============================================================ */
+
+  const CHAVE_ULTIMO_ERRO = 'salavox.ultimoErro';
+
+  function guardarUltimoErro(msg) {
+    try {
+      localStorage.setItem(CHAVE_ULTIMO_ERRO, JSON.stringify({
+        quando: new Date().toISOString(), msg: String(msg || '').slice(0, 300)
+      }));
+    } catch (e) {}
+  }
+
+  async function diagnosticar() {
+    const sim = v => v ? 'sim' : 'não';
+    const nav = navigator;
+    const linhas = [];
+    const põe = (k, v) => linhas.push(k + ': ' + v);
+
+    põe('Salavox', VERSAO);
+    põe('quando', new Date().toISOString());
+    põe('endereço', location.origin + location.pathname);
+    põe('idioma da tela', (window.SalavoxIdioma && window.SalavoxIdioma.atual()) || 'pt');
+    põe('navegador', (nav.userAgent || '').slice(0, 160));
+    põe('plataforma', nav.platform || '?');
+    põe('núcleos', String(nav.hardwareConcurrency || '?'));
+    põe('memória (GB)', String(nav.deviceMemory || '?'));
+
+    põe('isolado entre origens', sim(self.crossOriginIsolated));
+    põe('memória compartilhada', sim(typeof SharedArrayBuffer === 'function'));
+    põe('linhas do WASM', String(linhasDoWasm()));
+    põe('WebGPU no navegador', sim(!!nav.gpu));
+    põe('caixa da placa marcada', sim(usaPlaca()));
+    const semPlaca = porqueSemPlaca();
+    põe('placa desligada por falha', semPlaca ? 'sim — ' + semPlaca.slice(0, 160) : 'não');
+
+    põe('modelo escolhido', $('modelo').value);
+    põe('download previsto', emMB(tamanhoDoModelo() || 0));
+    põe('motor em uso', motorEmUso || 'ainda não carregou');
+    põe('origem do modelo', origemModelo);
+    põe('transcrever durante a reunião', sim($('aoVivo').checked));
+    põe('compactar o silêncio', sim($('compactar').checked));
+
+    const guardado = await modeloGuardado();
+    põe('modelo guardado no navegador', guardado
+      ? guardado.arquivos + ' arquivos' + (guardado.bytes ? ', ' + (guardado.bytes / 1048576).toFixed(0) + ' MB' : '')
+      : 'não');
+
+    try {
+      const persistido = nav.storage && nav.storage.persisted ? await nav.storage.persisted() : null;
+      põe('armazenamento persistente', persistido === null ? '?' : sim(persistido));
+      const e = nav.storage && nav.storage.estimate ? await nav.storage.estimate() : null;
+      if (e) põe('disco para o navegador',
+                 ((e.quota - e.usage) / 1073741824).toFixed(1) + ' GB livres de ' +
+                 (e.quota / 1073741824).toFixed(1) + ' GB');
+    } catch (e) {}
+    põe('gravação em disco (OPFS)', sim(TEM_OPFS));
+    põe('janelinha flutuante', sim('documentPictureInPicture' in window));
+
+    põe('camada paga configurada', sim(!!cfg));
+    põe('entrou na conta', sim(!!sessao));
+    põe('plano', perfil ? String(perfil.plano || '?') : '—');
+
+    let ultimo = null;
+    try { ultimo = JSON.parse(localStorage.getItem(CHAVE_ULTIMO_ERRO) || 'null'); } catch (e) {}
+    põe('último erro do motor', ultimo ? ultimo.quando + ' — ' + ultimo.msg : 'nenhum');
+
+    return linhas.join('\n');
+  }
+
+  $('diagnostico').onclick = async () => {
+    const cx = $('diagCaixa');
+    if (!cx.classList.contains('hide')) { cx.classList.add('hide'); return; }
+    $('diagTexto').textContent = T('Levantando…', 'Gathering…');
+    cx.classList.remove('hide');
+    $('diagTexto').textContent = await diagnosticar();
+  };
+
+  $('diagCopiar').onclick = async () => {
+    try { await navigator.clipboard.writeText($('diagTexto').textContent); } catch (e) {}
+    $('diagMsg').innerHTML = `<span class="ok">${T('copiado', 'copied')}</span>`;
+  };
+
   /* A versão sai do rodapé, que o build carimba. Ler dali evita um segundo
      lugar para o mesmo número — e um segundo lugar é onde ele fica velho. */
   const VERSAO = (() => {
@@ -3363,6 +3599,7 @@ registerProcessor('toca', Toca);`;
 
   iniciarConta();
   desenharPassos();
+  mostrarPlaca();      // depois de tudo declarado: ela lê armazenamento e escreve HTML
 
   /* ============================================================
      Recuperação. Como cada pedaço é fechado no disco assim que

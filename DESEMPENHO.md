@@ -398,3 +398,24 @@ fila e a corrida fica vermelha — sem ela, o degrau poderia ser apagado sem nin
 A reunião inteira também foi reproduzida com `ferramentas/medir-paralelo.mjs`: com a placa marcada e o
 modelo recusando, a transcrição ao vivo começa aos 18 s **no processador** e faz quatro chamadas
 durante a gravação, em vez de morrer no primeiro segundo.
+
+### O mesmo erro, uma camada abaixo
+
+O relato seguinte veio com o carimbo `2026-08-13.4d01d9f` — **o build que já tinha a fila de
+tentativas** — e mesmo assim a transcrição ao vivo parou, com a mesma linha de C++.
+
+A fila cobria só o **carregamento** do modelo. E o defeito não estava lá: montar o modelo dava certo,
+e a sessão do ONNX quebrava na **primeira transcrição** — que é quando o arquivo de 4 bits é aberto de
+verdade. A escolha da placa parecia ter funcionado, e a queda vinha depois, num lugar onde não havia
+rede nenhuma.
+
+Agora a rede existe nos dois lugares. Se um pedido de transcrição falha com cara de sessão que não
+abre, e estamos na placa, o modelo é remontado no processador e **aquele mesmo pedido é refeito** —
+uma vez só, para que erro de verdade continue sendo erro. A caixa da placa também se desliga por este
+caminho.
+
+A lição vale mais que o conserto: **eu tinha inferido onde o erro acontecia em vez de tratar onde ele
+aparece.** O simulacro que escrevi na primeira vez falhava no carregamento, então ele concordava com a
+minha hipótese e o teste ficava verde sobre um produto que quebrava na reunião. O novo simulacro
+(`modeloQueQuebraAoTranscrever`) abre normalmente e quebra na primeira chamada — que foi o que
+aconteceu de verdade.

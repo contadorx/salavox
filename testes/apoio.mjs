@@ -72,6 +72,21 @@ export function micMudo() {
    Fica o registro porque a tentação de simular estava a um passo, e simular
    teria escondido o recurso funcionando. */
 
+/* Tela compartilhada SEM a caixa de áudio marcada.
+
+   É o erro mais fácil de cometer no seletor do navegador, e o mais caro de
+   descobrir tarde: sem o áudio da aba, quem grava no alto-falante ainda ouve os
+   outros pelo microfone, refletidos na sala. A gravação não sai vazia — sai com
+   a reunião inteira atribuída a uma pessoa só. */
+export function telaSemAudio() {
+  return `navigator.mediaDevices.getDisplayMedia = async () => {
+    const c = document.createElement('canvas'); c.width = 320; c.height = 180;
+    const x = c.getContext('2d');
+    setInterval(() => { x.fillStyle = '#345'; x.fillRect(0, 0, 320, 180); }, 100);
+    return c.captureStream(8);          // vídeo e só: nenhuma trilha de áudio
+  };`;
+}
+
 export function telaFalsa(segundosPorSlide) {
   return `(spp => {
     navigator.mediaDevices.getDisplayMedia = async () => {
@@ -129,6 +144,34 @@ export function telaFalsa(segundosPorSlide) {
    pedem WebGPU ou um `dtype` por arquivo (que é como se pede o de 4 bits).
    Nas demais, ele transcreve normalmente — é isso que permite verificar que a
    ferramenta cai no processador em vez de desistir. */
+/* O mesmo defeito, mas escondido um passo adiante.
+
+   Este é o que realmente aconteceu em 13/08/2026: o relato veio com o carimbo
+   do build que JÁ tinha a fila de tentativas, e mesmo assim a transcrição ao
+   vivo parou. A explicação é que montar o modelo deu certo e a sessão do ONNX
+   só quebrou na primeira transcrição — que é quando o arquivo de 4 bits é
+   aberto de verdade.
+
+   Um simulacro que falhasse no carregamento teria dito "está tudo bem" sobre
+   um produto que quebrava na reunião. Este falha onde o de verdade falhou. */
+export function modeloQueQuebraAoTranscrever() {
+  const ERRO = "Can't create a session. ERROR_CODE: 1, ERROR_MESSAGE: qdq_actions.cc:137 " +
+    "TransposeDQWeightsForMatMulNBits Missing required scale: " +
+    "model.decoder.embed_tokens.weight_merged_0_scale for node: " +
+    "model.decoder.embed_tokens.weight_transposed_DequantizeLinear";
+  return {
+    contentType: 'application/javascript',
+    body: MODELO_FALSO.body.replace(
+      'export async function pipeline(){ return async (d, opts) => { n++;',
+      'export async function pipeline(tarefa, modelo, opts){\n' +
+      '      const quatroBits = !!(opts && (opts.device === "webgpu" ||\n' +
+      '                                     (opts.dtype && typeof opts.dtype === "object")));\n' +
+      '      return async (d, opts2) => { n++;\n' +
+      '        if (quatroBits) throw new Error(' + JSON.stringify(ERRO) + ');\n' +
+      '        const opts = opts2;')
+  };
+}
+
 export function modeloQueRecusaQuatroBits() {
   const ERRO = "Can't create a session. ERROR_CODE: 1, ERROR_MESSAGE: qdq_actions.cc:137 " +
     "TransposeDQWeightsForMatMulNBits Missing required scale: " +

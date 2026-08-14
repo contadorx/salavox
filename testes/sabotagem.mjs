@@ -72,6 +72,15 @@ const SABOTAGENS = [
     pega: 'quem não consegue abrir o modelo de 4 bits ficaria sem transcrição, com uma linha de C++ na tela'
   },
   {
+    /* A rede que faltava. Ela existia só no carregamento, e o defeito real
+       acontecia uma camada depois — na primeira transcrição. */
+    nome: 'a queda na hora de transcrever volta a não ter rede',
+    teste: 'extras',
+    porta: 8199,
+    trocas: [["            if (!(motorAtual === 'placa de v\u00eddeo' && deSessao && mod && carga)) throw e;", "            throw e;"]],
+    pega: 'o modelo que abre e quebra ao transcrever mataria a ata sem cair no processador'
+  },
+  {
     nome: 'nome escolhido para a fala é ignorado',
     teste: 'extras',
     porta: 8146,

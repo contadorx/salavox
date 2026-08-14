@@ -175,6 +175,31 @@ export default async function (ctx, url, erros) {
   const texto2 = await p.evaluate(() => window.__salavox.comoTexto());
   b.verdade('a correção aparece no texto exportado', /Texto corrigido à mão pelo contador\./.test(texto2));
 
+  /* ---------- o diagnóstico ----------
+
+     O botão existia na tela e não fazia nada desde que a conta mudou de lugar.
+     Agora ele levanta os fatos da máquina — e a regra que manda nele é o que
+     este trecho guarda: **não pode conter reunião**. É um texto feito para ser
+     colado num chamado, e um relatório que vaza a ata seria pior do que não
+     existir. */
+  await p.click('#diagnostico');
+  await p.waitForFunction(() => /Salavox:/.test(document.getElementById('diagTexto').textContent),
+                          null, { timeout: 15000 });
+  const laudo = await p.textContent('#diagTexto');
+
+  b.verdade('o diagnóstico traz a versão, o isolamento e as linhas do processador',
+            /Salavox: \d{4}-\d{2}-\d{2}\./.test(laudo) &&
+            /isolado entre origens: (sim|não)/.test(laudo) &&
+            /linhas do WASM: \d/.test(laudo));
+  b.verdade('e diz o que está guardado e qual motor rodou',
+            /modelo guardado no navegador:/.test(laudo) && /motor em uso:/.test(laudo));
+
+  const falado = await p.evaluate(() => window.__salavox.falas().map(f => f.texto));
+  b.conferir('e não leva uma linha sequer da reunião junto',
+             falado.filter(t => t && t.length > 8 && laudo.indexOf(t) >= 0), []);
+  b.verdade('nem o título que foi digitado',
+            laudo.indexOf('Fechamento do balanço') < 0);
+
   const espera = p.waitForEvent('download', { timeout: 60000 });
   await p.click('#baixarPdf');
   const arq = await espera;

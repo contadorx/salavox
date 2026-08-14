@@ -96,6 +96,14 @@
                      font-size:13.5px;line-height:1.5}
   label.chk.destaque input{margin-top:3px}
   label.chk.destaque b{color:var(--verde-escuro)}
+  .diagCaixa{background:#fff;border:1px solid var(--linha);border-radius:12px;padding:14px 16px;
+             margin:0 auto 26px}
+  .rodape button{margin-left:10px;background:transparent;color:var(--brilho);border:1px solid rgba(255,255,255,.2);
+                 box-shadow:none;padding:5px 12px;font-size:12.5px}
+  .rodape button:hover{background:rgba(255,255,255,.08);color:#fff;transform:none}
+  .diagCaixa pre{font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;
+                 background:var(--superficie);border-radius:8px;padding:12px 14px;margin:8px 0 12px;
+                 max-height:340px;overflow:auto;color:var(--tinta)}
   .espera{font-size:13.5px;color:var(--muted);margin:-4px 0 0 41px;max-width:640px}
   .card.agora .espera,.card.feito .espera{display:none}
 
@@ -297,9 +305,10 @@
   <div class="faixaConta hide" id="contaCard">
     <span id="contaEstado">—</span>
     <a class="link" href="/conta" id="irConta">sua conta</a>
-    <button id="diagnostico" class="ghost sm hide">Diagnóstico</button>
     <span class="status" id="contaMsg"></span>
   </div>
+
+
 
   <div class="card hide" id="recupCard" style="border-color:var(--warn)">
     <h2 style="color:var(--warn)">Gravação interrompida</h2>
@@ -401,6 +410,7 @@
     <div class="row" style="margin-top:2px">
       <label class="chk"><input type="checkbox" id="compactar" checked> compactar o silêncio antes de transcrever</label>
       <label class="chk"><input type="checkbox" id="placa"> usar a placa de vídeo</label>
+      <div class="status" id="placaMsg" style="flex-basis:100%"></div>
     </div>
     <details class="vocab">
       <summary>Vocabulário do escritório</summary>
@@ -537,8 +547,19 @@
 
 </div>
 
+  <div class="diagCaixa hide wrap" id="diagCaixa">
+    <p class="status">Os fatos desta máquina, para colar num chamado. <b>Não vai reunião nenhuma
+    aqui dentro</b> — nem fala, nem título, nem participante.</p>
+    <pre id="diagTexto" data-usuario></pre>
+    <div class="row">
+      <button class="ghost sm" id="diagCopiar">Copiar</button>
+      <span class="status" id="diagMsg"></span>
+    </div>
+  </div>
+
 <footer class="rodape">
-  Salavox versão <code>2026-08-13.4d01d9f</code> — tudo roda neste computador.
+  Salavox versão <code>2026-08-13.320caa4</code> — tudo roda neste computador.
+  <button id="diagnostico" class="ghost sm">Diagnóstico</button>
   <a href="/privacidade">privacidade</a><a href="/termos">termos</a><a href="/">site</a>
 </footer>
 <script>/* ============================================================
@@ -665,6 +686,7 @@
     "Abrir": "Open",
     "Abrir o Salavox": "Open Salavox",
     "Abrir o Salavox — é grátis": "Open Salavox — it's free",
+    "Agora escolha a janela da reunião e marque a opção de compartilhar o áudio…": "Now pick the meeting window and tick the option to share the audio…",
     "Aguenta uma reunião de duas horas?": "Does it hold up in a two-hour meeting?",
     "Alterações": "Changes",
     "Antes de gravar": "Before you record",
@@ -830,6 +852,7 @@
     "Nenhum robô entra na chamada e nada sai do seu computador — a gravação e a transcrição acontecem aqui, no seu navegador.": "No bot joins the call and nothing leaves your computer — recording and transcription happen right here, in your browser.",
     "Nenhum robô entra na chamada — e, mais importante,": "No bot joins the call — and, more to the point,",
     "Nenhuma ferramenta de nuvem faz isso": "No cloud tool does this",
+    "Nenhuma fonte de áudio. Ao compartilhar, marque \"compartilhar áudio\".": "No audio source. When sharing, tick \"share audio\".",
     "Next steps": "Next steps",
     "No seu computador, e só. A gravação, a transcrição e a ata nascem e ficam aí — não há para onde elas subirem. Se você assinar o plano pago existe conta e existe servidor, mas o que ele vê é o seu e-mail, o seu plano e quantos resumos você pediu no mês; gravação, ele nunca vê. Esta página, aliás, não faz uma única chamada a servidor de terceiro: nem fonte, nem rastreador, nem estatística.": "On your computer, and nowhere else. The recording, the transcript and the minutes are born and stay there — there is nowhere for them to go up to. If you subscribe to the paid plan there is an account and there is a server, but what it sees is your e-mail, your plan and how many summaries you asked for this month; the recording, it never sees. This page, incidentally, does not make a single call to any third-party server: no font, no tracker, no analytics.",
     "Nome de cliente, sigla e termo técnico que a transcrição sempre erra: escreva uma vez e ele corrige em todas as atas. Em português — o que nem os pagos oferecem.": "Client names, acronyms and technical terms the transcript always gets wrong: write them once and it fixes them in every set of minutes.",
@@ -840,6 +863,7 @@
     "Não garantimos funcionamento ininterrupto. O serviço pode ser alterado, suspenso ou encerrado a qualquer momento.": "We do not warrant uninterrupted operation. The service may be changed, suspended or discontinued at any time.",
     "Não há caminho no produto para esse material sair do seu computador. Sem conta, também não recebemos absolutamente nada: não há login, não há cookies e não há registro de uso. Se você assinar o plano pago, passamos a guardar o seu e-mail e a contagem de resumos do mês, e o": "There is no path in the product for that material to leave your computer. Without an account, we also receive absolutely nothing: there is no login, there are no cookies and there is no usage record. If you subscribe to the paid plan, we start keeping your e-mail and the month's summary count, and the",
     "Não utilizamos cookies próprios nem de terceiros para rastreamento, publicidade ou análise.": "We use no cookies of our own or of third parties for tracking, advertising or analytics.",
+    "Não vai reunião nenhuma aqui dentro": "No meeting content goes in here",
     "Não é recurso de plano pago. Quem grava reunião de cliente precisa disso na primeira reunião, não na trigésima.": "It is not a paid-plan feature. Anyone recording a client meeting needs this at the first meeting, not the thirtieth.",
     "Não, e vale entender por quê. Certificado de segurança atesta como uma empresa cuida do dado que recebe. O Salavox quase não recebe dado: a gravação, a transcrição e a ata nascem e ficam no seu computador, e não existe caminho para elas subirem. O que chega ao nosso servidor, e só de quem assina e só quando clica, é o texto da ata para gerar um resumo — usado e descartado na mesma requisição. Não há gravação para vazar e não há funcionário nosso com acesso a reunião nenhuma. O resto do que há para auditar é o seu próprio computador, e disso a política de segurança do seu escritório já cuida.": "No, and it is worth understanding why. A security certificate attests to how a company looks after the data it receives. Salavox receives almost no data: the recording, the transcript and the minutes are born and stay on your computer, and there is no path for them to go up. What reaches our server, and only from subscribers and only when they click, is the text of the minutes to produce a summary — used and discarded in the same request. There is no recording to leak and no employee of ours with access to any meeting. The rest of what there is to audit is your own computer, and your practice's security policy already covers that.",
     "Não. Nenhum robô entra na chamada e nada aparece na lista de participantes. Justamente por isso avisar é obrigação sua — e o Salavox insiste nisso antes de deixar você gravar.": "No. No bot joins the call and nothing appears in the participant list. That is exactly why giving notice is your duty — and Salavox insists on it before letting you record.",
@@ -887,6 +911,7 @@
     "Organised minutes": "Organised minutes",
     "Organizar a ata": "Organise the minutes",
     "Os dados dos participantes são de sua responsabilidade": "The participants' data are your responsibility",
+    "Os fatos desta máquina, para colar num chamado.": "The facts about this machine, to paste into a support request.",
     "Os nomes são seus": "The names are yours",
     "Os outros participantes veem alguma coisa?": "Do the other participants see anything?",
     "Os preços podem mudar; qualquer alteração será avisada com antecedência e valerá a partir do ciclo seguinte.": "Prices may change; any change will be announced in advance and will apply from the following cycle.",
@@ -1103,6 +1128,7 @@
     "escolha no computador": "pick one from your computer",
     "ferramenta gratuita": "free tool",
     "gratuitos, sem cadastro e sem limite de duração": "free, with no sign-up and no limit on length",
+    "gravar só o meu microfone": "record my microphone only",
     "gravação pronta": "recording ready",
     "grátis com teto de armazenamento; pago de R$ 26 a 180 por pessoa/mês": "free with a storage ceiling; paid from R$ 26 to 180 per person/month",
     "grátis; R$ 19,90/mês para o resumo por IA": "free; R$ 19.90/month for the AI summary",
@@ -1188,6 +1214,7 @@
     "sua vez": "your turn",
     "só o microfone — é o modo que funciona no celular": "microphone only — this is the mode that works on a phone",
     "telas": "screens",
+    "tentar de novo": "try again",
     "ter": "having it",
     "termos": "terms",
     "termos de uso": "terms of use",
@@ -1217,6 +1244,7 @@
     "— e leva tudo para o PDF e para o arquivo de texto.": "— and carries it all into the PDF and the text file.",
     "— está no que você entrega em troca. Nelas, o resumo sai de uma reunião que já mora no servidor delas, com áudio e vídeo. Aqui, o áudio nunca sai do seu computador: o que sobe é o": "— it is in what you hand over in exchange. In theirs, the summary comes from a meeting that already lives on their server, with audio and video. Here the audio never leaves your computer: what goes up is the",
     "— guardamos o seu e-mail, o plano, a data de validade e a contagem de resumos usados no mês. É o mínimo para saber quem você é e se a assinatura está em dia. Não há senha: a entrada é por link enviado ao seu e-mail, e a sessão fica no seu navegador.": "— we keep your e-mail, the plan, the expiry date and the count of summaries used this month. It is the minimum needed to know who you are and whether the subscription is current. There is no password: entry is by a link sent to your e-mail, and the session stays in your browser.",
+    "— nem fala, nem título, nem participante.": "— no speech, no title, no participant.",
     "— o arquivo fica lá dentro": "— the file stays inside",
     "— o passo 2 vai aproveitá-las.": "— step 2 will make use of them.",
     "— para assinar é preciso informar nome e CPF/CNPJ, que são enviados à": "— to subscribe you must give a name and a tax ID, which are sent to",
@@ -2506,9 +2534,27 @@ registerProcessor('toca', Toca);`;
     if (!soMicrofone()) {
       $('recMsg').textContent = 'Agora escolha a janela da reunião e marque a opção de compartilhar o áudio…';
       try {
+        /* As três dicas abaixo existem para encurtar o ritual do seletor.
+
+           `systemAudio: include` pede ao Chrome que ofereça o áudio do sistema
+           inteiro, e não só o da aba — é o que faz a caixa de áudio aparecer
+           marcada por padrão, e é o que cobre reunião em programa instalado.
+
+           `selfBrowserSurface: exclude` tira a aba do próprio Salavox da lista.
+           Ela nunca é a resposta certa, e estava lá para ser escolhida por
+           engano no meio de uma reunião que já começou.
+
+           `surfaceSwitching: include` deixa trocar a janela compartilhada sem
+           parar a gravação. Antes, mudar de tela no meio encerrava tudo.
+
+           Navegador que não conhece essas chaves as ignora — não há caminho
+           novo aqui, só um seletor menos hostil onde ele existe. */
         telaFluxo = await navigator.mediaDevices.getDisplayMedia({
           video: $('tela').checked ? { frameRate: 8 } : { frameRate: 2 },
-          audio: true
+          audio: true,
+          systemAudio: 'include',
+          selfBrowserSurface: 'exclude',
+          surfaceSwitching: 'include'
         });
       } catch (e) {
         if (micFluxo) micFluxo.getTracks().forEach(t => t.stop());   // não deixa o microfone aberto à toa
@@ -2526,6 +2572,35 @@ registerProcessor('toca', Toca);`;
       if (telaFluxo) telaFluxo.getTracks().forEach(t => t.stop());
       $('recMsg').innerHTML = '<span class="err">Nenhuma fonte de áudio. Ao compartilhar, marque "compartilhar áudio".</span>';
       $('rec').disabled = false;
+      return;
+    }
+
+    /* Esqueceu de marcar a caixa do áudio: para aqui, e não no fim.
+
+       Este é o erro mais fácil de cometer no seletor do navegador e o mais
+       caro de descobrir tarde. Sem o áudio da aba, quem grava com alto-falante
+       ainda ouve os outros — pelo microfone, refletidos na sala. A gravação
+       não sai vazia, sai pior que vazia: sai com a reunião inteira atribuída a
+       uma pessoa só, e ninguém percebe até ler a ata.
+
+       Parar custa trinta segundos agora. Descobrir no fim custa a reunião. */
+    if (!temSistema && !soMicrofone()) {
+      telaFluxo.getTracks().forEach(t => t.stop());
+      if (micFluxo) micFluxo.getTracks().forEach(t => t.stop());
+      $('recMsg').innerHTML = T(
+        '<span class="err">A tela foi compartilhada sem o áudio.</span> Sem ele, as vozes dos outros ' +
+        'não entram — e, se você estiver no alto-falante, elas vazam pelo seu microfone e a ata sai ' +
+        'com a reunião toda atribuída a você. <b>Clique em gravar de novo e marque a caixa de ' +
+        'compartilhar o áudio</b> no seletor do navegador.',
+        '<span class="err">The screen was shared without the audio.</span> Without it the other ' +
+        'voices do not come in — and if you are on a speaker they leak through your microphone and the ' +
+        'minutes come out with the whole meeting attributed to you. <b>Click record again and tick the ' +
+        'share-audio box</b> in the browser picker.') +
+        ` <button class="ghost sm" id="soMeuMic">${T('gravar só o meu microfone',
+                                                     'record my microphone only')}</button>`;
+      $('rec').disabled = false;
+      const b = $('soMeuMic');
+      if (b) b.onclick = () => { $('modoMic').checked = true; $('modoMic').onchange(); $('rec').click(); };
       return;
     }
 
@@ -3019,6 +3094,59 @@ registerProcessor('toca', Toca);`;
      os cabeçalhos de isolamento: sem isolamento não há SharedArrayBuffer, e
      sem SharedArrayBuffer o WASM roda numa linha só, por mais núcleos que a
      máquina tenha. */
+  /* A placa de vídeo que falhou uma vez não é oferecida de novo.
+
+     A caixa existe porque em algumas máquinas a placa ajuda. Em outras, o
+     modelo de 4 bits simplesmente não abre — e aí ela não é uma opção, é uma
+     armadilha: some com a transcrição ao vivo, derruba o passo 2 e devolve uma
+     linha de C++ que não diz nada a quem só queria a ata.
+
+     Agora a primeira falha desliga a caixa NESTE navegador e escreve o porquê
+     ao lado dela. Não é decisão nossa tomada por todo mundo: é a máquina
+     respondendo por si, uma vez, em vez de repetir o mesmo erro a cada reunião.
+     Quem quiser insistir tem o "tentar de novo" ali do lado. */
+  const CHAVE_SEM_PLACA = 'salavox.semPlaca';
+
+  function desligarPlaca(porque) {
+    try { localStorage.setItem(CHAVE_SEM_PLACA, String(porque || 'sem detalhe').slice(0, 300)); } catch (e) {}
+    if ($('placa')) $('placa').checked = false;
+    mostrarPlaca();
+    avisarModeloEscolhido();
+  }
+
+  /* O `try` cobre só a leitura do armazenamento, e nada além dela.
+
+     Ele cobria a função inteira, e engoliu um defeito de verdade: a chamada
+     acontecia antes de `CHAVE_SEM_PLACA` existir, o erro de inicialização caía
+     dentro deste mesmo `try`, e a caixa continuava oferecida como se nada
+     tivesse acontecido. Try largo demais é lugar onde defeito se esconde. */
+  const porqueSemPlaca = () => {
+    try { return localStorage.getItem(CHAVE_SEM_PLACA); } catch (e) { return null; }
+  };
+
+  function mostrarPlaca() {
+    const porque = porqueSemPlaca();
+    const cx = $('placa'), aviso = $('placaMsg');
+    if (!cx || !aviso) return;
+    if (!porque) { cx.disabled = false; aviso.innerHTML = ''; return; }
+    cx.checked = false;
+    cx.disabled = true;
+    aviso.innerHTML = T(
+      'Neste navegador a placa de vídeo <b>não conseguiu abrir o modelo</b>, então ela saiu da frente. ' +
+      'O processador dá conta e costuma ser mais rápido em Whisper.',
+      'On this browser the graphics card <b>could not open the model</b>, so it stepped aside. ' +
+      'The processor handles it and is usually faster for Whisper.') +
+      ` <button class="ghost sm" id="placaDeNovo">${T('tentar de novo', 'try again')}</button>` +
+      `<br><span class="status">${escapar(String(porque).slice(0, 200))}</span>`;
+    const b = $('placaDeNovo');
+    if (b) b.onclick = () => {
+      try { localStorage.removeItem(CHAVE_SEM_PLACA); } catch (e) {}
+      promessaModelo = null;          // a próxima transcrição monta o modelo de novo
+      mostrarPlaca();
+      avisarModeloEscolhido();
+    };
+  }
+
   const quantasLinhas = (nucleos, isolado) => {
     if (!isolado) return 1;
     return Math.max(1, Math.min(4, (nucleos || 2) - 1));
@@ -3070,12 +3198,16 @@ registerProcessor('toca', Toca);`;
 
   const CODIGO_TRABALHADOR = `
     let pipe = null;
+    /* Guardados para poder remontar o modelo sem a placa de vídeo, se ele
+       falhar só na hora de transcrever. Ver o comentário lá embaixo. */
+    let mod = null, carga = null, motorAtual = null;
 
     self.onmessage = async ev => {
       const m = ev.data;
       try {
         if (m.tipo === 'carregar') {
-          const mod = await import(m.tjs);
+          carga = m;
+          mod = await import(m.tjs);
           if (m.espelho) { mod.env.remoteHost = m.espelho; mod.env.remotePathTemplate = '{model}'; }
           mod.env.allowLocalModels = false;
           mod.env.allowRemoteModels = true;
@@ -3169,19 +3301,48 @@ registerProcessor('toca', Toca);`;
             } catch (e) {
               ultimoErro = (e && e.message) || String(e);
               const resta = tentativas[i + 1];
-              self.postMessage({ tipo: 'aviso', msg: resta
+              self.postMessage({ tipo: 'aviso', caiu: t.motor, porque: ultimoErro, msg: resta
                 ? 'O modelo não abriu na ' + t.motor + '. Tentando ' +
                   (resta.motor === 'processador' ? 'no processador' : 'na ' + resta.motor) + '…'
                 : 'O modelo não abriu.' });
             }
           }
           if (!pipe) throw new Error(ultimoErro || 'não consegui montar o modelo');
+          motorAtual = motor;
           self.postMessage({ tipo: 'pronto', motor });
           return;
         }
         if (m.tipo === 'transcrever') {
           if (!pipe) throw new Error('o modelo ainda não está pronto');
-          const r = await pipe(m.dados, m.opts);
+          let r;
+          try {
+            r = await pipe(m.dados, m.opts);
+          } catch (e) {
+            /* O degrau também precisa existir AQUI.
+
+               A fila de tentativas cobria só o carregamento, e não bastou: o
+               relato de 13/08/2026 veio com o carimbo do build que já tinha a
+               fila, e mesmo assim a transcrição ao vivo parou. O motivo é que
+               montar o modelo pode dar certo e a sessão do ONNX só quebrar na
+               primeira transcrição — é lá que o arquivo de 4 bits é aberto de
+               verdade.
+
+               Quer dizer: a escolha da placa parecia ter funcionado, e a queda
+               vinha depois, num lugar onde ninguém tinha posto rede.
+
+               Agora, se a falha tem cara de sessão que não abre e estamos na
+               placa, o modelo é remontado no processador e ESTE MESMO pedido é
+               refeito. Uma vez só: se cair de novo, é erro de verdade. */
+            const msg = (e && e.message) || String(e);
+            const deSessao = /session|Missing required scale|MatMulNBits|DequantizeLinear|ERROR_CODE/i.test(msg);
+            if (!(motorAtual === 'placa de vídeo' && deSessao && mod && carga)) throw e;
+            self.postMessage({ tipo: 'aviso', caiu: 'placa de vídeo', porque: msg,
+              msg: 'O modelo abriu na placa de vídeo mas quebrou ao transcrever. Refazendo no processador…' });
+            pipe = await mod.pipeline('automatic-speech-recognition', carga.modelo, { dtype: 'q8' });
+            motorAtual = 'processador';
+            self.postMessage({ tipo: 'pronto', motor: 'processador' });
+            r = await pipe(m.dados, m.opts);
+          }
           self.postMessage({ tipo: 'trecho', id: m.id, opcoes: m.opts,
                              chunks: (r && r.chunks) || null, texto: (r && r.text) || '' });
           return;
@@ -3249,7 +3410,11 @@ registerProcessor('toca', Toca);`;
     trabalhador.onmessage = ev => {
       const m = ev.data;
       if (m.tipo === 'progresso' && avisoModelo) avisoModelo(m.pct, null, m.lidos, m.total);
-      else if (m.tipo === 'aviso' && avisoModelo) avisoModelo(null, m.msg);
+      else if (m.tipo === 'aviso') {
+        if (m.porque) guardarUltimoErro(m.porque);
+        if (m.caiu === 'placa de vídeo') desligarPlaca(m.porque);
+        if (avisoModelo) avisoModelo(null, m.msg);
+      }
       else if (m.tipo === 'pronto') {
         motorEmUso = m.motor || null;
         const p = pendentes.get('modelo');
@@ -3777,6 +3942,105 @@ registerProcessor('toca', Toca);`;
      é o que permite alguém pesquisar ou me mandar; mas vem acompanhada da
      frase que resolve, e do carimbo de versão, que é o que diz qual código
      estava rodando quando aquilo aconteceu. */
+  /* ============================================================
+     Diagnóstico: os fatos da máquina, num clique.
+
+     O botão existia na tela e não fazia nada — perdeu o código
+     quando a conta mudou de lugar. Ele volta fazendo o que faltava
+     nas últimas semanas: transformar "deu erro" em fatos.
+
+     Cada defeito que chegou aqui de uma reunião de verdade custou
+     uma ida e volta para descobrir o óbvio — qual versão estava no
+     ar, se a placa estava marcada, se os cabeçalhos de isolamento
+     chegaram, se o modelo estava guardado. Tudo isso a página sabe
+     e nunca foi perguntada.
+
+     Uma regra manda neste texto: **ele não pode conter reunião.**
+     Nem fala, nem título, nem nome de participante, nem e-mail. É
+     um relatório para colar num chat, e um relatório que vaza a
+     ata seria pior do que não existir. O teste guarda isso.
+     ============================================================ */
+
+  const CHAVE_ULTIMO_ERRO = 'salavox.ultimoErro';
+
+  function guardarUltimoErro(msg) {
+    try {
+      localStorage.setItem(CHAVE_ULTIMO_ERRO, JSON.stringify({
+        quando: new Date().toISOString(), msg: String(msg || '').slice(0, 300)
+      }));
+    } catch (e) {}
+  }
+
+  async function diagnosticar() {
+    const sim = v => v ? 'sim' : 'não';
+    const nav = navigator;
+    const linhas = [];
+    const põe = (k, v) => linhas.push(k + ': ' + v);
+
+    põe('Salavox', VERSAO);
+    põe('quando', new Date().toISOString());
+    põe('endereço', location.origin + location.pathname);
+    põe('idioma da tela', (window.SalavoxIdioma && window.SalavoxIdioma.atual()) || 'pt');
+    põe('navegador', (nav.userAgent || '').slice(0, 160));
+    põe('plataforma', nav.platform || '?');
+    põe('núcleos', String(nav.hardwareConcurrency || '?'));
+    põe('memória (GB)', String(nav.deviceMemory || '?'));
+
+    põe('isolado entre origens', sim(self.crossOriginIsolated));
+    põe('memória compartilhada', sim(typeof SharedArrayBuffer === 'function'));
+    põe('linhas do WASM', String(linhasDoWasm()));
+    põe('WebGPU no navegador', sim(!!nav.gpu));
+    põe('caixa da placa marcada', sim(usaPlaca()));
+    const semPlaca = porqueSemPlaca();
+    põe('placa desligada por falha', semPlaca ? 'sim — ' + semPlaca.slice(0, 160) : 'não');
+
+    põe('modelo escolhido', $('modelo').value);
+    põe('download previsto', emMB(tamanhoDoModelo() || 0));
+    põe('motor em uso', motorEmUso || 'ainda não carregou');
+    põe('origem do modelo', origemModelo);
+    põe('transcrever durante a reunião', sim($('aoVivo').checked));
+    põe('compactar o silêncio', sim($('compactar').checked));
+
+    const guardado = await modeloGuardado();
+    põe('modelo guardado no navegador', guardado
+      ? guardado.arquivos + ' arquivos' + (guardado.bytes ? ', ' + (guardado.bytes / 1048576).toFixed(0) + ' MB' : '')
+      : 'não');
+
+    try {
+      const persistido = nav.storage && nav.storage.persisted ? await nav.storage.persisted() : null;
+      põe('armazenamento persistente', persistido === null ? '?' : sim(persistido));
+      const e = nav.storage && nav.storage.estimate ? await nav.storage.estimate() : null;
+      if (e) põe('disco para o navegador',
+                 ((e.quota - e.usage) / 1073741824).toFixed(1) + ' GB livres de ' +
+                 (e.quota / 1073741824).toFixed(1) + ' GB');
+    } catch (e) {}
+    põe('gravação em disco (OPFS)', sim(TEM_OPFS));
+    põe('janelinha flutuante', sim('documentPictureInPicture' in window));
+
+    põe('camada paga configurada', sim(!!cfg));
+    põe('entrou na conta', sim(!!sessao));
+    põe('plano', perfil ? String(perfil.plano || '?') : '—');
+
+    let ultimo = null;
+    try { ultimo = JSON.parse(localStorage.getItem(CHAVE_ULTIMO_ERRO) || 'null'); } catch (e) {}
+    põe('último erro do motor', ultimo ? ultimo.quando + ' — ' + ultimo.msg : 'nenhum');
+
+    return linhas.join('\n');
+  }
+
+  $('diagnostico').onclick = async () => {
+    const cx = $('diagCaixa');
+    if (!cx.classList.contains('hide')) { cx.classList.add('hide'); return; }
+    $('diagTexto').textContent = T('Levantando…', 'Gathering…');
+    cx.classList.remove('hide');
+    $('diagTexto').textContent = await diagnosticar();
+  };
+
+  $('diagCopiar').onclick = async () => {
+    try { await navigator.clipboard.writeText($('diagTexto').textContent); } catch (e) {}
+    $('diagMsg').innerHTML = `<span class="ok">${T('copiado', 'copied')}</span>`;
+  };
+
   /* A versão sai do rodapé, que o build carimba. Ler dali evita um segundo
      lugar para o mesmo número — e um segundo lugar é onde ele fica velho. */
   const VERSAO = (() => {
@@ -5236,6 +5500,7 @@ registerProcessor('toca', Toca);`;
 
   iniciarConta();
   desenharPassos();
+  mostrarPlaca();      // depois de tudo declarado: ela lê armazenamento e escreve HTML
 
   /* ============================================================
      Recuperação. Como cada pedaço é fechado no disco assim que

@@ -5,7 +5,8 @@
    segundos e baixo depois, o que também prova que a janela de trinta segundos
    lê o pedaço certo do arquivo importado. */
 
-import { telaFalsa, paginaLimpa, bloco, transcrever, modeloQueRecusaQuatroBits } from './apoio.mjs';
+import { telaFalsa, telaSemAudio, paginaLimpa, bloco, transcrever,
+         modeloQueRecusaQuatroBits, modeloQueQuebraAoTranscrever } from './apoio.mjs';
 
 const MONTAR_WAV = `(seg => {
   const SR = 16000, n = SR * seg;
@@ -51,6 +52,30 @@ export default async function (ctx, url, erros) {
   await p.selectOption('#modelo', 'onnx-community/whisper-small');
   await p.waitForTimeout(120);
 
+  /* ---------- 0. compartilhou a tela e esqueceu o áudio ----------
+
+     O seletor do navegador tem uma caixa que precisa ser marcada, e esquecê-la
+     é o erro mais comum de todos. Antes, a gravação começava assim mesmo e o
+     defeito só aparecia na ata: no alto-falante, as vozes dos outros entram
+     pelo microfone e tudo sai atribuído a quem gravou. */
+  {
+    const q = await paginaLimpa(ctx, erros);
+    await q.addInitScript(telaSemAudio());
+    await q.goto(url + '/app');
+    await q.check('#okConsent');
+    await q.click('#rec');
+    await q.waitForFunction(() => /sem o áudio|without the audio/i.test(
+      document.getElementById('recMsg').textContent), null, { timeout: 20000 });
+
+    b.verdade('a gravação não começa quando a tela vem sem áudio',
+              await q.isHidden('#stop'));
+    b.verdade('e a tela diz o que fazer, em vez de deixar seguir',
+              /marque a caixa de compartilhar o áudio/i.test(await q.textContent('#recMsg')));
+    b.verdade('com a saída de quem quer gravar só o microfone mesmo assim',
+              !(await q.isHidden('#soMeuMic')));
+    await q.close();
+  }
+
   /* ---------- 0a. o modelo que recusa abrir na placa de vídeo ----------
 
      Isto é a reprodução de uma reunião de verdade. Com a placa marcada, o ONNX
@@ -73,6 +98,53 @@ export default async function (ctx, url, erros) {
               (await q.evaluate(() => window.__salavox.falas().length)) > 0);
     b.conferir('e quem transcreveu foi o processador, no degrau seguinte',
                await q.evaluate(() => window.__salavox.desempenho().motor), 'processador');
+
+    /* Uma vez basta. A caixa se desliga sozinha nesta máquina, com o motivo ao
+       lado — em vez de repetir a mesma parede de C++ a cada reunião. */
+    b.verdade('a caixa da placa se desmarca sozinha depois da falha',
+              await q.evaluate(() => !document.getElementById('placa').checked));
+    b.verdade('e fica travada, para não repetir o mesmo erro',
+              await q.evaluate(() => document.getElementById('placa').disabled === true));
+    b.verdade('com o motivo escrito ao lado',
+              /não conseguiu abrir o modelo/i.test(await q.textContent('#placaMsg')));
+
+    /* Ao reabrir a ferramenta neste navegador, ela continua desligada. */
+    await q.reload();
+    await q.waitForFunction(() => !!window.__salavox, null, { timeout: 15000 });
+    b.verdade('e continua desligada ao abrir a ferramenta de novo',
+              await q.evaluate(() => document.getElementById('placa').disabled === true));
+
+    await q.click('#placaDeNovo');
+    await q.waitForTimeout(150);
+    b.verdade('mas quem quiser insistir tem o "tentar de novo"',
+              await q.evaluate(() => document.getElementById('placa').disabled === false));
+    await q.close();
+  }
+
+  /* ---------- 0a-bis. o modelo que abre e SÓ DEPOIS quebra ----------
+
+     Este é o caso que escapou. O relato veio com o carimbo do build que já
+     tinha a fila de tentativas, e mesmo assim a transcrição parou: montar o
+     modelo deu certo, e a sessão do ONNX quebrou na primeira transcrição — que
+     é quando o arquivo de 4 bits é aberto de verdade. A rede estava só no
+     carregamento, e a queda acontecia depois dela. */
+  {
+    const q = await paginaLimpa(ctx, erros);
+    await q.route('**/@huggingface/transformers@**', r => r.fulfill(modeloQueQuebraAoTranscrever()));
+    await q.addInitScript(telaFalsa(4));
+    await q.goto(url + '/app');
+    await q.check('#placa');
+    await q.evaluate(MONTAR_WAV);
+    await q.waitForFunction(() => /pronto|<span class="err">/.test(document.getElementById('arqMsg').innerHTML),
+                            null, { timeout: 60000 });
+    await transcrever(q);
+
+    b.verdade('a ata sai mesmo quando o modelo só quebra na hora de transcrever',
+              (await q.evaluate(() => window.__salavox.falas().length)) > 0);
+    b.conferir('e o pedido é refeito no processador, sem perder o trecho',
+               await q.evaluate(() => window.__salavox.desempenho().motor), 'processador');
+    b.verdade('a caixa da placa também se desliga neste caminho',
+              await q.evaluate(() => document.getElementById('placa').disabled === true));
     await q.close();
   }
 

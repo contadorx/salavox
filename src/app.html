@@ -96,6 +96,14 @@
                      font-size:13.5px;line-height:1.5}
   label.chk.destaque input{margin-top:3px}
   label.chk.destaque b{color:var(--verde-escuro)}
+  .diagCaixa{background:#fff;border:1px solid var(--linha);border-radius:12px;padding:14px 16px;
+             margin:0 auto 26px}
+  .rodape button{margin-left:10px;background:transparent;color:var(--brilho);border:1px solid rgba(255,255,255,.2);
+                 box-shadow:none;padding:5px 12px;font-size:12.5px}
+  .rodape button:hover{background:rgba(255,255,255,.08);color:#fff;transform:none}
+  .diagCaixa pre{font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;
+                 background:var(--superficie);border-radius:8px;padding:12px 14px;margin:8px 0 12px;
+                 max-height:340px;overflow:auto;color:var(--tinta)}
   .espera{font-size:13.5px;color:var(--muted);margin:-4px 0 0 41px;max-width:640px}
   .card.agora .espera,.card.feito .espera{display:none}
 
@@ -297,9 +305,10 @@
   <div class="faixaConta hide" id="contaCard">
     <span id="contaEstado">—</span>
     <a class="link" href="/conta" id="irConta">sua conta</a>
-    <button id="diagnostico" class="ghost sm hide">Diagnóstico</button>
     <span class="status" id="contaMsg"></span>
   </div>
+
+
 
   <div class="card hide" id="recupCard" style="border-color:var(--warn)">
     <h2 style="color:var(--warn)">Gravação interrompida</h2>
@@ -401,6 +410,7 @@
     <div class="row" style="margin-top:2px">
       <label class="chk"><input type="checkbox" id="compactar" checked> compactar o silêncio antes de transcrever</label>
       <label class="chk"><input type="checkbox" id="placa"> usar a placa de vídeo</label>
+      <div class="status" id="placaMsg" style="flex-basis:100%"></div>
     </div>
     <details class="vocab">
       <summary>Vocabulário do escritório</summary>
@@ -537,8 +547,19 @@
 
 </div>
 
+  <div class="diagCaixa hide wrap" id="diagCaixa">
+    <p class="status">Os fatos desta máquina, para colar num chamado. <b>Não vai reunião nenhuma
+    aqui dentro</b> — nem fala, nem título, nem participante.</p>
+    <pre id="diagTexto" data-usuario></pre>
+    <div class="row">
+      <button class="ghost sm" id="diagCopiar">Copiar</button>
+      <span class="status" id="diagMsg"></span>
+    </div>
+  </div>
+
 <footer class="rodape">
   Salavox versão <code>__VERSAO__</code> — tudo roda neste computador.
+  <button id="diagnostico" class="ghost sm">Diagnóstico</button>
   <a href="/privacidade">privacidade</a><a href="/termos">termos</a><a href="/">site</a>
 </footer>
 <script>/*__IDIOMAS__*/</script>
